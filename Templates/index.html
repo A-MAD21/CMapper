@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Discovery Platform</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i data-feather="globe"></i>
+                    <span>NetDiscover</span>
+                </div>
+                <div class="current-site" id="currentSiteDisplay">No site selected</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-item active" data-tab="dashboard">
+                        <i data-feather="home"></i>
+                        <span>Dashboard</span>
+                    </li>
+                    <li class="nav-item" data-tab="sites">
+                        <i data-feather="map-pin"></i>
+                        <span>Sites</span>
+                    </li>
+                    <li class="nav-item" data-tab="devices">
+                        <i data-feather="server"></i>
+                        <span>Devices</span>
+                    </li>
+                    <li class="nav-item" data-tab="topology">
+                        <i data-feather="share-2"></i>
+                        <span>Topology</span>
+                    </li>
+                    <li class="nav-item" data-tab="settings">
+                        <i data-feather="settings"></i>
+                        <span>Settings</span>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <div class="status-dot active"></div>
+                    <span>System Ready</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <h1 class="page-title" id="pageTitle">Dashboard</h1>
+                    <div class="last-update">Last updated: <span id="lastUpdateTime">--:--:--</span></div>
+                </div>
+                <div class="header-right">
+                    <button class="btn btn-secondary" id="refreshBtn">
+                        <i data-feather="refresh-cw"></i>
+                        Refresh
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Tab -->
+            <div class="tab-content active" id="dashboardTab">
+                <div class="stats-grid" id="statsGrid">
+                    <!-- Real stats will be loaded here -->
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Sites Overview</h2>
+                        <button class="btn btn-primary" id="addSiteBtn">
+                            <i data-feather="plus"></i>
+                            Add Site
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Site Name</th>
+                                    <th>Root IP</th>
+                                    <th>Devices</th>
+                                    <th>Last Scan</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sitesTableBody">
+                                <!-- Real sites will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sites Tab -->
+            <div class="tab-content" id="sitesTab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Manage Sites</h2>
+                        <button class="btn btn-primary" id="addSiteBtn2">
+                            <i data-feather="plus"></i>
+                            Add New Site
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Site Name</th>
+                                    <th>Root IP</th>
+                                    <th>Created</th>
+                                    <th>Devices</th>
+                                    <th>Last Scan</th>
+                                    <th>Locked</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sitesManagementBody">
+                                <!-- Real sites will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Devices Tab -->
+            <div class="tab-content" id="devicesTab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Devices</h2>
+                        <div class="header-actions">
+                            <div class="site-selector">
+                                <select id="deviceSiteFilter">
+                                    <option value="">All Sites</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Device Name</th>
+                                    <th>IP Address</th>
+                                    <th>Site</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Discovered</th>
+                                    <th>Last Seen</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="devicesTableBody">
+                                <!-- Real devices will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Topology Tab -->
+            <div class="tab-content" id="topologyTab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Discovery Modules</h2>
+                        <div class="header-actions">
+                            <div class="site-selector">
+                                <select id="moduleSiteSelect">
+                                    <option value="">Select Site</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modules-grid" id="modulesGrid">
+                        <!-- Real modules will be loaded here -->
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Active Module Jobs</h2>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Module</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                    <th>Started</th>
+                                    <th>Duration</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="moduleJobsBody">
+                                <!-- Active module jobs will be shown here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div class="tab-content" id="settingsTab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Settings</h2>
+                        <button class="btn btn-primary" id="saveSettingsBtn">
+                            <i data-feather="save"></i>
+                            Save Settings
+                        </button>
+                    </div>
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label for="defaultSite">Default Site</label>
+                            <select id="defaultSite">
+                                <option value="">No default site</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="backupPath">Backup Path</label>
+                            <input type="text" id="backupPath" placeholder="./backups">
+                        </div>
+                        <div class="form-group">
+                            <label for="scanDepth">Default Scan Depth</label>
+                            <input type="number" id="scanDepth" min="1" max="10" value="3">
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="autoRefresh">
+                                <span>Auto Refresh</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="refreshInterval">Refresh Interval (seconds)</label>
+                            <input type="number" id="refreshInterval" min="5" max="300" value="30">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Module Runner Modal -->
+            <div class="modal" id="moduleRunnerModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="moduleModalTitle">Run Module</h3>
+                        <button class="btn-icon close-modal">
+                            <i data-feather="x"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="moduleFormContainer">
+                            <!-- Module form will be generated here -->
+                        </div>
+                        <div class="module-status" id="moduleStatusDisplay" style="display: none;">
+                            <div class="status-message"></div>
+                            <div class="progress-bar">
+                                <div class="progress-fill"></div>
+                            </div>
+                            <div class="status-details"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary close-modal">Cancel</button>
+                        <button class="btn btn-primary" id="startModuleBtn">Start Module</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Site Modal -->
+            <div class="modal" id="addSiteModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Add New Site</h3>
+                        <button class="btn-icon close-modal">
+                            <i data-feather="x"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="siteName">Site Name</label>
+                            <input type="text" id="siteName" placeholder="e.g., Ahvaz-Warehouse">
+                        </div>
+                        <div class="form-group">
+                            <label for="siteRootIP">Root IP Address</label>
+                            <input type="text" id="siteRootIP" placeholder="e.g., 10.192.3.2">
+                        </div>
+                        <div class="form-group">
+                            <label for="siteNotes">Notes (Optional)</label>
+                            <textarea id="siteNotes" rows="3" placeholder="Additional information about this site"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary close-modal">Cancel</button>
+                        <button class="btn btn-primary" id="saveSiteBtn">Add Site</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Device Modal -->
+            <div class="modal" id="editDeviceModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Edit Device</h3>
+                        <button class="btn-icon close-modal">
+                            <i data-feather="x"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="editDeviceName">Device Name</label>
+                            <input type="text" id="editDeviceName">
+                        </div>
+                        <div class="form-group">
+                            <label for="editDeviceIP">IP Address</label>
+                            <input type="text" id="editDeviceIP">
+                        </div>
+                        <div class="form-group">
+                            <label for="editDeviceType">Device Type</label>
+                            <select id="editDeviceType">
+                                <option value="router">Router</option>
+                                <option value="switch">Switch</option>
+                                <option value="firewall">Firewall</option>
+                                <option value="ap">Access Point</option>
+                                <option value="server">Server</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editDeviceStatus">Status</label>
+                            <select id="editDeviceStatus">
+                                <option value="online">Online</option>
+                                <option value="offline">Offline</option>
+                                <option value="unknown">Unknown</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editDeviceNotes">Notes</label>
+                            <textarea id="editDeviceNotes" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="editDeviceLocked">
+                                <span>Lock device (prevent module updates)</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary close-modal">Cancel</button>
+                        <button class="btn btn-primary" id="updateDeviceBtn">Update Device</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+    <script>
+        // Initialize Feather icons
+        feather.replace();
+        
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDashboard();
+        });
+    </script>
+</body>
+</html>

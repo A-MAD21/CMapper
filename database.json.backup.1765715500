@@ -1,0 +1,67 @@
+{
+  "version": "1.0",
+  "meta": {
+    "created": "2025-12-14T15:06:43.093176",
+    "last_modified": "2025-12-14T15:30:29.299378"
+  },
+  "sites": [
+    {
+      "id": "e55f9a11",
+      "name": "Roodan",
+      "root_ip": "10.192.178.1",
+      "created": "2025-12-14T15:30:29.299369",
+      "last_scan": "2025-12-14T16:00:58.175191",
+      "locked": false,
+      "notes": ""
+    }
+  ],
+  "devices": [
+    {
+      "id": "dev_9dcf0a03",
+      "site": "Roodan",
+      "name": "CDP-Root-10.192.178.2",
+      "ip": "10.192.178.2",
+      "type": "router",
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-14T16:00:18.666790",
+      "last_seen": "2025-12-14T16:00:18.666814",
+      "last_modified": "2025-12-14T16:00:18.666815",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [],
+      "credentials_used": "admin",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "locked": false,
+      "notes": "CDP discovery root device"
+    },
+    {
+      "id": "dev_5fd0f1ec",
+      "site": "Roodan",
+      "name": "CDP-Root-10.192.178.2",
+      "ip": "10.192.178.2",
+      "type": "router",
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-14T16:00:56.692397",
+      "last_seen": "2025-12-14T16:00:56.692420",
+      "last_modified": "2025-12-14T16:00:56.692421",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [],
+      "credentials_used": "kordestani",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "locked": false,
+      "notes": "CDP discovery root device"
+    }
+  ],
+  "discovery_sessions": []
+}

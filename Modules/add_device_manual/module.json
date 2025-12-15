@@ -1,0 +1,39 @@
+{
+  "id": "add_device_manual",
+  "name": "Add Device Manually",
+  "version": "1.0",
+  "description": "Manually add a device to the inventory",
+  "author": "System",
+  "entry_point": "add_device.py",
+  "inputs": [
+    {
+      "name": "ip",
+      "type": "text",
+      "required": true,
+      "label": "IP Address",
+      "placeholder": "192.168.1.1"
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true,
+      "label": "Device Name",
+      "placeholder": "router-01"
+    },
+    {
+      "name": "device_type",
+      "type": "select",
+      "required": false,
+      "default": "router",
+      "options": ["router", "switch", "firewall", "ap", "server"],
+      "label": "Device Type"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "device_added",
+      "type": "boolean",
+      "description": "Whether device was added"
+    }
+  ]
+}

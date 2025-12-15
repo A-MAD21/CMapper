@@ -1,0 +1,1 @@
+{"site_name": "Roodan", "parameters": {"root_ip": "10.192.178.2", "subnet_mask": "24", "username": "admin", "password": "123456", "max_hops": "5"}, "database_path": "D:\\Net Automation\\SW mapper\\Test1\\database.json", "module_id": "cdp_discovery", "thread_id": "9ef2395b"}

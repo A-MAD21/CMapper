@@ -1,0 +1,64 @@
+{
+  "id": "cdp_discovery",
+  "name": "CDP Discovery",
+  "version": "1.0",
+  "description": "Discover network devices using CDP protocol",
+  "author": "System",
+  "entry_point": "cdp_module.py",
+  "inputs": [
+    {
+      "name": "root_ip",
+      "type": "text",
+      "required": true,
+      "label": "Starting IP Address",
+      "placeholder": "10.192.178.1",
+      "description": "IP address of the first device to scan"
+    },
+    {
+      "name": "subnet_mask",
+      "type": "select",
+      "required": false,
+      "default": "24",
+      "options": ["16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"],
+      "label": "Subnet Mask",
+      "description": "Stop discovery when IP is outside this subnet"
+    },
+    {
+      "name": "username",
+      "type": "text",
+      "required": true,
+      "label": "SSH Username",
+      "placeholder": "admin"
+    },
+    {
+      "name": "password",
+      "type": "password",
+      "required": true,
+      "label": "SSH Password",
+      "placeholder": "••••••••",
+      "description": "Password will be hidden"
+    },
+    {
+      "name": "max_hops",
+      "type": "number",
+      "required": false,
+      "default": 5,
+      "label": "Maximum Hops",
+      "description": "Maximum CDP hops from starting device (1-10)",
+      "min": 1,
+      "max": 10
+    }
+  ],
+  "outputs": [
+    {
+      "name": "devices_found",
+      "type": "number",
+      "description": "Number of devices discovered"
+    },
+    {
+      "name": "connections_found",
+      "type": "number",
+      "description": "Number of connections discovered"
+    }
+  ]
+}

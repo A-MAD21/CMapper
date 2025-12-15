@@ -1,0 +1,12 @@
+{
+  "site_name": "TestSite",
+  "parameters": {
+    "root_ip": "10.192.178.2",
+    "username": "kordestani",
+    "password": "123456",
+    "subnet_mask": "24",
+    "max_hops": 3
+  },
+  "database_path": "database.json",
+  "module_id": "cdp_discovery"
+}

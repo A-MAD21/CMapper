@@ -1,0 +1,485 @@
+{
+  "version": "1.0",
+  "meta": {
+    "created": "2025-12-14T15:06:43.093176",
+    "last_modified": "2025-12-14T16:01:43.512771"
+  },
+  "sites": [
+    {
+      "id": "e55f9a11",
+      "name": "Roodan",
+      "root_ip": "10.192.178.1",
+      "created": "2025-12-14T15:30:29.299369",
+      "last_scan": "2025-12-15T12:25:46.209206",
+      "locked": false,
+      "notes": ""
+    }
+  ],
+  "devices": [
+    {
+      "id": "dev_5beecadf",
+      "site": "Roodan",
+      "name": "Device-10.192.178.2",
+      "ip": "10.192.178.2",
+      "type": "unknown",
+      "model": "",
+      "platform": "cisco WS-C2960S-48FPS-L",
+      "capabilities": "",
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-14T16:56:19.419260",
+      "last_seen": "2025-12-15T12:24:20.598697",
+      "last_modified": "2025-12-14T16:56:19.419360",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [
+        {
+          "id": "conn_0a8845ec",
+          "local_interface": "GigabitEthernet1/0/42",
+          "remote_device": "dev_cc3a85f4",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T16:56:19.419870",
+          "status": "up"
+        },
+        {
+          "id": "conn_62bec038",
+          "local_interface": "GigabitEthernet1/0/40",
+          "remote_device": "dev_683fb499",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T16:56:19.420482",
+          "status": "up"
+        },
+        {
+          "id": "conn_502b24b6",
+          "local_interface": "GigabitEthernet1/0/47",
+          "remote_device": "dev_385652c8",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T16:56:19.421537",
+          "status": "up"
+        },
+        {
+          "id": "conn_6ceed9b1",
+          "local_interface": "GigabitEthernet1/0/39",
+          "remote_device": "dev_5f5a1277",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T16:56:19.421876",
+          "status": "up"
+        },
+        {
+          "id": "conn_848f7f2d",
+          "local_interface": "GigabitEthernet1/0/42",
+          "remote_device": "dev_cc3a85f4",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T17:04:20.346334",
+          "status": "up"
+        },
+        {
+          "id": "conn_3aaf5186",
+          "local_interface": "GigabitEthernet1/0/40",
+          "remote_device": "dev_683fb499",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T17:04:20.346390",
+          "status": "up"
+        },
+        {
+          "id": "conn_7d2522d0",
+          "local_interface": "GigabitEthernet1/0/47",
+          "remote_device": "dev_385652c8",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T17:04:20.346474",
+          "status": "up"
+        },
+        {
+          "id": "conn_b610950f",
+          "local_interface": "GigabitEthernet1/0/39",
+          "remote_device": "dev_5f5a1277",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T17:04:20.346510",
+          "status": "up"
+        },
+        {
+          "id": "conn_ce20bcef",
+          "local_interface": "GigabitEthernet1/0/42",
+          "remote_device": "dev_cc3a85f4",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T17:06:06.209262",
+          "status": "up"
+        },
+        {
+          "id": "conn_9b4801b0",
+          "local_interface": "GigabitEthernet1/0/40",
+          "remote_device": "dev_683fb499",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T17:06:06.209445",
+          "status": "up"
+        },
+        {
+          "id": "conn_4ea42909",
+          "local_interface": "GigabitEthernet1/0/47",
+          "remote_device": "dev_385652c8",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T17:06:06.209728",
+          "status": "up"
+        },
+        {
+          "id": "conn_00352764",
+          "local_interface": "GigabitEthernet1/0/39",
+          "remote_device": "dev_5f5a1277",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T17:06:06.209854",
+          "status": "up"
+        },
+        {
+          "id": "conn_2216d279",
+          "local_interface": "GigabitEthernet1/0/42",
+          "remote_device": "dev_cc3a85f4",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-15T12:18:13.084370",
+          "status": "up"
+        },
+        {
+          "id": "conn_748cc432",
+          "local_interface": "GigabitEthernet1/0/40",
+          "remote_device": "dev_683fb499",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-15T12:18:13.084464",
+          "status": "up"
+        },
+        {
+          "id": "conn_fab2ce2e",
+          "local_interface": "GigabitEthernet1/0/47",
+          "remote_device": "dev_385652c8",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-15T12:18:13.084616",
+          "status": "up"
+        },
+        {
+          "id": "conn_1894e2da",
+          "local_interface": "GigabitEthernet1/0/39",
+          "remote_device": "dev_5f5a1277",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-15T12:18:13.084681",
+          "status": "up"
+        }
+      ],
+      "credentials_used": "kordestani",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "modules_failed": [],
+      "locked": false,
+      "notes": "Discovered via CDP from 10.192.178.4"
+    },
+    {
+      "id": "dev_cc3a85f4",
+      "site": "Roodan",
+      "name": "RW-Bandar.OKCO.ir",
+      "ip": "10.192.178.1",
+      "type": "unknown",
+      "model": "",
+      "platform": "Cisco CISCO2911/K9",
+      "capabilities": null,
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-14T16:56:19.419773",
+      "last_seen": "2025-12-15T12:24:20.599052",
+      "last_modified": "2025-12-14T16:56:19.419802",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [],
+      "credentials_used": "kordestani",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "modules_failed": [],
+      "locked": false,
+      "notes": "Discovered via CDP from 10.192.178.2"
+    },
+    {
+      "id": "dev_683fb499",
+      "site": "Roodan",
+      "name": "Sw4-Dry-BalayeEdari.OKCO.ir",
+      "ip": "10.192.178.4",
+      "type": "unknown",
+      "model": "",
+      "platform": "cisco WS-C2960S-48FPS-L",
+      "capabilities": null,
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-14T16:56:19.420251",
+      "last_seen": "2025-12-15T12:24:20.599100",
+      "last_modified": "2025-12-14T16:56:19.420330",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [
+        {
+          "id": "conn_3201dda8",
+          "local_interface": "GigabitEthernet1/0/48",
+          "remote_device": "dev_5beecadf",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T17:05:24.402301",
+          "status": "up"
+        },
+        {
+          "id": "conn_74c7acc3",
+          "local_interface": "GigabitEthernet1/0/46",
+          "remote_device": "dev_b1d768a2",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T17:05:24.402454",
+          "status": "up"
+        },
+        {
+          "id": "conn_22aded47",
+          "local_interface": "GigabitEthernet1/0/46",
+          "remote_device": "dev_1b4e5150",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-14T17:05:24.402580",
+          "status": "up"
+        }
+      ],
+      "credentials_used": "kordestani",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "modules_failed": [],
+      "locked": false,
+      "notes": "Discovered via CDP from 10.192.178.2"
+    },
+    {
+      "id": "dev_385652c8",
+      "site": "Roodan",
+      "name": "BAbbad-DHCP",
+      "ip": "10.192.178.253",
+      "type": "unknown",
+      "model": "",
+      "platform": "MikroTik",
+      "capabilities": null,
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-14T16:56:19.420971",
+      "last_seen": "2025-12-15T12:24:20.599160",
+      "last_modified": "2025-12-14T16:56:19.420999",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [],
+      "credentials_used": "kordestani",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "modules_failed": [],
+      "locked": false,
+      "notes": "Discovered via CDP from 10.192.178.2"
+    },
+    {
+      "id": "dev_5f5a1277",
+      "site": "Roodan",
+      "name": "sw3-Dry-Buffer.OKCO.ir",
+      "ip": "10.192.178.3",
+      "type": "unknown",
+      "model": "",
+      "platform": "cisco WS-C2960S-48FPS-L",
+      "capabilities": null,
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-14T16:56:19.421796",
+      "last_seen": "2025-12-15T12:24:20.599192",
+      "last_modified": "2025-12-14T16:56:19.421822",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [
+        {
+          "id": "conn_6e73cfa8",
+          "local_interface": "GigabitEthernet1/0/48",
+          "remote_device": "dev_5beecadf",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-15T12:24:54.216683",
+          "status": "up"
+        },
+        {
+          "id": "conn_2b705e7c",
+          "local_interface": "GigabitEthernet1/0/47",
+          "remote_device": "dev_ca88c00d",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-15T12:24:54.216765",
+          "status": "up"
+        }
+      ],
+      "credentials_used": "kordestani",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "modules_failed": [],
+      "locked": false,
+      "notes": "Discovered via CDP from 10.192.178.2"
+    },
+    {
+      "id": "dev_b1d768a2",
+      "site": "Roodan",
+      "name": "SXT-Babbas2",
+      "ip": "10.192.178.145",
+      "type": "unknown",
+      "model": "",
+      "platform": "MikroTik",
+      "capabilities": null,
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-14T17:05:24.402404",
+      "last_seen": "2025-12-15T12:24:35.846774",
+      "last_modified": "2025-12-14T17:05:24.402415",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [],
+      "credentials_used": "kordestani",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "modules_failed": [],
+      "locked": false,
+      "notes": "Discovered via CDP from 10.192.178.4"
+    },
+    {
+      "id": "dev_1b4e5150",
+      "site": "Roodan",
+      "name": "SXT-Babbas1",
+      "ip": "10.192.178.144",
+      "type": "unknown",
+      "model": "",
+      "platform": "MikroTik",
+      "capabilities": null,
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-14T17:05:24.402538",
+      "last_seen": "2025-12-15T12:24:35.847013",
+      "last_modified": "2025-12-14T17:05:24.402548",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [],
+      "credentials_used": "kordestani",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "modules_failed": [],
+      "locked": false,
+      "notes": "Discovered via CDP from 10.192.178.4"
+    },
+    {
+      "id": "dev_ca88c00d",
+      "site": "Roodan",
+      "name": "Sw5-Dry-akhar.OKCO.ir",
+      "ip": "10.192.178.5",
+      "type": "unknown",
+      "model": "",
+      "platform": "cisco WS-C2960S-48FPS-L",
+      "capabilities": null,
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-15T12:24:54.216746",
+      "last_seen": "2025-12-15T12:24:54.216749",
+      "last_modified": "2025-12-15T12:24:54.216750",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [
+        {
+          "id": "conn_e068c696",
+          "local_interface": "GigabitEthernet1/0/48",
+          "remote_device": "dev_5f5a1277",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-15T12:25:39.878649",
+          "status": "up"
+        },
+        {
+          "id": "conn_60ade13b",
+          "local_interface": "GigabitEthernet1/0/47",
+          "remote_device": "dev_89233579",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-15T12:25:39.878732",
+          "status": "up"
+        }
+      ],
+      "credentials_used": "kordestani",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "modules_failed": [],
+      "locked": false,
+      "notes": "Discovered via CDP from 10.192.178.3"
+    },
+    {
+      "id": "dev_89233579",
+      "site": "Roodan",
+      "name": "SW6-Cold-Akhar.OKCO.ir",
+      "ip": "10.192.178.6",
+      "type": "unknown",
+      "model": "",
+      "platform": "cisco WS-C2960S-48FPS-L",
+      "capabilities": null,
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-15T12:25:39.878714",
+      "last_seen": "2025-12-15T12:25:39.878717",
+      "last_modified": "2025-12-15T12:25:39.878719",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [
+        {
+          "id": "conn_ce0055e4",
+          "local_interface": "GigabitEthernet2/0/48",
+          "remote_device": "dev_ca88c00d",
+          "remote_interface": null,
+          "protocol": "cdp",
+          "discovered_at": "2025-12-15T12:25:45.208709",
+          "status": "up"
+        }
+      ],
+      "credentials_used": "kordestani",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "modules_failed": [],
+      "locked": false,
+      "notes": "Discovered via CDP from 10.192.178.5"
+    }
+  ],
+  "discovery_sessions": []
+}

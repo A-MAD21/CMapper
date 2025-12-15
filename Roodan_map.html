@@ -1,0 +1,94 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Network Map - Roodan</title>
+        <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                background-color: #0f172a;
+                color: #e5e7eb;
+            }
+            #network {
+                width: 100%;
+                height: 800px;
+                border: 1px solid #1e293b;
+                border-radius: 8px;
+                background-color: #020617;
+            }
+            .header {
+                margin-bottom: 20px;
+            }
+            .stats {
+                background-color: #1e293b;
+                padding: 10px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>Network Map: Roodan</h1>
+            <p>Generated: 2025-12-14 15:40:46</p>
+        </div>
+        
+        <div class="stats">
+            <p>Devices: 0 | Connections: 0</p>
+        </div>
+        
+        <div id="network"></div>
+        
+        <script type="text/javascript">
+            var nodes = new vis.DataSet([]);
+            var edges = new vis.DataSet([]);
+            
+            var container = document.getElementById('network');
+            var data = {
+                nodes: nodes,
+                edges: edges
+            };
+            
+            var options = {
+                nodes: {
+                    shape: 'dot',
+                    size: 20,
+                    font: {
+                        size: 12,
+                        color: '#e5e7eb'
+                    },
+                    borderWidth: 2
+                },
+                edges: {
+                    width: 2,
+                    color: {
+                        color: '#475569',
+                        highlight: '#D71920'
+                    },
+                    font: {
+                        size: 10,
+                        color: '#94a3b8'
+                    },
+                    smooth: {
+                        type: 'continuous'
+                    }
+                },
+                physics: {
+                    enabled: true,
+                    stabilization: {
+                        iterations: 100
+                    }
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 200
+                }
+            };
+            
+            var network = new vis.Network(container, data, options);
+        </script>
+    </body>
+    </html>
+    
