@@ -10,9 +10,18 @@
       "name": "Roodan",
       "root_ip": "10.192.178.1",
       "created": "2025-12-14T15:30:29.299369",
-      "last_scan": "2025-12-15T12:25:46.209206",
+      "last_scan": "2025-12-16T11:58:30.409904",
       "locked": false,
       "notes": ""
+    },
+    {
+      "id": "83273945",
+      "name": "Roodan-New",
+      "root_ip": "10.192.178.2",
+      "created": "2025-12-16T16:20:01.556313",
+      "last_scan": "2025-12-16T16:21:33.469439",
+      "locked": false,
+      "notes": "bandar"
     }
   ],
   "devices": [
@@ -27,10 +36,10 @@
       "capabilities": "",
       "discovered_by": "cdp_discovery",
       "discovered_at": "2025-12-14T16:56:19.419260",
-      "last_seen": "2025-12-15T12:24:20.598697",
+      "last_seen": "2025-12-16T11:58:30.409851",
       "last_modified": "2025-12-14T16:56:19.419360",
-      "status": "online",
-      "reachable": true,
+      "status": "unreachable",
+      "reachable": false,
       "config_backup": {
         "enabled": false
       },
@@ -348,14 +357,14 @@
       "site": "Roodan",
       "name": "SXT-Babbas2",
       "ip": "10.192.178.145",
-      "type": "unknown",
+      "type": "other",
       "model": "",
       "platform": "MikroTik",
       "capabilities": null,
       "discovered_by": "cdp_discovery",
       "discovered_at": "2025-12-14T17:05:24.402404",
       "last_seen": "2025-12-15T12:24:35.846774",
-      "last_modified": "2025-12-14T17:05:24.402415",
+      "last_modified": "2025-12-16T12:40:12.881440",
       "status": "online",
       "reachable": true,
       "config_backup": {
@@ -479,6 +488,33 @@
       "modules_failed": [],
       "locked": false,
       "notes": "Discovered via CDP from 10.192.178.5"
+    },
+    {
+      "id": "dev_571de1f0",
+      "site": "Roodan-New",
+      "name": "Device-10.192.178.2",
+      "ip": "10.192.178.2",
+      "type": "unknown",
+      "model": "",
+      "platform": "",
+      "capabilities": "",
+      "discovered_by": "cdp_discovery",
+      "discovered_at": "2025-12-16T16:21:33.469318",
+      "last_seen": "2025-12-16T16:21:33.469383",
+      "last_modified": "2025-12-16T16:21:33.469387",
+      "status": "online",
+      "reachable": true,
+      "config_backup": {
+        "enabled": false
+      },
+      "connections": [],
+      "credentials_used": "kordestani",
+      "modules_successful": [
+        "cdp_discovery"
+      ],
+      "modules_failed": [],
+      "locked": false,
+      "notes": "Discovered via CDP"
     }
   ],
   "discovery_sessions": []

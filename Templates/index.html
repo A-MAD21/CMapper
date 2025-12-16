@@ -29,13 +29,17 @@
                         <i data-feather="map-pin"></i>
                         <span>Sites</span>
                     </li>
-                    <li class="nav-item" data-tab="devices">
+                                        <li class="nav-item" data-tab="devices">
                         <i data-feather="server"></i>
                         <span>Devices</span>
                     </li>
                     <li class="nav-item" data-tab="topology">
                         <i data-feather="share-2"></i>
                         <span>Topology</span>
+                    </li>
+                    <li class="nav-item" data-tab="map">
+                        <i data-feather="map"></i>
+                        <span>Map</span>
                     </li>
                     <li class="nav-item" data-tab="settings">
                         <i data-feather="settings"></i>
@@ -210,7 +214,80 @@
                     </div>
                 </div>
             </div>
+                        <!-- Map Tab -->
+            <div class="tab-content" id="mapTab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Network Topology Map</h2>
+                        <div class="header-actions">
+                            <div class="site-selector">
+                                <select id="mapSiteSelect">
+                                    <option value="">Select Site</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                                <button class="btn btn-primary" id="showTextMapBtn">
+                                    <i data-feather="list"></i> Text Map
+                                </button>
+                                <button class="btn btn-primary" id="showVisualMapBtn">
+                                    <i data-feather="layout"></i> Visual Map
+                                </button>
+                                <button class="btn btn-success" id="generateMapBtn">
+                                    <i data-feather="refresh-cw"></i> Generate Maps
+                                </button>
+                            </div>
+                            <button class="btn btn-success" id="generateMapBtn">
+                                <i data-feather="refresh-cw"></i>
+                                Generate Map
+                            </button>
+                            <button class="btn btn-primary" id="showMapBtn" disabled>
+                                <i data-feather="eye"></i>
+                                Show Map
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="map-container" id="mapContainer" style="padding: 24px; display: none;">
+                        <div class="map-controls" style="margin-bottom: 16px; display: flex; gap: 12px;">
+                            <button class="btn btn-secondary" id="refreshMapBtn">
+                                <i data-feather="refresh-cw"></i>
+                                Refresh
+                            </button>
+                            <button class="btn btn-secondary" id="fullscreenBtn">
+                                <i data-feather="maximize"></i>
+                                Fullscreen
+                            </button>
+                        </div>
+                        
+                        <iframe id="mapFrame" 
+                                src="" 
+                                style="width: 100%; height: 600px; border: 1px solid var(--border-color); border-radius: 12px; display: none;">
+                        </iframe>
+                        
+                        <div id="noMapMessage" class="empty-state" style="text-align: center; padding: 48px 24px;">
+                            <i data-feather="map" style="width: 48px; height: 48px; margin-bottom: 16px;"></i>
+                            <h3 style="margin-bottom: 8px;">No Map Available</h3>
+                            <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                                Select a site and click "Show Map" to view the network topology
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
+            <!-- Settings Tab -->
+            <div class="tab-content" id="settingsTab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Settings</h2>
+                        <button class="btn btn-primary" id="saveSettingsBtn">
+                            <i data-feather="save"></i>
+                            Save Settings
+                        </button>
+                    </div>
+                    <!-- ... rest of settings content ... -->
+                </div>
+            </div>    
             <!-- Settings Tab -->
             <div class="tab-content" id="settingsTab">
                 <div class="card">

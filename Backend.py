@@ -3,7 +3,7 @@
 Network Discovery Platform - COMPLETE WORKING BACKEND
 """
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file
 import json
 import os
 import threading
@@ -330,6 +330,44 @@ def handle_sites():
         
         return jsonify(new_site)
 
+
+@app.route('/api/generate_map', methods=['POST'])
+def api_generate_map():
+    """Generate map from database"""
+    try:
+        # Import the generator function
+        from generate_map import generate_map_from_database
+        
+        result = generate_map_from_database()
+        
+        if result.get('status') == 'success':
+            return jsonify({
+                "success": True,
+                "message": result['message'],
+                "map_url": "/static/maps/Roodan_map.html",
+                "device_count": result['device_count'],
+                "connection_count": result['connection_count']
+            })
+        else:
+            return jsonify({"error": result.get('message', 'Unknown error')}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    """Generate a map from current database"""
+    try:
+        # Run the map generator
+        result = generate_map_from_database()
+        
+        return jsonify({
+            "success": True,
+            "message": "Map generated successfully",
+            "file_path": result,
+            "file_url": "/static/maps/Roodan_map.html"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/sites/<site_id>', methods=['PUT', 'DELETE'])
 def handle_site(site_id):
     """Update or delete a site"""
@@ -457,6 +495,96 @@ def get_module_status(thread_id):
 def get_all_module_status():
     """Get status of all modules"""
     return jsonify(module_runner.get_all_status())
+
+
+@app.route('/static/maps/<filename>')
+def serve_map_file(filename):
+    """Serve map HTML files directly"""
+    try:
+        # Clean filename to prevent directory traversal
+        filename = os.path.basename(filename)
+        
+        # Look for the file directly
+        if os.path.exists(filename):
+            return send_file(filename)
+        
+        # Try with maps/ prefix
+        maps_path = f"maps/{filename}"
+        if os.path.exists(maps_path):
+            return send_file(maps_path)
+        
+        # Fallback to Roodan_map.html
+        if os.path.exists("Roodan_map.html"):
+            return send_file("Roodan_map.html")
+        
+        return jsonify({
+            "error": f"Map file '{filename}' not found",
+            "checked_paths": [filename, maps_path, "Roodan_map.html"]
+        }), 404
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/debug/files')
+def debug_files():
+    """Debug endpoint to see available files"""
+    import glob
+    
+    files = []
+    patterns = ["*.html", "maps/*.html", "*_map.html"]
+    
+    for pattern in patterns:
+        for filepath in glob.glob(pattern):
+            files.append({
+                "name": os.path.basename(filepath),
+                "path": filepath,
+                "size": os.path.getsize(filepath) if os.path.exists(filepath) else 0,
+                "exists": os.path.exists(filepath)
+            })
+    
+    return jsonify({
+        "current_dir": os.getcwd(),
+        "files": files,
+        "has_roodan": os.path.exists("Roodan_map.html")
+    })
+
+@app.route('/api/map/<site_name>')
+def get_map_for_site(site_name):
+    """Get map URL for a specific site"""
+    try:
+        # Check for map files in common locations
+        possible_paths = [
+            f"{site_name}_map.html",
+            f"maps/{site_name}_map.html", 
+            f"{site_name}/map.html",
+            "Roodan_map.html",  # Default fallback
+            "maps/Roodan_map.html"
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                return jsonify({
+                    "map_url": f"/static/maps/{os.path.basename(path)}",
+                    "site": site_name,
+                    "file_exists": True,
+                    "path": path
+                })
+        
+        # If no map found
+        return jsonify({
+            "error": f"No map found for site '{site_name}'",
+            "map_url": None,
+            "file_exists": False,
+            "suggestion": "Run topology discovery first"
+        }), 404
+        
+    except Exception as e:
+        return jsonify({
+            "error": str(e),
+            "map_url": None
+        }), 500
+
 
 @app.route('/api/settings', methods=['GET', 'PUT'])
 def handle_settings():

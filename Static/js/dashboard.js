@@ -11,6 +11,10 @@ class NetworkPlatform {
         this.settings = {};
         this.modules = [];
         
+        // ADD MAP-SPECIFIC PROPERTIES
+        this.mapLoaded = false;
+        this.currentMapSite = '';
+        
         // Initialize
         this.initEventListeners();
         this.loadSettings();
@@ -21,6 +25,133 @@ class NetworkPlatform {
     }
 
     // ==================== INITIALIZATION ====================
+        // ==================== MAP TAB METHODS ====================
+        
+
+    updateMapTab() {
+        const siteSelect = document.getElementById('mapSiteSelect');
+        if (!siteSelect) return;
+        
+        // Store current selection
+        const currentValue = siteSelect.value;
+        
+        // Clear and repopulate
+        siteSelect.innerHTML = '<option value="">Select Site</option>';
+        
+        if (this.sites && this.sites.length > 0) {
+            this.sites.forEach(site => {
+                const option = document.createElement('option');
+                option.value = site.name;
+                option.textContent = site.name;
+                
+                // Auto-select current site
+                if (site.name === this.currentSite) {
+                    option.selected = true;
+                }
+                
+                siteSelect.appendChild(option);
+            });
+        }
+        
+        // Restore selection if it exists
+        if (currentValue) {
+            const optionExists = Array.from(siteSelect.options).some(opt => opt.value === currentValue);
+            if (optionExists) {
+                siteSelect.value = currentValue;
+            }
+        }
+        
+        // Update Show Map button
+        this.updateShowMapButton();
+    }
+
+    updateShowMapButton() {
+        const siteSelect = document.getElementById('mapSiteSelect');
+        const showMapBtn = document.getElementById('showMapBtn');
+        
+        if (!siteSelect || !showMapBtn) return;
+        
+        showMapBtn.disabled = !siteSelect.value;
+    }
+
+    async loadMapForSite(siteName) {
+        const mapContainer = document.getElementById('mapContainer');
+        const mapFrame = document.getElementById('mapFrame');
+        const noMapMessage = document.getElementById('noMapMessage');
+        const showMapBtn = document.getElementById('showMapBtn');
+        
+        if (!mapContainer || !mapFrame || !noMapMessage || !showMapBtn) {
+            console.error('Map elements not found');
+            return;
+        }
+        
+        // Show loading state
+        showMapBtn.innerHTML = '<i data-feather="loader"></i> Loading...';
+        showMapBtn.disabled = true;
+        feather.replace();
+        
+        // Show map container
+        mapContainer.style.display = 'block';
+        noMapMessage.style.display = 'none';
+        mapFrame.style.display = 'none';
+        
+        // Save current map site
+        this.currentMapSite = siteName;
+        
+        try {
+            // Try to load the map
+            const response = await fetch(`/api/map/${encodeURIComponent(siteName)}`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                if (data.map_url) {
+                    // Map exists
+                    mapFrame.src = data.map_url;
+                    mapFrame.style.display = 'block';
+                    noMapMessage.style.display = 'none';
+                    this.mapLoaded = true;
+                } else {
+                    throw new Error('No map URL in response');
+                }
+            } else {
+                // No map available
+                this.showNoMapMessage(siteName);
+                this.mapLoaded = false;
+            }
+        } catch (error) {
+            console.error('Error loading map:', error);
+            this.showNoMapMessage(siteName);
+            this.mapLoaded = false;
+        } finally {
+            // Reset button
+            showMapBtn.innerHTML = '<i data-feather="eye"></i> Show Map';
+            showMapBtn.disabled = false;
+            feather.replace();
+        }
+    }
+
+    showNoMapMessage(siteName) {
+        const mapFrame = document.getElementById('mapFrame');
+        const noMapMessage = document.getElementById('noMapMessage');
+        
+        mapFrame.style.display = 'none';
+        noMapMessage.style.display = 'block';
+        noMapMessage.innerHTML = `
+            <i data-feather="map" style="width: 48px; height: 48px; margin-bottom: 16px;"></i>
+            <h3 style="margin-bottom: 8px;">No Map Generated</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                Run topology discovery for "${siteName}" first to generate a map
+            </p>
+            <button class="btn btn-primary" onclick="platform.switchTab('topology')">
+                <i data-feather="share-2"></i>
+                Go to Topology
+            </button>
+        `;
+        feather.replace();
+    }
+    
+        // ==================== INITIALIZATION ====================
 
     initEventListeners() {
         // Tab navigation
@@ -56,13 +187,74 @@ class NetworkPlatform {
             this.updateCurrentSiteDisplay();
         });
 
+        // Generate map button
+document.getElementById('generateMapBtn')?.addEventListener('click', function() {
+    const btn = this;
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i data-feather="loader"></i> Generating...';
+    btn.disabled = true;
+    feather.replace();
+    
+    fetch('/api/generate_map', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            platform.showMessage(`Map generated with ${data.device_count} devices!`);
+            // Auto-load the new map
+            const siteName = document.getElementById('mapSiteSelect').value;
+            if (siteName) {
+                platform.loadMapForSite(siteName);
+            }
+        } else {
+            platform.showError(data.error || 'Failed to generate map');
+        }
+    })
+    .catch(err => {
+        platform.showError('Error generating map');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        feather.replace();
+    });
+});
+
         // Modal close buttons
         document.querySelectorAll('.close-modal').forEach(btn => {
             btn.addEventListener('click', () => {
                 this.closeAllModals();
             });
         });
+// Show text map
+document.getElementById('showTextMapBtn')?.addEventListener('click', () => {
+    const siteName = document.getElementById('mapSiteSelect').value;
+    if (siteName) {
+        // Load text map
+        document.getElementById('mapFrame').src = '/static/maps/Roodan_map.html';
+    }
+});
 
+// Show visual map  
+document.getElementById('showVisualMapBtn')?.addEventListener('click', () => {
+    const siteName = document.getElementById('mapSiteSelect').value;
+    if (siteName) {
+        // Load visual map
+        document.getElementById('mapFrame').src = '/static/maps/Roodan_visual_map.html';
+    }
+});
+
+// Generate both maps
+document.getElementById('generateMapBtn')?.addEventListener('click', async () => {
+    // Generate text map
+    await fetch('/api/generate_text_map', { method: 'POST' });
+    // Generate visual map  
+    await fetch('/api/generate_visual_map', { method: 'POST' });
+    platform.showMessage('Both maps generated!');
+});
         // Edit Device
         document.getElementById('updateDeviceBtn').addEventListener('click', () => {
             this.updateDevice();
@@ -72,45 +264,79 @@ class NetworkPlatform {
         document.getElementById('saveSettingsBtn').addEventListener('click', () => {
             this.saveSettings();
         });
+
+        // ==================== MAP TAB EVENT LISTENERS ====================
+        
+        // Map site selection
+        document.getElementById('mapSiteSelect')?.addEventListener('change', (e) => {
+            this.updateShowMapButton();
+        });
+        
+        // Show Map button
+        document.getElementById('showMapBtn')?.addEventListener('click', () => {
+            const siteName = document.getElementById('mapSiteSelect').value;
+            if (siteName) {
+                this.currentSite = siteName;
+                this.updateCurrentSiteDisplay();
+                this.loadMapForSite(siteName);
+            }
+        });
+        
+        // Refresh map button
+        document.getElementById('refreshMapBtn')?.addEventListener('click', () => {
+            const siteName = document.getElementById('mapSiteSelect').value;
+            if (siteName) {
+                this.loadMapForSite(siteName);
+            }
+        });
+        
+        // Fullscreen button
+        document.getElementById('fullscreenBtn')?.addEventListener('click', () => {
+            const mapFrame = document.getElementById('mapFrame');
+            if (mapFrame.src) {
+                window.open(mapFrame.src, '_blank');
+            }
+        });
     }
 
     // ==================== DATA LOADING ====================
 
     async loadData() {
-        try {
-            this.showLoading(true);
-            
-            // Load all data in parallel
-            const [sites, devices, stats, modules] = await Promise.all([
-                this.fetchData('/api/sites'),
-                this.fetchData('/api/devices'),
-                this.fetchData('/api/stats'),
-                this.fetchData('/api/modules')
-            ]);
-            
-            // Update UI
-            this.sites = sites || [];
-            this.devices = devices || [];
-            this.modules = modules || [];
-            this.stats = stats || {};
-            
-            this.updateDashboard();
-            this.updateSitesTab();
-            this.updateDevicesTab();
-            this.updateTopologyTab();
-            this.updateSettingsTab();
-            this.updateCurrentSiteDisplay();
-            
-            // Update time display
-            this.updateTimeDisplay();
-            
-        } catch (error) {
-            console.error('Error loading data:', error);
-            this.showError('Failed to load data');
-        } finally {
-            this.showLoading(false);
-        }
+    try {
+        this.showLoading(true);
+        
+        // Load all data in parallel
+        const [sites, devices, stats, modules] = await Promise.all([
+            this.fetchData('/api/sites'),
+            this.fetchData('/api/devices'),
+            this.fetchData('/api/stats'),
+            this.fetchData('/api/modules')
+        ]);
+        
+        // Update UI
+        this.sites = sites || [];
+        this.devices = devices || [];
+        this.modules = modules || [];
+        this.stats = stats || {};
+        
+        this.updateDashboard();
+        this.updateSitesTab();
+        this.updateDevicesTab();
+        this.updateTopologyTab();
+        this.updateSettingsTab();
+        this.updateCurrentSiteDisplay();
+        this.updateTimeDisplay();
+        
+        // ADD THIS LINE:
+        this.updateMapTab(); // Update map dropdown
+        
+    } catch (error) {
+        console.error('Error loading data:', error);
+        this.showError('Failed to load data');
+    } finally {
+        this.showLoading(false);
     }
+}
 
     async fetchData(endpoint) {
         try {
@@ -782,14 +1008,17 @@ formHTML += `
         }
     }
 
-    selectSite(siteName) {
-        this.currentSite = siteName;
-        this.updateCurrentSiteDisplay();
-        this.showMessage(`Selected site: ${siteName}`);
-        
-        // Switch to devices tab
-        this.switchTab('devices');
-    }
+selectSite(siteName) {
+    this.currentSite = siteName;
+    this.updateCurrentSiteDisplay();
+    this.showMessage(`Selected site: ${siteName}`);
+    
+    // Switch to devices tab
+    this.switchTab('devices');
+    
+    // ADD THIS: Update map dropdown
+    this.updateMapTab();
+}
 
     async editSite(siteId) {
         const site = this.sites.find(s => s.id === siteId);
@@ -983,28 +1212,35 @@ formHTML += `
     // ==================== UTILITIES ====================
 
     switchTab(tabName) {
-        // Update active tab in sidebar
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.remove('active');
-            if (item.dataset.tab === tabName) {
-                item.classList.add('active');
-            }
-        });
-        
-        // Update tab content
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        
-        const activeTab = document.getElementById(`${tabName}Tab`);
-        if (activeTab) {
-            activeTab.classList.add('active');
-            document.getElementById('pageTitle').textContent = 
-                tabName.charAt(0).toUpperCase() + tabName.slice(1);
+    // Update active tab in sidebar
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.tab === tabName) {
+            item.classList.add('active');
         }
-        
-        this.currentTab = tabName;
+    });
+    
+    // Update tab content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    const activeTab = document.getElementById(`${tabName}Tab`);
+    if (activeTab) {
+        activeTab.classList.add('active');
+        document.getElementById('pageTitle').textContent = 
+            tabName.charAt(0).toUpperCase() + tabName.slice(1);
     }
+    
+    this.currentTab = tabName;
+    
+    // ADD THIS: Update map tab when switched to it
+    if (tabName === 'map') {
+        this.updateMapTab();
+    }
+}
+
+
 
     closeAllModals() {
         document.querySelectorAll('.modal').forEach(modal => {

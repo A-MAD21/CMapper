@@ -1,0 +1,26 @@
+{
+  "id": "view_map",
+  "name": "Network Map Generator",
+  "version": "2.0",
+  "description": "Generates interactive network topology maps from discovered devices",
+  "author": "System",
+  "entry_point": "visualization_module.py",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "map_url",
+      "type": "text",
+      "description": "URL to access the interactive network map"
+    },
+    {
+      "name": "devices_count",
+      "type": "number",
+      "description": "Number of devices in the generated map"
+    },
+    {
+      "name": "map_path",
+      "type": "text",
+      "description": "Filesystem path to the generated HTML map"
+    }
+  ]
+}
