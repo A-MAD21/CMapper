@@ -19,7 +19,7 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 
 DATABASE_FILE = 'database.json'
 SETTINGS_FILE = 'settings.json'
-MODULES_DIR = 'modules'
+MODULES_DIR = 'Modules'
 
 # ==================== FILE OPERATIONS ====================
 
@@ -368,6 +368,68 @@ def api_generate_map():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/generate_visual_map', methods=['POST'])
+def api_generate_visual_map():
+    """Generate a visual map for a specific site"""
+    try:
+        data = request.get_json() or {}
+        site_name = data.get('site_name')
+        
+        if not site_name:
+            return jsonify({"error": "site_name is required"}), 400
+        
+        from generale_visual_map import generate_visual_map
+        
+        result = generate_visual_map(site_name)
+        
+        if result.get('status') == 'success':
+            return jsonify({
+                "success": True,
+                "message": result['message'],
+                "map_file": result['map_file'],
+                "map_url": result['map_url'],
+                "site_name": result['site_name'],
+                "device_count": result['device_count'],
+                "connection_count": result['connection_count']
+            })
+        else:
+            return jsonify({"error": result.get('message', 'Unknown error')}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/generate_text_map', methods=['POST'])
+def api_generate_text_map():
+    """Generate a text map for a specific site"""
+    try:
+        data = request.get_json() or {}
+        site_name = data.get('site_name')
+        
+        if not site_name:
+            return jsonify({"error": "site_name is required"}), 400
+        
+        from generate_map import generate_map_from_database
+        
+        result = generate_map_from_database(site_name)
+        
+        if result.get('status') == 'success':
+            return jsonify({
+                "success": True,
+                "message": result['message'],
+                "map_file": result['map_file'],
+                "map_url": result['map_url'],
+                "site_name": result['site_name'],
+                "device_count": result['device_count'],
+                "connection_count": result['connection_count']
+            })
+        else:
+            return jsonify({"error": result.get('message', 'Unknown error')}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/sites/<site_id>', methods=['PUT', 'DELETE'])
 def handle_site(site_id):
     """Update or delete a site"""
@@ -526,6 +588,27 @@ def serve_map_file(filename):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/generated_maps/<filename>')
+def serve_generated_map_file(filename):
+    """Serve generated map HTML files directly"""
+    try:
+        # Clean filename to prevent directory traversal
+        filename = os.path.basename(filename)
+        
+        # Look for the file in generated_maps directory
+        generated_path = f"generated_maps/{filename}"
+        if os.path.exists(generated_path):
+            return send_file(generated_path)
+        
+        return jsonify({
+            "error": f"Generated map file '{filename}' not found",
+            "checked_paths": [generated_path]
+        }), 404
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/debug/files')
 def debug_files():
     """Debug endpoint to see available files"""
@@ -553,22 +636,39 @@ def debug_files():
 def get_map_for_site(site_name):
     """Get map URL for a specific site"""
     try:
-        # Check for map files in common locations
+        # Check for map files in common locations (both visual and text maps)
         possible_paths = [
-            f"{site_name}_map.html",
+            f"generated_maps/{site_name}_visual_map.html",  # Visual map first
+            f"generated_maps/{site_name}_map.html",  # Text map
+            f"{site_name}_visual_map.html",  # Fallback in root
+            f"maps/{site_name}_visual_map.html",
+            f"{site_name}_map.html",  # Text map
             f"maps/{site_name}_map.html", 
             f"{site_name}/map.html",
-            "Roodan_map.html",  # Default fallback
+            "generated_maps/Roodan_visual_map.html",  # Default fallback visual
+            "generated_maps/Roodan_map.html",  # Default fallback text
+            "Roodan_visual_map.html",  # Default fallback visual
+            "Roodan_map.html",  # Default fallback text
+            "maps/Roodan_visual_map.html",
             "maps/Roodan_map.html"
         ]
         
         for path in possible_paths:
             if os.path.exists(path):
+                # Determine the correct URL based on file location
+                if path.startswith("generated_maps/"):
+                    url_path = f"/generated_maps/{os.path.basename(path)}"
+                elif path.startswith("maps/"):
+                    url_path = f"/static/maps/{os.path.basename(path)}"
+                else:
+                    url_path = f"/static/maps/{os.path.basename(path)}"
+                
                 return jsonify({
-                    "map_url": f"/static/maps/{os.path.basename(path)}",
+                    "map_url": url_path,
                     "site": site_name,
                     "file_exists": True,
-                    "path": path
+                    "path": path,
+                    "is_visual": "_visual_" in path
                 })
         
         # If no map found
@@ -653,10 +753,10 @@ if __name__ == '__main__':
             print(f"Created module directory: {module_dir}", file=sys.stderr)
     
     print("=" * 60)
-    print("NETWORK DISCOVERY PLATFORM")
+    print("NETWORK DISCOVERY PLATFORM (HTTPS)")
     print("=" * 60)
-    print(f"Dashboard URL: http://localhost:5000")
-    print(f"API Base URL: http://localhost:5000/api/")
+    print(f"Dashboard URL: https://localhost:8443")
+    print(f"API Base URL: https://localhost:8443/api/")
     print("\nAvailable API endpoints:")
     print("  GET  /api/database          - Get database")
     print("  GET  /api/sites             - List sites")
@@ -667,7 +767,9 @@ if __name__ == '__main__':
     print("  GET  /api/stats             - Get stats")
     print("  GET  /api/settings          - Get settings")
     print("  PUT  /api/settings          - Update settings")
+    print("\n⚠️  WARNING: Using self-signed SSL certificate")
+    print("   Browsers will show security warnings - accept them for development")
     print("\nDebug logs will appear below...")
     print("=" * 60)
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='172.18.1.141', port=8443, ssl_context='adhoc')

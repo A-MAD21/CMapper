@@ -1,433 +1,349 @@
+#!/usr/bin/env python3
+"""
+Text Map Generator
+Creates hierarchical text-based network topology maps
+"""
+
 import json
 import os
-import sys
 from datetime import datetime
 
-def generate_map_from_database():
-    """Generate a network map from database.json"""
-    
+def generate_map_from_database(site_name=None):
+    """Generate a network map from database.json for a specific site"""
+
     try:
         # Read database
         with open('database.json', 'r') as f:
             data = json.load(f)
-        
-        # Extract devices and connections
-        devices = data.get('devices', [])
-        
+
+        # Get all sites if no site specified
+        sites = data.get('sites', [])
+        if not sites:
+            return {"status": "error", "message": "No sites in database"}
+
+        # If no site specified, use the first site
+        if not site_name:
+            site_name = sites[0]['name']
+
+        # Find the selected site
+        selected_site = None
+        for site in sites:
+            if site['name'] == site_name:
+                selected_site = site
+                break
+
+        if not selected_site:
+            return {"status": "error", "message": f"Site '{site_name}' not found"}
+
+        # Filter devices by site
+        all_devices = data.get('devices', [])
+        devices = [d for d in all_devices if d.get('site') == site_name]
+
         if not devices:
-            return {"status": "error", "message": "No devices in database"}
-        
+            return {"status": "error", "message": f"No devices found for site '{site_name}'"}
+
         # Build device mapping
         device_map = {}
         for device in devices:
             device_map[device['id']] = device
-        
-        # Build connection graph
+
+        # Build connection graph (only within the site)
         connections = []
         for device in devices:
             for conn in device.get('connections', []):
-                if conn['remote_device'] in device_map:
+                if conn['remote_device'] in device_map:  # Only connections within the site
                     connections.append({
                         'source': device['id'],
                         'target': conn['remote_device'],
                         'local_port': conn['local_interface'],
                         'protocol': conn['protocol']
                     })
-        
+
         # Count unique connections (remove duplicates)
         unique_connections = set()
         for conn in connections:
             key = tuple(sorted([conn['source'], conn['target']]))
             unique_connections.add(key)
-        
-        # Generate HTML
+
+        # Build connection tree function
+        def build_connection_tree(devices, connections):
+            """Build a hierarchical tree structure from connections"""
+            # Create adjacency list
+            adj_list = {}
+            for device in devices:
+                adj_list[device['id']] = []
+
+            for conn in connections:
+                adj_list[conn['source']].append({
+                    'target': conn['target'],
+                    'port': conn['local_port'],
+                    'protocol': conn['protocol']
+                })
+
+            # Find root device (device with most connections or site root)
+            root_device = None
+            max_connections = 0
+
+            # First try to find device matching site root IP
+            for device in devices:
+                if device.get('ip') == selected_site.get('root_ip'):
+                    root_device = device
+                    break
+
+            # If not found, use device with most connections
+            if not root_device:
+                for device in devices:
+                    conn_count = len(adj_list.get(device['id'], []))
+                    if conn_count > max_connections:
+                        max_connections = conn_count
+                        root_device = device
+
+            if not root_device:
+                root_device = devices[0] if devices else None
+
+            if not root_device:
+                return ""
+
+            # Build tree structure
+            def build_tree_html(device_id, visited, depth=0, is_last=False):
+                if device_id in visited:
+                    return ""
+                visited.add(device_id)
+
+                device = device_map.get(device_id, {})
+                if not device:
+                    return ""
+
+                # Determine device type from platform/model info
+                device_type = device.get('type', 'unknown')
+                platform = device.get('platform', '').lower()
+                model = device.get('model', '').lower()
+
+                if 'ws-c' in platform or 'catalyst' in platform or 'cisco' in platform and ('2960' in platform or '3650' in platform or '3850' in platform or 'switch' in platform):
+                    device_type = 'switch'
+                elif 'cisco' in platform and ('2911' in platform or '2921' in platform or 'ISR' in platform or 'ASR' in platform or 'router' in platform):
+                    device_type = 'router'
+                elif 'mikrotik' in platform:
+                    device_type = 'router'  # MikroTik devices are typically routers
+                elif 'access' in platform or 'ap' in platform or 'aironet' in platform:
+                    device_type = 'access-point'
+                elif 'phone' in platform or 'ip phone' in platform:
+                    device_type = 'ip-phone'
+                elif 'ws-c' in platform or 'catalyst' in platform:
+                    device_type = 'switch'
+                elif 'cisco' in platform:
+                    device_type = 'switch'  # Default Cisco devices to switch
+
+                indent = "  " * depth
+                prefix = ""
+                if depth > 0:
+                    prefix = "└─ " if is_last else "├─ "
+
+                status = device.get('status', 'unknown')
+                status_icon = "🟢" if status == 'online' else "🔴" if status == 'offline' else "🟡"
+
+                html = f"{indent}{prefix}{status_icon} {device.get('name', 'Unknown')} ({device_type})\n"
+                html += f"{indent}│  IP: {device.get('ip', 'N/A')}\n"
+                html += f"{indent}│  Platform: {device.get('platform', 'Unknown')}\n"
+
+                # Show connections
+                neighbors = adj_list.get(device_id, [])
+                if neighbors:
+                    html += f"{indent}│  Connections: {len(neighbors)}\n"
+                    for i, neighbor in enumerate(neighbors):
+                        neighbor_device = device_map.get(neighbor['target'], {})
+                        is_last_neighbor = (i == len(neighbors) - 1)
+                        branch_prefix = "└─ " if is_last_neighbor else "├─ "
+                        html += f"{indent}│  {branch_prefix}{neighbor_device.get('name', 'Unknown')} ({neighbor['port']})\n"
+
+                        # Recursively build subtree with proper indentation
+                        subtree = build_tree_html(neighbor['target'], visited, depth + 1, is_last_neighbor)
+                        if subtree:
+                            # Add connecting line for subtree
+                            connector = "   " if is_last_neighbor else "│  "
+                            subtree_lines = subtree.split('\n')
+                            modified_subtree = []
+                            for line in subtree_lines:
+                                if line.strip():  # Only modify non-empty lines
+                                    modified_subtree.append(f"{indent}│  {connector}{line}")
+                                else:
+                                    modified_subtree.append("")
+                            html += '\n'.join(modified_subtree) + '\n'
+                else:
+                    html += f"{indent}│  (No connections)\n"
+
+                return html
+
+            visited = set()
+            tree_html = build_tree_html(root_device['id'], visited)
+
+            return tree_html
+
+        # Generate hierarchical tree
+        tree_html = build_connection_tree(devices, connections)
+
+        # Create HTML with tree structure
         html = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>Network Topology Map - Roodan</title>
+    <title>Network Topology Tree - {site_name}</title>
     <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        
         body {{
-            font-family: system-ui, 'Segoe UI', Inter, sans-serif;
-            background: #0f172a;
-            color: #e5e7eb;
-            padding: 20px;
-            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            margin: 20px;
+            background-color: #f5f5f5;
+            line-height: 1.4;
         }}
-        
-        .container {{
-            max-width: 1200px;
-            margin: 0 auto;
-        }}
-        
         .header {{
-            background: #020617;
-            border: 1px solid #1e293b;
-            border-radius: 20px;
-            padding: 25px;
-            margin-bottom: 25px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }}
-        
-        .header h1 {{
-            color: #e5e7eb;
-            font-size: 28px;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
+        .tree-container {{
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-x: auto;
         }}
-        
-        .header h1 i {{ color: #D71920; }}
-        
+        .tree {{
+            white-space: pre;
+            font-size: 14px;
+            color: #333;
+        }}
         .stats {{
             display: flex;
             gap: 20px;
             margin-top: 20px;
-            flex-wrap: wrap;
         }}
-        
         .stat-card {{
-            background: rgba(255,255,255,0.05);
-            border: 1px solid #1e293b;
-            border-radius: 12px;
+            background: #e3f2fd;
             padding: 15px;
-            min-width: 150px;
-        }}
-        
-        .stat-value {{
-            font-size: 32px;
-            font-weight: bold;
-            color: #D71920;
-            margin-bottom: 5px;
-        }}
-        
-        .stat-label {{
-            font-size: 13px;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }}
-        
-        .devices-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }}
-        
-        .device-card {{
-            background: #020617;
-            border: 1px solid #1e293b;
-            border-radius: 16px;
-            padding: 20px;
-            transition: all 0.3s ease;
-        }}
-        
-        .device-card:hover {{
-            border-color: #D71920;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(215, 25, 32, 0.2);
-        }}
-        
-        .device-header {{
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 15px;
-        }}
-        
-        .device-icon {{
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #D71920;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-        }}
-        
-        .device-name {{
-            font-weight: bold;
-            font-size: 16px;
-            color: #e5e7eb;
-        }}
-        
-        .device-ip {{
-            font-family: monospace;
-            color: #94a3b8;
-            font-size: 13px;
-            margin-top: 2px;
-        }}
-        
-        .device-status {{
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-top: 10px;
-        }}
-        
-        .status-online {{ background: rgba(16, 185, 129, 0.2); color: #10B981; }}
-        .status-unreachable {{ background: rgba(239, 68, 68, 0.2); color: #EF4444; }}
-        
-        .connections {{
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #1e293b;
-        }}
-        
-        .connection-item {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }}
-        
-        .connection-port {{
-            font-family: monospace;
-            color: #D71920;
-            font-weight: bold;
-            font-size: 12px;
-        }}
-        
-        .connection-target {{
-            font-size: 12px;
-            color: #94a3b8;
-        }}
-        
-        .topology-summary {{
-            background: #020617;
-            border: 1px solid #1e293b;
-            border-radius: 16px;
-            padding: 25px;
-            margin-top: 30px;
-        }}
-        
-        .summary-title {{
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            color: #e5e7eb;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }}
-        
-        .connection-line {{
-            padding: 12px;
-            background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            margin-bottom: 8px;
-            border-left: 3px solid #D71920;
-            font-family: monospace;
-            font-size: 13px;
-        }}
-        
-        .timestamp {{
+            border-radius: 6px;
             text-align: center;
-            margin-top: 30px;
-            padding: 15px;
-            background: rgba(255,255,255,0.02);
-            border-radius: 10px;
-            border: 1px solid #1e293b;
-            color: #94a3b8;
-            font-size: 12px;
+            flex: 1;
         }}
-        
-        @media (max-width: 768px) {{
-            .devices-grid {{
-                grid-template-columns: 1fr;
-            }}
-            .stats {{
-                flex-direction: column;
-            }}
+        .stat-value {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #1976d2;
+        }}
+        .stat-label {{
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
         }}
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1><i class="fas fa-project-diagram"></i> Roodan Network Topology</h1>
-            <p style="color: #94a3b8; margin-top: 5px;">Auto-generated from database.json</p>
-            
-            <div class="stats">
-                <div class="stat-card">
-                    <div class="stat-value">{len(devices)}</div>
-                    <div class="stat-label">Devices</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">{len(unique_connections)}</div>
-                    <div class="stat-label">Connections</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">{len([d for d in devices if d.get('status') == 'online'])}</div>
-                    <div class="stat-label">Online</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">{len([d for d in devices if 'cisco' in d.get('platform', '').lower()])}</div>
-                    <div class="stat-label">Cisco</div>
-                </div>
+    <div class="header">
+        <h1>Network Topology Tree - {site_name}</h1>
+        <p>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value">{len(devices)}</div>
+                <div class="stat-label">Total Devices</div>
             </div>
-        </div>
-        
-        <div class="devices-grid">
-"""
-        
-        # Add device cards
-        for device in devices:
-            # Determine device type and icon
-            platform = device.get('platform', '').lower()
-            if 'cisco' in platform:
-                if '2911' in platform or 'router' in platform:
-                    icon = '<i class="fas fa-router"></i>'
-                    device_type = 'Router'
-                else:
-                    icon = '<i class="fas fa-network-wired"></i>'
-                    device_type = 'Switch'
-            elif 'mikrotik' in platform:
-                icon = '<i class="fas fa-wifi"></i>'
-                device_type = 'MikroTik'
-            else:
-                icon = '<i class="fas fa-server"></i>'
-                device_type = 'Unknown'
-            
-            # Status
-            status = device.get('status', 'unknown')
-            status_class = 'status-online' if status == 'online' else 'status-unreachable'
-            
-            html += f"""
-            <div class="device-card">
-                <div class="device-header">
-                    <div class="device-icon">{icon}</div>
-                    <div>
-                        <div class="device-name">{device.get('name', 'Unknown')}</div>
-                        <div class="device-ip">{device.get('ip', 'N/A')}</div>
-                        <div class="device-status {status_class}">{status.upper()}</div>
-                    </div>
-                </div>
-                
-                <div style="margin: 10px 0; font-size: 12px; color: #94a3b8;">
-                    {device_type} • {device.get('platform', 'Unknown platform')}
-                </div>
-"""
-            
-            # Add connections
-            connections = device.get('connections', [])
-            if connections:
-                html += '<div class="connections">'
-                html += '<div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;"><strong>Connections:</strong></div>'
-                
-                for conn in connections[:5]:  # Show max 5 connections
-                    remote = device_map.get(conn['remote_device'], {})
-                    remote_name = remote.get('name', 'Unknown')
-                    
-                    html += f"""
-                    <div class="connection-item">
-                        <span class="connection-port">{conn['local_interface']}</span>
-                        <span class="connection-target">→ {remote_name}</span>
-                    </div>
-                    """
-                
-                if len(connections) > 5:
-                    html += f'<div style="font-size: 11px; color: #64748b; margin-top: 5px;">+ {len(connections) - 5} more</div>'
-                
-                html += '</div>'
-            
-            html += '</div>'
-        
-        # Add topology summary
-        html += f"""
-        </div>
-        
-        <div class="topology-summary">
-            <div class="summary-title"><i class="fas fa-sitemap"></i> Network Topology Summary</div>
-            
-            <div style="color: #94a3b8; margin-bottom: 15px;">
-                This network has <strong>{len(devices)} devices</strong> with <strong>{len(unique_connections)} unique connections</strong>.
+            <div class="stat-card">
+                <div class="stat-value">{len(unique_connections)}</div>
+                <div class="stat-label">Connections</div>
             </div>
-"""
-        
-        # Show key connections
-        html += '<div style="margin-top: 20px;">'
-        html += '<div style="font-size: 13px; color: #94a3b8; margin-bottom: 10px;"><strong>Key Connections:</strong></div>'
-        
-        # Show first 10 unique connections
-        shown_connections = set()
-        for device in devices:
-            for conn in device.get('connections', []):
-                if conn['remote_device'] in device_map:
-                    source = device.get('name', device['id'])
-                    target = device_map[conn['remote_device']].get('name', conn['remote_device'])
-                    
-                    # Avoid duplicates
-                    connection_key = tuple(sorted([source, target]))
-                    if connection_key not in shown_connections and len(shown_connections) < 10:
-                        shown_connections.add(connection_key)
-                        html += f"""
-                        <div class="connection-line">
-                            {source} <span style="color: #D71920;">→</span> {target}
-                            <div style="font-size: 11px; color: #64748b; margin-top: 3px;">
-                                Port: {conn['local_interface']} • Protocol: {conn['protocol'].upper()}
-                            </div>
-                        </div>
-                        """
-        
-        html += """
+            <div class="stat-card">
+                <div class="stat-value">{len([d for d in devices if d.get('status') == 'online'])}</div>
+                <div class="stat-label">Online</div>
             </div>
-        </div>
-        
-        <div class="timestamp">
-            <i class="fas fa-clock"></i> Generated: """ + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + """<br>
-            <small>Data source: database.json • Auto-refresh available in the web interface</small>
+            <div class="stat-card">
+                <div class="stat-value">{len([d for d in devices if 'cisco' in d.get('platform', '').lower()])}</div>
+                <div class="stat-label">Cisco Devices</div>
+            </div>
         </div>
     </div>
-    
-    <script>
-        // Add click handlers to device cards
-        document.querySelectorAll('.device-card').forEach(card => {
-            card.style.cursor = 'pointer';
-            card.addEventListener('click', function() {
-                const name = this.querySelector('.device-name').textContent;
-                const ip = this.querySelector('.device-ip').textContent;
-                alert(`Selected device:\\n${name}\\n${ip}`);
-            });
-        });
-        
-        // Auto-refresh every 60 seconds
-        setTimeout(() => {
-            if (confirm('Refresh with latest data?')) {
-                location.reload();
-            }
-        }, 60000);
-    </script>
+
+    <div class="tree-container">
+        <h2>Network Hierarchy</h2>
+        <div class="tree">{tree_html}</div>
+    </div>
+
+    <div class="tree-container" style="margin-top: 20px;">
+        <h2>Device Details</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f5f5f5;">
+                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Device Name</th>
+                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">IP Address</th>
+                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Type</th>
+                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Platform</th>
+                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Status</th>
+                </tr>
+            </thead>
+            <tbody>"""
+
+        for device in sorted(devices, key=lambda x: x.get('name', '')):
+            # Determine device type
+            device_type = device.get('type', 'unknown')
+            platform = device.get('platform', '').lower()
+            model = device.get('model', '').lower()
+
+            if 'ws-c' in platform or 'catalyst' in platform or 'cisco' in platform and ('2960' in platform or '3650' in platform or '3850' in platform or 'switch' in platform):
+                device_type = 'switch'
+            elif 'cisco' in platform and ('2911' in platform or '2921' in platform or 'ISR' in platform or 'ASR' in platform or 'router' in platform):
+                device_type = 'router'
+            elif 'mikrotik' in platform:
+                device_type = 'router'  # MikroTik devices are typically routers
+            elif 'access' in platform or 'ap' in platform or 'aironet' in platform:
+                device_type = 'access-point'
+            elif 'phone' in platform or 'ip phone' in platform:
+                device_type = 'ip-phone'
+            elif 'ws-c' in platform or 'catalyst' in platform:
+                device_type = 'switch'
+            elif 'cisco' in platform:
+                device_type = 'switch'  # Default Cisco devices to switch
+
+            status = device.get('status', 'unknown')
+            status_color = '#4CAF50' if status == 'online' else '#f44336' if status == 'offline' else '#ff9800'
+
+            html += f"""
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;">{device.get('name', 'Unknown')}</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">{device.get('ip', 'N/A')}</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">{device_type.title()}</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">{device.get('platform', 'Unknown')}</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; color: {status_color};">{status.title()}</td>
+                </tr>"""
+
+        html += """
+            </tbody>
+        </table>
+    </div>
 </body>
-</html>
-"""
-        
+</html>"""
+
         # Write to file
-        output_file = 'Roodan_map.html'
-        with open(output_file, 'w', encoding='utf-8') as f:
+        output_file = f'{site_name.replace(" ", "_")}_map.html'
+        os.makedirs('generated_maps', exist_ok=True)
+        output_path = f'generated_maps/{output_file}'
+        with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html)
-        
+
         print(f"Generated {output_file}")
         return {
             "status": "success",
-            "message": f"Map generated with {len(devices)} devices",
+            "message": f"Map generated for site '{site_name}' with {len(devices)} devices",
             "map_file": output_file,
-            "map_url": f"/static/maps/{output_file}",
+            "map_url": f"/generated_maps/{output_file}",
+            "site_name": site_name,
             "device_count": len(devices),
-            "connection_count": len(unique_connections)
+            "connection_count": len(connections)
         }
-        
+
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 if __name__ == '__main__':
-    result = generate_map_from_database()
+    import sys
+    site_name = sys.argv[1] if len(sys.argv) > 1 else None
+    result = generate_map_from_database(site_name)
     print(json.dumps(result, indent=2))

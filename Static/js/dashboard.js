@@ -189,6 +189,12 @@ class NetworkPlatform {
 
         // Generate map button
 document.getElementById('generateMapBtn')?.addEventListener('click', function() {
+    const siteName = document.getElementById('mapSiteSelect').value;
+    if (!siteName) {
+        platform.showError('Please select a site first');
+        return;
+    }
+    
     const btn = this;
     const originalText = btn.innerHTML;
     
@@ -196,19 +202,17 @@ document.getElementById('generateMapBtn')?.addEventListener('click', function() 
     btn.disabled = true;
     feather.replace();
     
-    fetch('/api/generate_map', {
+    fetch('/api/generate_text_map', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ site_name: siteName })
     })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            platform.showMessage(`Map generated with ${data.device_count} devices!`);
+            platform.showMessage(`Text map generated for ${siteName} with ${data.device_count} devices!`);
             // Auto-load the new map
-            const siteName = document.getElementById('mapSiteSelect').value;
-            if (siteName) {
-                platform.loadMapForSite(siteName);
-            }
+            platform.loadMapForSite(siteName);
         } else {
             platform.showError(data.error || 'Failed to generate map');
         }
@@ -230,30 +234,133 @@ document.getElementById('generateMapBtn')?.addEventListener('click', function() 
             });
         });
 // Show text map
-document.getElementById('showTextMapBtn')?.addEventListener('click', () => {
+document.getElementById('showTextMapBtn')?.addEventListener('click', async () => {
     const siteName = document.getElementById('mapSiteSelect').value;
     if (siteName) {
-        // Load text map
-        document.getElementById('mapFrame').src = '/static/maps/Roodan_map.html';
+        const btn = document.getElementById('showTextMapBtn');
+        const originalText = btn.innerHTML;
+        
+        btn.innerHTML = '<i data-feather="loader"></i> Generating...';
+        btn.disabled = true;
+        feather.replace();
+        
+        try {
+            // Generate text map for selected site
+            const response = await fetch('/api/generate_text_map', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ site_name: siteName })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                // Load the generated text map
+                document.getElementById('mapFrame').src = result.map_url;
+                document.getElementById('mapContainer').style.display = 'block';
+                document.getElementById('noMapMessage').style.display = 'none';
+                document.getElementById('mapFrame').style.display = 'block';
+                platform.currentSite = siteName;
+                platform.updateCurrentSiteDisplay();
+            } else {
+                const error = await response.json();
+                platform.showError(error.error || 'Failed to generate text map');
+            }
+            
+        } catch (error) {
+            console.error('Error generating text map:', error);
+            platform.showError('Error generating text map');
+        } finally {
+            btn.innerHTML = '<i data-feather="list"></i> Text Map';
+            btn.disabled = false;
+            feather.replace();
+        }
     }
 });
 
 // Show visual map  
-document.getElementById('showVisualMapBtn')?.addEventListener('click', () => {
+document.getElementById('showVisualMapBtn')?.addEventListener('click', async () => {
     const siteName = document.getElementById('mapSiteSelect').value;
     if (siteName) {
-        // Load visual map
-        document.getElementById('mapFrame').src = '/static/maps/Roodan_visual_map.html';
+        const btn = document.getElementById('showVisualMapBtn');
+        const originalText = btn.innerHTML;
+        
+        btn.innerHTML = '<i data-feather="loader"></i> Generating...';
+        btn.disabled = true;
+        feather.replace();
+        
+        try {
+            // Generate visual map for selected site
+            const response = await fetch('/api/generate_visual_map', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ site_name: siteName })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                // Load the generated visual map
+                document.getElementById('mapFrame').src = result.map_url;
+                document.getElementById('mapContainer').style.display = 'block';
+                document.getElementById('noMapMessage').style.display = 'none';
+                document.getElementById('mapFrame').style.display = 'block';
+                platform.showMessage(`Visual map generated for ${siteName}!`);
+            } else {
+                throw new Error('Failed to generate visual map');
+            }
+        } catch (error) {
+            console.error('Error generating visual map:', error);
+            platform.showMessage('Error generating visual map', 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            feather.replace();
+        }
     }
 });
 
 // Generate both maps
 document.getElementById('generateMapBtn')?.addEventListener('click', async () => {
-    // Generate text map
-    await fetch('/api/generate_text_map', { method: 'POST' });
-    // Generate visual map  
-    await fetch('/api/generate_visual_map', { method: 'POST' });
-    platform.showMessage('Both maps generated!');
+    const siteName = document.getElementById('mapSiteSelect').value;
+    if (!siteName) {
+        platform.showMessage('Please select a site first', 'warning');
+        return;
+    }
+    
+    const btn = document.getElementById('generateMapBtn');
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i data-feather="loader"></i> Generating...';
+    btn.disabled = true;
+    feather.replace();
+    
+    try {
+        // Generate text map for selected site
+        const textResponse = await fetch('/api/generate_text_map', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ site_name: siteName })
+        });
+        
+        // Generate visual map for selected site
+        const visualResponse = await fetch('/api/generate_visual_map', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ site_name: siteName })
+        });
+        
+        if (textResponse.ok && visualResponse.ok) {
+            platform.showMessage(`Maps generated for ${siteName}!`);
+        } else {
+            throw new Error('Failed to generate one or more maps');
+        }
+    } catch (error) {
+        console.error('Error generating maps:', error);
+        platform.showMessage('Error generating maps', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        feather.replace();
+    }
 });
         // Edit Device
         document.getElementById('updateDeviceBtn').addEventListener('click', () => {
@@ -273,12 +380,62 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         });
         
         // Show Map button
-        document.getElementById('showMapBtn')?.addEventListener('click', () => {
+        document.getElementById('showMapBtn')?.addEventListener('click', async () => {
             const siteName = document.getElementById('mapSiteSelect').value;
             if (siteName) {
-                this.currentSite = siteName;
-                this.updateCurrentSiteDisplay();
-                this.loadMapForSite(siteName);
+                const btn = document.getElementById('showMapBtn');
+                const originalText = btn.innerHTML;
+                
+                btn.innerHTML = '<i data-feather="loader"></i> Loading...';
+                btn.disabled = true;
+                feather.replace();
+                
+                try {
+                    // Try to load existing visual map first
+                    const checkResponse = await fetch(`/api/map/${encodeURIComponent(siteName)}`);
+                    
+                    if (checkResponse.ok) {
+                        const data = await checkResponse.json();
+                        if (data.map_url && data.map_url.includes('_visual_map.html')) {
+                            // Visual map exists, load it
+                            document.getElementById('mapFrame').src = data.map_url;
+                            document.getElementById('mapContainer').style.display = 'block';
+                            document.getElementById('noMapMessage').style.display = 'none';
+                            document.getElementById('mapFrame').style.display = 'block';
+                            platform.currentSite = siteName;
+                            platform.updateCurrentSiteDisplay();
+                            return;
+                        }
+                    }
+                    
+                    // If no visual map exists, generate one
+                    const genResponse = await fetch('/api/generate_visual_map', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ site_name: siteName })
+                    });
+                    
+                    if (genResponse.ok) {
+                        const result = await genResponse.json();
+                        // Load the generated visual map
+                        document.getElementById('mapFrame').src = result.map_url;
+                        document.getElementById('mapContainer').style.display = 'block';
+                        document.getElementById('noMapMessage').style.display = 'none';
+                        document.getElementById('mapFrame').style.display = 'block';
+                        platform.currentSite = siteName;
+                        platform.updateCurrentSiteDisplay();
+                        platform.showMessage(`Visual map loaded for ${siteName}!`);
+                    } else {
+                        throw new Error('Failed to generate visual map');
+                    }
+                } catch (error) {
+                    console.error('Error loading/generating map:', error);
+                    platform.showMessage('Error loading map', 'error');
+                } finally {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    feather.replace();
+                }
             }
         });
         

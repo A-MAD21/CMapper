@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CDP Discovery Module - COMPLETE WORKING VERSION
-Uses Netmiko (best) or paramiko for SSH to Cisco devices
+Uses Netmiko (best) or paramiko for SSH, falls back to telnet
 """
 
 import json
@@ -19,15 +19,15 @@ print("=== CDP DISCOVERY MODULE STARTING ===", file=sys.stderr)
 
 def connect_to_device(host, username, password):
     """
-    Try multiple methods to connect to Cisco device
-    Returns: (success, connection_object_or_error)
+    Try multiple methods to connect to Cisco device: SSH (Netmiko), SSH (paramiko), Telnet (Netmiko)
+    Returns: (success, connection_object_or_error, method)
     """
     
     # Method 1: Try Netmiko first (best for network devices)
     try:
         from netmiko import ConnectHandler
         
-        print(f"DEBUG: Trying Netmiko connection to {host}", file=sys.stderr)
+        print(f"DEBUG: Trying SSH-Netmiko to {host}", file=sys.stderr)
         
         device = {
             'device_type': 'cisco_ios',
@@ -41,8 +41,8 @@ def connect_to_device(host, username, password):
         }
         
         connection = ConnectHandler(**device)
-        print(f"DEBUG: Netmiko connection successful to {host}", file=sys.stderr)
-        return True, connection
+        print(f"DEBUG: SSH-Netmiko successful to {host}", file=sys.stderr)
+        return True, connection, "SSH-Netmiko"
         
     except ImportError:
         print("DEBUG: Netmiko not installed, trying paramiko", file=sys.stderr)
@@ -53,7 +53,7 @@ def connect_to_device(host, username, password):
     try:
         import paramiko
         
-        print(f"DEBUG: Trying paramiko connection to {host}", file=sys.stderr)
+        print(f"DEBUG: Trying SSH-paramiko to {host}", file=sys.stderr)
         
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -88,13 +88,38 @@ def connect_to_device(host, username, password):
                 allow_agent=False
             )
         
-        print(f"DEBUG: Paramiko connection successful to {host}", file=sys.stderr)
-        return True, client
+        print(f"DEBUG: SSH-paramiko successful to {host}", file=sys.stderr)
+        return True, client, "SSH-paramiko"
         
     except Exception as e:
         error_msg = f"SSH failed: {type(e).__name__}: {str(e)[:200]}"
         print(f"DEBUG: {error_msg}", file=sys.stderr)
-        return False, error_msg
+    
+    # Method 3: Try telnet with Netmiko
+    try:
+        from netmiko import ConnectHandler
+        
+        print(f"DEBUG: Trying telnet to {host}", file=sys.stderr)
+        
+        device = {
+            'device_type': 'cisco_ios_telnet',
+            'host': host,
+            'username': username,
+            'password': password,
+            'port': 23,
+            'secret': '',  # Enable password if needed
+            'timeout': 15,
+            'global_delay_factor': 2,
+        }
+        
+        connection = ConnectHandler(**device)
+        print(f"DEBUG: Telnet successful to {host}", file=sys.stderr)
+        return True, connection, "Telnet"
+        
+    except Exception as e:
+        error_msg = f"Telnet failed: {type(e).__name__}: {str(e)[:200]}"
+        print(f"DEBUG: {error_msg}", file=sys.stderr)
+        return False, error_msg, "Failed"
 
 def get_cdp_from_device(connection, is_netmiko=True):
     """Get CDP output from connected device"""
@@ -463,10 +488,12 @@ def main():
         scanned_ips.add(current_ip)
         
         # Try to connect and get CDP
-        success, connection = connect_to_device(current_ip, username, password)
+        success, connection, method = connect_to_device(current_ip, username, password)
         
-        if not success:
-            print(f"DEBUG: Could not connect to {current_ip}: {connection}", file=sys.stderr)
+        if success:
+            print(f"✓ Connected to {current_ip} via {method}", file=sys.stderr)
+        else:
+            print(f"✗ Failed to connect to {current_ip} - {method}", file=sys.stderr)
             errors.append(f"Failed to connect to {current_ip}: {connection}")
             
             # Even if we can't connect, we should record this device
