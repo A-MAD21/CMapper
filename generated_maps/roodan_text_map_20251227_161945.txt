@@ -1,0 +1,21 @@
+Site: roodan
+Generated: 2025-12-27T16:19:45
+Devices: 9 | Connection entries: 12
+
+- Device-10.192.178.2 (10.192.178.2) | unknown | cisco WS-C2960S-48FPS-L
+  link: cdp GigabitEthernet1/0/47
+  - BAbbad-DHCP (10.192.178.253) | unknown | MikroTik
+  link: cdp GigabitEthernet1/0/42
+  - RW-Bandar.OKCO.ir (10.192.178.1) | unknown | Cisco CISCO2911/K9
+  link: cdp GigabitEthernet1/0/40
+  - Sw4-Dry-BalayeEdari.OKCO.ir (10.192.178.4) | unknown | cisco WS-C2960S-48FPS-L
+    link: cdp GigabitEthernet1/0/46
+    - SXT-Babbas1 (10.192.178.144) | unknown | MikroTik
+    link: cdp GigabitEthernet1/0/46
+    - SXT-Babbas2 (10.192.178.145) | unknown | MikroTik
+  link: cdp GigabitEthernet1/0/39
+  - sw3-Dry-Buffer.OKCO.ir (10.192.178.3) | unknown | cisco WS-C2960S-48FPS-L
+    link: cdp GigabitEthernet1/0/47
+    - Sw5-Dry-akhar.OKCO.ir (10.192.178.5) | unknown | cisco WS-C2960S-48FPS-L
+      link: cdp GigabitEthernet1/0/47
+      - SW6-Cold-Akhar.OKCO.ir (10.192.178.6) | unknown | cisco WS-C2960S-48FPS-L

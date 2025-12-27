@@ -1,349 +1,189 @@
 #!/usr/bin/env python3
 """
 Text Map Generator
-Creates hierarchical text-based network topology maps
+
+Generates a human-readable, hierarchical topology text map from the device
+database.
 """
+
+from __future__ import annotations
 
 import json
 import os
+from collections import defaultdict, deque
 from datetime import datetime
+from typing import Any, Dict, List, Tuple, Optional
 
-def generate_map_from_database(site_name=None):
-    """Generate a network map from database.json for a specific site"""
+
+def _load_database(db_path: str, fallback_path: str | None = None) -> Dict[str, Any]:
+    """Load database JSON from primary path, optionally falling back to a secondary path."""
+    target = db_path if os.path.exists(db_path) else fallback_path
+    if not target:
+        raise FileNotFoundError(f"Database not found at {db_path}")
+    with open(target, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _build_graph(devices: List[Dict[str, Any]]) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, List[Tuple[str, str, str, str]]], int]:
+    """
+    Build an adjacency list based on per-device 'connections'.
+
+    Returns:
+      - id_map: device_id -> device dict
+      - adj: device_id -> list of (neighbor_id, local_intf, remote_intf, protocol)
+      - conn_count: number of connection entries considered
+    """
+    id_map = {d.get("id"): d for d in devices if d.get("id")}
+    adj: Dict[str, List[Tuple[str, str, str, str]]] = defaultdict(list)
+    conn_count = 0
+
+    for d in devices:
+        did = d.get("id")
+        if not did:
+            continue
+        for c in d.get("connections") or []:
+            remote_id = c.get("remote_device")
+            if not remote_id or remote_id not in id_map:
+                continue
+            conn_count += 1
+            adj[did].append(
+                (
+                    remote_id,
+                    c.get("local_interface") or "",
+                    c.get("remote_interface") or "",
+                    c.get("protocol") or "",
+                )
+            )
+    return id_map, adj, conn_count
+
+
+def _pick_root_device(site: Dict[str, Any], devices: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    root_ip = site.get("root_ip")
+    if root_ip:
+        for d in devices:
+            if d.get("ip") == root_ip:
+                return d
+    return devices[0] if devices else None
+
+
+def _format_device_line(device: Dict[str, Any]) -> str:
+    name = device.get("name") or "Unknown"
+    ip = device.get("ip") or "?"
+    platform = device.get("platform") or device.get("model") or ""
+    dtype = device.get("type") or ""
+    extras = " | ".join([x for x in [dtype, platform] if x])
+    return f"{name} ({ip})" + (f" | {extras}" if extras else "")
+
+
+def generate_map_from_database(site_name: str | None = None) -> Dict[str, Any]:
+    """
+    Generate a text map from the device database.
+
+    Output is written to ./generated_maps/<site>_text_map_<timestamp>.txt
+    and a dict is returned for the API layer.
+    """
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(base_dir, "devices.db")
+    fallback_db_path = os.path.join(base_dir, "database.json")
+    out_dir = os.path.join(base_dir, "generated_maps")
+    os.makedirs(out_dir, exist_ok=True)
 
     try:
-        # Read database
-        with open('database.json', 'r') as f:
-            data = json.load(f)
-
-        # Get all sites if no site specified
-        sites = data.get('sites', [])
+        data = _load_database(db_path, fallback_db_path)
+        sites = data.get("sites", [])
         if not sites:
-            return {"status": "error", "message": "No sites in database"}
+            return {"status": "error", "message": "No sites found in database"}
 
-        # If no site specified, use the first site
-        if not site_name:
-            site_name = sites[0]['name']
+        # Choose site
+        selected_site: Optional[Dict[str, Any]] = None
+        if site_name:
+            for s in sites:
+                if s.get("name") == site_name:
+                    selected_site = s
+                    break
+            if not selected_site:
+                return {"status": "error", "message": f"Site '{site_name}' not found"}
+        else:
+            selected_site = sites[0]
+            site_name = selected_site.get("name") or "default"
 
-        # Find the selected site
-        selected_site = None
-        for site in sites:
-            if site['name'] == site_name:
-                selected_site = site
-                break
-
-        if not selected_site:
-            return {"status": "error", "message": f"Site '{site_name}' not found"}
-
-        # Filter devices by site
-        all_devices = data.get('devices', [])
-        devices = [d for d in all_devices if d.get('site') == site_name]
-
+        # Devices for site
+        all_devices = data.get("devices", [])
+        devices = [d for d in all_devices if d.get("site") == site_name]
         if not devices:
             return {"status": "error", "message": f"No devices found for site '{site_name}'"}
 
-        # Build device mapping
-        device_map = {}
-        for device in devices:
-            device_map[device['id']] = device
+        id_map, adj, conn_count = _build_graph(devices)
 
-        # Build connection graph (only within the site)
-        connections = []
-        for device in devices:
-            for conn in device.get('connections', []):
-                if conn['remote_device'] in device_map:  # Only connections within the site
-                    connections.append({
-                        'source': device['id'],
-                        'target': conn['remote_device'],
-                        'local_port': conn['local_interface'],
-                        'protocol': conn['protocol']
-                    })
+        root_device = _pick_root_device(selected_site, devices)
+        if not root_device or not root_device.get("id"):
+            return {"status": "error", "message": "Could not determine a root device for the map"}
 
-        # Count unique connections (remove duplicates)
-        unique_connections = set()
-        for conn in connections:
-            key = tuple(sorted([conn['source'], conn['target']]))
-            unique_connections.add(key)
+        # BFS tree for a readable hierarchy
+        root_id = root_device["id"]
+        visited = set([root_id])
+        parent: Dict[str, str] = {}
+        parent_edge: Dict[str, tuple[str, str, str]] = {}  # child -> (local, remote, proto)
 
-        # Build connection tree function
-        def build_connection_tree(devices, connections):
-            """Build a hierarchical tree structure from connections"""
-            # Create adjacency list
-            adj_list = {}
-            for device in devices:
-                adj_list[device['id']] = []
+        q = deque([root_id])
+        while q:
+            cur = q.popleft()
+            for nbr, local_intf, remote_intf, proto in adj.get(cur, []):
+                if nbr in visited:
+                    continue
+                visited.add(nbr)
+                parent[nbr] = cur
+                parent_edge[nbr] = (local_intf, remote_intf, proto)
+                q.append(nbr)
 
-            for conn in connections:
-                adj_list[conn['source']].append({
-                    'target': conn['target'],
-                    'port': conn['local_port'],
-                    'protocol': conn['protocol']
-                })
+        # Build children list for printing
+        children: Dict[str, List[str]] = defaultdict(list)
+        for child, par in parent.items():
+            children[par].append(child)
 
-            # Find root device (device with most connections or site root)
-            root_device = None
-            max_connections = 0
+        def write_node(node_id: str, indent: str, out_lines: List[str]) -> None:
+            out_lines.append(f"{indent}- {_format_device_line(id_map[node_id])}")
 
-            # First try to find device matching site root IP
-            for device in devices:
-                if device.get('ip') == selected_site.get('root_ip'):
-                    root_device = device
-                    break
+            # Sort children by name for stability
+            kids = sorted(children.get(node_id, []), key=lambda x: (id_map[x].get("name") or "", id_map[x].get("ip") or ""))
+            for kid in kids:
+                local_intf, remote_intf, proto = parent_edge.get(kid, ("", "", ""))
+                link = " ".join([x for x in [proto, local_intf, ("-> " + remote_intf) if remote_intf else ""] if x]).strip()
+                if link:
+                    out_lines.append(f"{indent}  link: {link}")
+                write_node(kid, indent + "  ", out_lines)
 
-            # If not found, use device with most connections
-            if not root_device:
-                for device in devices:
-                    conn_count = len(adj_list.get(device['id'], []))
-                    if conn_count > max_connections:
-                        max_connections = conn_count
-                        root_device = device
+        out_lines: List[str] = []
+        out_lines.append(f"Site: {site_name}")
+        out_lines.append(f"Generated: {datetime.now().isoformat(timespec='seconds')}")
+        out_lines.append(f"Devices: {len(devices)} | Connection entries: {conn_count}")
+        out_lines.append("")
+        write_node(root_id, "", out_lines)
 
-            if not root_device:
-                root_device = devices[0] if devices else None
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_site = "".join(ch for ch in (site_name or "site") if ch.isalnum() or ch in ("-", "_")).strip() or "site"
+        filename = f"{safe_site}_text_map_{timestamp}.txt"
+        out_path = os.path.join(out_dir, filename)
 
-            if not root_device:
-                return ""
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(out_lines) + "\n")
 
-            # Build tree structure
-            def build_tree_html(device_id, visited, depth=0, is_last=False):
-                if device_id in visited:
-                    return ""
-                visited.add(device_id)
-
-                device = device_map.get(device_id, {})
-                if not device:
-                    return ""
-
-                # Determine device type from platform/model info
-                device_type = device.get('type', 'unknown')
-                platform = device.get('platform', '').lower()
-                model = device.get('model', '').lower()
-
-                if 'ws-c' in platform or 'catalyst' in platform or 'cisco' in platform and ('2960' in platform or '3650' in platform or '3850' in platform or 'switch' in platform):
-                    device_type = 'switch'
-                elif 'cisco' in platform and ('2911' in platform or '2921' in platform or 'ISR' in platform or 'ASR' in platform or 'router' in platform):
-                    device_type = 'router'
-                elif 'mikrotik' in platform:
-                    device_type = 'router'  # MikroTik devices are typically routers
-                elif 'access' in platform or 'ap' in platform or 'aironet' in platform:
-                    device_type = 'access-point'
-                elif 'phone' in platform or 'ip phone' in platform:
-                    device_type = 'ip-phone'
-                elif 'ws-c' in platform or 'catalyst' in platform:
-                    device_type = 'switch'
-                elif 'cisco' in platform:
-                    device_type = 'switch'  # Default Cisco devices to switch
-
-                indent = "  " * depth
-                prefix = ""
-                if depth > 0:
-                    prefix = "└─ " if is_last else "├─ "
-
-                status = device.get('status', 'unknown')
-                status_icon = "🟢" if status == 'online' else "🔴" if status == 'offline' else "🟡"
-
-                html = f"{indent}{prefix}{status_icon} {device.get('name', 'Unknown')} ({device_type})\n"
-                html += f"{indent}│  IP: {device.get('ip', 'N/A')}\n"
-                html += f"{indent}│  Platform: {device.get('platform', 'Unknown')}\n"
-
-                # Show connections
-                neighbors = adj_list.get(device_id, [])
-                if neighbors:
-                    html += f"{indent}│  Connections: {len(neighbors)}\n"
-                    for i, neighbor in enumerate(neighbors):
-                        neighbor_device = device_map.get(neighbor['target'], {})
-                        is_last_neighbor = (i == len(neighbors) - 1)
-                        branch_prefix = "└─ " if is_last_neighbor else "├─ "
-                        html += f"{indent}│  {branch_prefix}{neighbor_device.get('name', 'Unknown')} ({neighbor['port']})\n"
-
-                        # Recursively build subtree with proper indentation
-                        subtree = build_tree_html(neighbor['target'], visited, depth + 1, is_last_neighbor)
-                        if subtree:
-                            # Add connecting line for subtree
-                            connector = "   " if is_last_neighbor else "│  "
-                            subtree_lines = subtree.split('\n')
-                            modified_subtree = []
-                            for line in subtree_lines:
-                                if line.strip():  # Only modify non-empty lines
-                                    modified_subtree.append(f"{indent}│  {connector}{line}")
-                                else:
-                                    modified_subtree.append("")
-                            html += '\n'.join(modified_subtree) + '\n'
-                else:
-                    html += f"{indent}│  (No connections)\n"
-
-                return html
-
-            visited = set()
-            tree_html = build_tree_html(root_device['id'], visited)
-
-            return tree_html
-
-        # Generate hierarchical tree
-        tree_html = build_connection_tree(devices, connections)
-
-        # Create HTML with tree structure
-        html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Network Topology Tree - {site_name}</title>
-    <style>
-        body {{
-            font-family: 'Courier New', monospace;
-            margin: 20px;
-            background-color: #f5f5f5;
-            line-height: 1.4;
-        }}
-        .header {{
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        .tree-container {{
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow-x: auto;
-        }}
-        .tree {{
-            white-space: pre;
-            font-size: 14px;
-            color: #333;
-        }}
-        .stats {{
-            display: flex;
-            gap: 20px;
-            margin-top: 20px;
-        }}
-        .stat-card {{
-            background: #e3f2fd;
-            padding: 15px;
-            border-radius: 6px;
-            text-align: center;
-            flex: 1;
-        }}
-        .stat-value {{
-            font-size: 24px;
-            font-weight: bold;
-            color: #1976d2;
-        }}
-        .stat-label {{
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-        }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>Network Topology Tree - {site_name}</h1>
-        <p>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-value">{len(devices)}</div>
-                <div class="stat-label">Total Devices</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{len(unique_connections)}</div>
-                <div class="stat-label">Connections</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{len([d for d in devices if d.get('status') == 'online'])}</div>
-                <div class="stat-label">Online</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{len([d for d in devices if 'cisco' in d.get('platform', '').lower()])}</div>
-                <div class="stat-label">Cisco Devices</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="tree-container">
-        <h2>Network Hierarchy</h2>
-        <div class="tree">{tree_html}</div>
-    </div>
-
-    <div class="tree-container" style="margin-top: 20px;">
-        <h2>Device Details</h2>
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr style="background: #f5f5f5;">
-                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Device Name</th>
-                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">IP Address</th>
-                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Type</th>
-                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Platform</th>
-                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Status</th>
-                </tr>
-            </thead>
-            <tbody>"""
-
-        for device in sorted(devices, key=lambda x: x.get('name', '')):
-            # Determine device type
-            device_type = device.get('type', 'unknown')
-            platform = device.get('platform', '').lower()
-            model = device.get('model', '').lower()
-
-            if 'ws-c' in platform or 'catalyst' in platform or 'cisco' in platform and ('2960' in platform or '3650' in platform or '3850' in platform or 'switch' in platform):
-                device_type = 'switch'
-            elif 'cisco' in platform and ('2911' in platform or '2921' in platform or 'ISR' in platform or 'ASR' in platform or 'router' in platform):
-                device_type = 'router'
-            elif 'mikrotik' in platform:
-                device_type = 'router'  # MikroTik devices are typically routers
-            elif 'access' in platform or 'ap' in platform or 'aironet' in platform:
-                device_type = 'access-point'
-            elif 'phone' in platform or 'ip phone' in platform:
-                device_type = 'ip-phone'
-            elif 'ws-c' in platform or 'catalyst' in platform:
-                device_type = 'switch'
-            elif 'cisco' in platform:
-                device_type = 'switch'  # Default Cisco devices to switch
-
-            status = device.get('status', 'unknown')
-            status_color = '#4CAF50' if status == 'online' else '#f44336' if status == 'offline' else '#ff9800'
-
-            html += f"""
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;">{device.get('name', 'Unknown')}</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">{device.get('ip', 'N/A')}</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">{device_type.title()}</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">{device.get('platform', 'Unknown')}</td>
-                    <td style="padding: 10px; border: 1px solid #ddd; color: {status_color};">{status.title()}</td>
-                </tr>"""
-
-        html += """
-            </tbody>
-        </table>
-    </div>
-</body>
-</html>"""
-
-        # Write to file
-        output_file = f'{site_name.replace(" ", "_")}_map.html'
-        os.makedirs('generated_maps', exist_ok=True)
-        output_path = f'generated_maps/{output_file}'
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(html)
-
-        print(f"Generated {output_file}")
         return {
             "status": "success",
-            "message": f"Map generated for site '{site_name}' with {len(devices)} devices",
-            "map_file": output_file,
-            "map_url": f"/generated_maps/{output_file}",
+            "message": "Text map generated successfully",
+            "map_file": filename,
+            "map_url": f"/generated_maps/{filename}",
             "site_name": site_name,
             "device_count": len(devices),
-            "connection_count": len(connections)
+            "connection_count": conn_count,
         }
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import sys
-    site_name = sys.argv[1] if len(sys.argv) > 1 else None
-    result = generate_map_from_database(site_name)
-    print(json.dumps(result, indent=2))
+
+    site = sys.argv[1] if len(sys.argv) > 1 else None
+    print(json.dumps(generate_map_from_database(site), indent=2))

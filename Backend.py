@@ -11,17 +11,62 @@ import time
 import subprocess
 import uuid
 from datetime import datetime
-import portalocker  # For file locking
+import portalocker 
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
+
+# ===============================
+# Global paths (defined early)
+# ===============================
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DATABASE_FILE = os.path.join(BASE_DIR, "devices.db")
+SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
+
+MODULES_DIR = os.path.join(BASE_DIR, "Modules")
+TEMPLATES_DIR = os.path.join(BASE_DIR, "Templates")
+STATIC_DIR = os.path.join(BASE_DIR, "Static")
+
+GENERATED_MAPS_DIR = os.path.join(BASE_DIR, "generated_maps")
+
+# Ensure required dirs exist
+os.makedirs(GENERATED_MAPS_DIR, exist_ok=True)
+
+
+
+# ==================== PATHS ====================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def _pick_existing_dir(*candidates: str) -> str:
+    """Return first existing directory path relative to BASE_DIR."""
+    for name in candidates:
+        path = os.path.join(BASE_DIR, name)
+        if os.path.isdir(path):
+            return path
+    # Fall back to first candidate (Flask will error with a clear message)
+    return os.path.join(BASE_DIR, candidates[0]) if candidates else BASE_DIR
+
+TEMPLATES_DIR = _pick_existing_dir("Templates", "templates")
+STATIC_DIR = _pick_existing_dir("Static", "static")
+
+GENERATED_MAPS_DIR = os.path.join(BASE_DIR, "generated_maps")
+
+app = Flask(
+    __name__,
+    template_folder=TEMPLATES_DIR,
+    static_folder=STATIC_DIR,
+    static_url_path="/static",
+)
+
+
 
 # ==================== CONFIGURATION ====================
 
-DATABASE_FILE = 'database.json'
-SETTINGS_FILE = 'settings.json'
-MODULES_DIR = 'Modules'
 
 # ==================== FILE OPERATIONS ====================
+
+# Ensure output directories exist
+os.makedirs(GENERATED_MAPS_DIR, exist_ok=True)
 
 def init_database():
     """Initialize empty database if it doesn't exist"""
@@ -39,31 +84,39 @@ def init_database():
         with open(DATABASE_FILE, 'w') as f:
             json.dump(data, f, indent=2)
 
+DEFAULT_SETTINGS = {
+    "default_site": "",
+    "backup_path": "./backups",
+    "default_scan_depth": 3,
+    "auto_refresh": False,
+    "refresh_interval": 30,
+}
+
 def init_settings():
+
     """Initialize default settings"""
     if not os.path.exists(SETTINGS_FILE):
-        settings = {
-            "default_site": "",
-            "backup_path": "./backups",
-            "default_scan_depth": 3,
-            "auto_refresh": False,
-            "refresh_interval": 30
-        }
+        settings = DEFAULT_SETTINGS.copy()
         with open(SETTINGS_FILE, 'w') as f:
             json.dump(settings, f, indent=2)
 
 def read_database():
-    """Read database with file locking"""
+    """Read database.json.
+
+    If the file is missing or invalid, an empty database will be created.
+    """
     try:
         if os.path.exists(DATABASE_FILE):
-            with open(DATABASE_FILE, 'r') as f:
+            with open(DATABASE_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        else:
-            init_database()
-            return read_database()
+
+        init_database()
+        return read_database()
+
     except (json.JSONDecodeError, FileNotFoundError):
         init_database()
         return read_database()
+
 
 def write_database(data):
     """Write database"""
@@ -76,21 +129,36 @@ def write_database(data):
         return False
 
 def read_settings():
-    """Read settings file"""
+    """Read settings.json (merging in defaults for backwards/forwards compatibility)."""
     try:
         if os.path.exists(SETTINGS_FILE):
-            with open(SETTINGS_FILE, 'r') as f:
-                return json.load(f)
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                loaded = json.load(f) or {}
         else:
             init_settings()
             return read_settings()
+
+        merged = DEFAULT_SETTINGS.copy()
+        if isinstance(loaded, dict):
+            merged.update(loaded)
+
+        if merged != loaded:
+            try:
+                with open(SETTINGS_FILE, 'w', encoding='utf-8') as wf:
+                    json.dump(merged, wf, indent=2)
+            except Exception:
+                pass
+
+        return merged
+
     except (json.JSONDecodeError, FileNotFoundError):
         init_settings()
         return read_settings()
 
+
 def write_settings(settings):
     """Write settings file"""
-    with open(SETTINGS_FILE, 'w') as f:
+    with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
 # ==================== MODULE SYSTEM ====================
@@ -287,7 +355,10 @@ module_runner = ModuleRunner()
 
 @app.route('/')
 def index():
+    
+    t0 = time.perf_counter()
     """Serve the main interface"""
+    print(f"[PERF] / took {time.perf_counter() - t0:.2f}s")
     return render_template('index.html')
 
 @app.route('/api/database')
@@ -353,19 +424,6 @@ def api_generate_map():
             
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    """Generate a map from current database"""
-    try:
-        # Run the map generator
-        result = generate_map_from_database()
-        
-        return jsonify({
-            "success": True,
-            "message": "Map generated successfully",
-            "file_path": result,
-            "file_url": "/static/maps/Roodan_map.html"
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/generate_visual_map', methods=['POST'])
@@ -374,14 +432,11 @@ def api_generate_visual_map():
     try:
         data = request.get_json() or {}
         site_name = data.get('site_name')
-        
-        if not site_name:
-            return jsonify({"error": "site_name is required"}), 400
-        
+
         from generale_visual_map import generate_visual_map
-        
+
         result = generate_visual_map(site_name)
-        
+
         if result.get('status') == 'success':
             return jsonify({
                 "success": True,
@@ -394,7 +449,7 @@ def api_generate_visual_map():
             })
         else:
             return jsonify({"error": result.get('message', 'Unknown error')}), 500
-            
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -636,40 +691,46 @@ def debug_files():
 def get_map_for_site(site_name):
     """Get map URL for a specific site"""
     try:
-        # Check for map files in common locations (both visual and text maps)
-        possible_paths = [
-            f"generated_maps/{site_name}_visual_map.html",  # Visual map first
-            f"generated_maps/{site_name}_map.html",  # Text map
-            f"{site_name}_visual_map.html",  # Fallback in root
-            f"maps/{site_name}_visual_map.html",
-            f"{site_name}_map.html",  # Text map
-            f"maps/{site_name}_map.html", 
-            f"{site_name}/map.html",
-            "generated_maps/Roodan_visual_map.html",  # Default fallback visual
-            "generated_maps/Roodan_map.html",  # Default fallback text
-            "Roodan_visual_map.html",  # Default fallback visual
-            "Roodan_map.html",  # Default fallback text
-            "maps/Roodan_visual_map.html",
-            "maps/Roodan_map.html"
-        ]
-        
-        for path in possible_paths:
-            if os.path.exists(path):
-                # Determine the correct URL based on file location
-                if path.startswith("generated_maps/"):
-                    url_path = f"/generated_maps/{os.path.basename(path)}"
-                elif path.startswith("maps/"):
-                    url_path = f"/static/maps/{os.path.basename(path)}"
-                else:
-                    url_path = f"/static/maps/{os.path.basename(path)}"
-                
-                return jsonify({
-                    "map_url": url_path,
-                    "site": site_name,
-                    "file_exists": True,
-                    "path": path,
-                    "is_visual": "_visual_" in path
-                })
+        import glob
+
+        def _find_latest(patterns):
+            candidates = []
+            for pattern in patterns:
+                candidates.extend(glob.glob(pattern))
+            if not candidates:
+                return None
+            candidates.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+            return candidates[0]
+
+        visual = _find_latest([
+            f"generated_maps/{site_name}_visual_map*.html",
+            f"maps/{site_name}_visual_map*.html",
+            f"{site_name}_visual_map*.html",
+        ])
+        text = _find_latest([
+            f"generated_maps/{site_name}_text_map*.txt",
+            f"generated_maps/{site_name}_map*.html",
+            f"maps/{site_name}_map*.html",
+            f"{site_name}_map*.html",
+        ])
+
+        path = visual or text
+
+        if path and os.path.exists(path):
+            if path.startswith("generated_maps/"):
+                url_path = f"/generated_maps/{os.path.basename(path)}"
+            elif path.startswith("maps/"):
+                url_path = f"/static/maps/{os.path.basename(path)}"
+            else:
+                url_path = f"/static/maps/{os.path.basename(path)}"
+            
+            return jsonify({
+                "map_url": url_path,
+                "site": site_name,
+                "file_exists": True,
+                "path": path,
+                "is_visual": "_visual_" in path
+            })
         
         # If no map found
         return jsonify({
@@ -772,4 +833,13 @@ if __name__ == '__main__':
     print("\nDebug logs will appear below...")
     print("=" * 60)
     
-    app.run(debug=True, host='172.18.1.141', port=8443, ssl_context='adhoc')
+    if __name__ == "__main__":
+        use_ssl = os.getenv("USE_SSL", "0") == "1"
+
+        host = os.getenv("HOST", "0.0.0.0")
+        port = int(os.getenv("PORT", "5000"))
+
+        ssl_ctx = "adhoc" if use_ssl else None
+
+        print(f"Starting server on {'https' if use_ssl else 'http'}://{host}:{port}")
+        app.run(debug=True, host=host, port=port, use_reloader=False)

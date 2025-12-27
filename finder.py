@@ -1,57 +1,56 @@
-import os
-import glob
+#!/usr/bin/env python3
+"""
+finder.py
 
-# Search in common locations
-search_patterns = [
-    "*.html",                    # Current directory
-    "**/*.html",                 # Any subdirectory
-    "**/*_map.html",             # Any map file
-    "**/Roodan*",               # Anything starting with Roodan
-    "maps/**/*.html",           # In maps folder
-    "output/**/*.html",         # In output folder
-    "generated/**/*.html",      # In generated folder
-    "temp/**/*.html",           # In temp folder
+Small helper script to locate generated topology map files.
+
+Usage:
+    python finder.py
+"""
+
+from __future__ import annotations
+
+import glob
+import os
+
+
+SEARCH_PATTERNS = [
+    "generated_maps/*.html",
+    "generated_maps/*.txt",
+    "Static/maps/*.html",
+    "**/*_map.html",
+    "**/*map*.html",
 ]
 
-print("🔍 Searching for map files...")
-print("=" * 60)
 
-found_files = []
-for pattern in search_patterns:
-    for filepath in glob.glob(pattern, recursive=True):
-        if "map" in filepath.lower() or "roodan" in filepath.lower():
-            found_files.append(filepath)
+def main() -> int:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    print("🔍 Searching for map files...")
 
-if found_files:
-    print(f"✅ Found {len(found_files)} map-related files:")
-    for file in sorted(set(found_files)):
-        size = os.path.getsize(file) if os.path.exists(file) else 0
-        print(f"  📄 {file} ({size:,} bytes)")
-else:
-    print("❌ No map files found anywhere!")
+    found = []
+    for pat in SEARCH_PATTERNS:
+        matches = glob.glob(os.path.join(base_dir, pat), recursive=True)
+        found.extend(matches)
 
-# Also check what your cdp_discovery module produces
-print("\n🔍 Checking cdp_discovery module output...")
-cdp_module = "modules/cdp_discovery"
-if os.path.exists(cdp_module):
-    print(f"✅ cdp_discovery module exists at: {cdp_module}")
-    
-    # Look for any Python files in the module
-    py_files = glob.glob(f"{cdp_module}/*.py")
-    if py_files:
-        print(f"  Found {len(py_files)} Python files:")
-        for py in py_files:
-            # Check if they mention "map" or "html"
-            try:
-                with open(py, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    if 'html' in content or 'map' in content:
-                        print(f"  📝 {os.path.basename(py)} - mentions map/html")
-            except:
-                pass
-else:
-    print(f"❌ cdp_discovery module not found at: {cdp_module}")
+    # De-duplicate while keeping order
+    seen = set()
+    unique = []
+    for p in found:
+        if p not in seen and os.path.isfile(p):
+            seen.add(p)
+            unique.append(p)
 
-print("\n" + "=" * 60)
-print("💡 Suggestion: Run the CDP discovery module first!")
-print("Go to: Topology tab → Run cdp_discovery module")
+    if not unique:
+        print("❌ No map files found.")
+        return 1
+
+    print(f"✅ Found {len(unique)} file(s):")
+    for p in unique:
+        rel = os.path.relpath(p, base_dir)
+        print(f"  - {rel}")
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
