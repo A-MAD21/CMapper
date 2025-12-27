@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>CMapper - Zavieh visual map</title>
+  <style>
+    html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; background: #0c1b2a; color: #e8edf2; }
+    #topbar { padding: 12px 16px; border-bottom: 1px solid #1e3147; background: #13263b; }
+    #network { height: calc(100% - 54px); background: radial-gradient(circle at 20% 20%, #123, #0b1826); position: relative; overflow: hidden; }
+    .muted { color: #9fb3c8; font-size: 13px; }
+    .node-label { fill: #e8edf2; font-size: 12px; pointer-events: none; }
+    .node-circle { fill: #1f8ef1; stroke: #c1ddff; stroke-width: 1; }
+    .edge { stroke: #5c7ea8; stroke-width: 1.3; opacity: 0.7; }
+    .edge-label { fill: #c7d7e6; font-size: 11px; }
+    .tooltip {
+      position: absolute;
+      background: rgba(10, 20, 35, 0.9);
+      color: #e8edf2;
+      padding: 6px 10px;
+      border: 1px solid #234;
+      border-radius: 6px;
+      pointer-events: none;
+      font-size: 12px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="topbar">
+    <div><b>Site:</b> Zavieh <span class="muted">(15 devices, 14 links)</span></div>
+    <div class="muted">Generated 2025-12-27T16:35:17</div>
+  </div>
+  <div id="network">
+    <svg id="svg" width="100%" height="100%"></svg>
+    <div id="tooltip" class="tooltip"></div>
+  </div>
+  <script>
+    const nodes = [{"id": "dev_278eccd0", "label": "Device-10.192.86.131", "title": "10.192.86.131 | unknown | cisco WS-C2960S-48FPS-L"}, {"id": "dev_14666bf6", "label": "MikroTik", "title": "10.192.86.253 | unknown | MikroTik"}, {"id": "dev_7029004e", "label": "Zavie Warehouse", "title": "10.192.86.129 | unknown | MikroTik"}, {"id": "dev_c211d32f", "label": "SW(15)-Soleh7-1.OKCO.ir", "title": "10.192.86.144 | unknown | cisco WS-C2960S-48FPS-L"}, {"id": "dev_bfbae6c4", "label": "SW(12)-Soleh6-2.OKCO.ir", "title": "10.192.86.141 | unknown | cisco WS-C2960S-48FPS-L"}, {"id": "dev_1a5ce2e0", "label": "SW(9)-Soleh5-1.OKCO.ir", "title": "10.192.86.138 | unknown | cisco WS-C2960S-48FPS-L"}, {"id": "dev_5c0f17f1", "label": "SW(3)-Soleh1-1.OKCO.ir", "title": "10.192.86.132 | unknown | cisco WS-C2960S-48FPS-L"}, {"id": "dev_a3aeba69", "label": "SW(7)-Soleh4-1.OKCO.ir", "title": "10.192.86.136 | unknown | cisco WS-C2960S-48FPS-L"}, {"id": "dev_bdd44b5b", "label": "SW(5)-Soleh3-1.OKCO.ir", "title": "10.192.86.134 | unknown | cisco WS-C2960S-48FPS-L"}, {"id": "dev_0c89485e", "label": "SW(16)-Soleh7-2.OKCO.ir", "title": "10.192.86.145 | unknown | cisco WS-C2960S-48FPS-L"}, {"id": "dev_640e32b9", "label": "SW(11)-Soleh6-1.OKCO.ir", "title": "10.192.86.140 | unknown | cisco WS-C2960S-48FPS-L"}, {"id": "dev_655048d5", "label": "SW(10)-Soleh5-2.OKCO.ir", "title": "10.192.86.139 | unknown | cisco WS-C2960X-48FPS-L"}, {"id": "dev_27e49bee", "label": "SW(4)-Soleh1-2.OKCO.ir", "title": "10.192.86.133 | unknown | cisco WS-C2960S-48FPS-L"}, {"id": "dev_e8851a60", "label": "SW(8)-Soleh4-2.OKCO.ir", "title": "10.192.86.137 | unknown | cisco WS-C2960S-48FPS-L"}, {"id": "dev_373c44f5", "label": "SW(6)-Soleh3-2.OKCO.ir", "title": "10.192.86.135 | unknown | cisco WS-C2960S-48FPS-L"}];
+    const edges = [{"from": "dev_278eccd0", "to": "dev_14666bf6", "label": "GigabitEthernet1/0/26", "protocol": "CDP"}, {"from": "dev_278eccd0", "to": "dev_7029004e", "label": "GigabitEthernet1/0/48", "protocol": "CDP"}, {"from": "dev_278eccd0", "to": "dev_c211d32f", "label": "GigabitEthernet1/0/47", "protocol": "CDP"}, {"from": "dev_278eccd0", "to": "dev_bfbae6c4", "label": "GigabitEthernet1/0/46", "protocol": "CDP"}, {"from": "dev_278eccd0", "to": "dev_1a5ce2e0", "label": "GigabitEthernet1/0/45", "protocol": "CDP"}, {"from": "dev_278eccd0", "to": "dev_5c0f17f1", "label": "GigabitEthernet1/0/41", "protocol": "CDP"}, {"from": "dev_278eccd0", "to": "dev_a3aeba69", "label": "GigabitEthernet1/0/44", "protocol": "CDP"}, {"from": "dev_278eccd0", "to": "dev_bdd44b5b", "label": "GigabitEthernet1/0/43", "protocol": "CDP"}, {"from": "dev_c211d32f", "to": "dev_0c89485e", "label": "GigabitEthernet2/0/47", "protocol": "CDP"}, {"from": "dev_bfbae6c4", "to": "dev_640e32b9", "label": "GigabitEthernet2/0/47", "protocol": "CDP"}, {"from": "dev_1a5ce2e0", "to": "dev_655048d5", "label": "GigabitEthernet1/0/47", "protocol": "CDP"}, {"from": "dev_5c0f17f1", "to": "dev_27e49bee", "label": "GigabitEthernet1/0/47", "protocol": "CDP"}, {"from": "dev_a3aeba69", "to": "dev_e8851a60", "label": "GigabitEthernet1/0/47", "protocol": "CDP"}, {"from": "dev_bdd44b5b", "to": "dev_373c44f5", "label": "GigabitEthernet1/0/47", "protocol": "CDP"}];
+    const basePositions = {"dev_278eccd0": {"x": 1080.0, "y": 600.0}, "dev_14666bf6": {"x": 1038.5018196684484, "y": 795.2335886763841}, "dev_7029004e": {"x": 921.1826910522519, "y": 956.7095162291491}, "dev_c211d32f": {"x": 748.3281572999748, "y": 1056.5071278216737}, "dev_bfbae6c4": {"x": 549.8263376315264, "y": 1077.3705097767713}, "dev_1a5ce2e0": {"x": 360.0000000000001, "y": 1015.6921938165306}, "dev_5c0f17f1": {"x": 211.67184270002525, "y": 882.1369211003871}, "dev_a3aeba69": {"x": 130.48915164777327, "y": 699.7976115925245}, "dev_bdd44b5b": {"x": 130.48915164777327, "y": 500.20238840747567}, "dev_0c89485e": {"x": 211.6718427000252, "y": 317.86307889961296}, "dev_640e32b9": {"x": 359.9999999999998, "y": 184.30780618346955}, "dev_655048d5": {"x": 549.8263376315259, "y": 122.6294902232288}, "dev_27e49bee": {"x": 748.3281572999747, "y": 143.49287217832625}, "dev_e8851a60": {"x": 921.182691052252, "y": 243.29048377085087}, "dev_373c44f5": {"x": 1038.5018196684484, "y": 404.7664113236159}};
+
+    const svg = document.getElementById('svg');
+    const tooltip = document.getElementById('tooltip');
+
+    // Layout and physics parameters
+    const params = {
+      repulsion: 18000,
+      spring: 0.015,
+      restLength: 180,
+      damping: 0.85,
+      maxStep: 12
+    };
+
+    let nodePos = Object.fromEntries(nodes.map(n => [n.id, { ...basePositions[n.id] }]));
+    let velocity = Object.fromEntries(nodes.map(n => [n.id, { x: 0, y: 0 }]));
+    let draggingId = null;
+
+    function resize() {
+      const rect = svg.getBoundingClientRect();
+      svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+      // Center initial positions
+      Object.values(nodePos).forEach(p => {
+        if (!p._shifted) {
+          p.x += rect.width / 2;
+          p.y += rect.height / 2;
+          p._shifted = true;
+        }
+      });
+    }
+
+    function applyForces() {
+      // Repulsion
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodePos[nodes[i].id];
+          const b = nodePos[nodes[j].id];
+          let dx = a.x - b.x;
+          let dy = a.y - b.y;
+          const dist2 = Math.max(dx*dx + dy*dy, 40); // avoid div/0
+          const force = params.repulsion / dist2;
+          const invDist = 1 / Math.sqrt(dist2);
+          dx *= invDist; dy *= invDist;
+          velocity[nodes[i].id].x += dx * force;
+          velocity[nodes[i].id].y += dy * force;
+          velocity[nodes[j].id].x -= dx * force;
+          velocity[nodes[j].id].y -= dy * force;
+        }
+      }
+
+      // Springs
+      edges.forEach(e => {
+        const a = nodePos[e.from];
+        const b = nodePos[e.to];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        const dist = Math.max(Math.sqrt(dx*dx + dy*dy), 1);
+        const force = params.spring * (dist - params.restLength);
+        const normX = dx / dist;
+        const normY = dy / dist;
+        velocity[e.from].x += force * normX;
+        velocity[e.from].y += force * normY;
+        velocity[e.to].x -= force * normX;
+        velocity[e.to].y -= force * normY;
+      });
+
+      // Integrate
+      const rect = svg.getBoundingClientRect();
+      const minX = 30, minY = 30, maxX = rect.width - 30, maxY = rect.height - 30;
+
+      nodes.forEach(n => {
+        if (draggingId === n.id) return; // don't move while dragging
+        const v = velocity[n.id];
+        v.x *= params.damping;
+        v.y *= params.damping;
+        v.x = Math.max(Math.min(v.x, params.maxStep), -params.maxStep);
+        v.y = Math.max(Math.min(v.y, params.maxStep), -params.maxStep);
+        const p = nodePos[n.id];
+        p.x = Math.min(Math.max(minX, p.x + v.x), maxX);
+        p.y = Math.min(Math.max(minY, p.y + v.y), maxY);
+      });
+    }
+
+    function draw() {
+      svg.innerHTML = '';
+
+      // Draw edges
+      edges.forEach(e => {
+        const a = nodePos[e.from];
+        const b = nodePos[e.to];
+        if (!a || !b) return;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', a.x);
+        line.setAttribute('y1', a.y);
+        line.setAttribute('x2', b.x);
+        line.setAttribute('y2', b.y);
+        line.setAttribute('class', 'edge');
+        svg.appendChild(line);
+
+        if (e.label || e.protocol) {
+          const midX = (a.x + b.x) / 2;
+          const midY = (a.y + b.y) / 2;
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', midX);
+          text.setAttribute('y', midY - 4);
+          text.setAttribute('class', 'edge-label');
+          text.textContent = (e.protocol ? e.protocol + ' ' : '') + (e.label || '');
+          svg.appendChild(text);
+        }
+      });
+
+      // Draw nodes
+      nodes.forEach(n => {
+        const p = nodePos[n.id];
+        if (!p) return;
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('cursor', 'pointer');
+        g.addEventListener('mousemove', (evt) => {
+          tooltip.style.display = 'block';
+          tooltip.style.left = `${evt.clientX + 10}px`;
+          tooltip.style.top = `${evt.clientY + 10}px`;
+          tooltip.innerHTML = `<b>${n.label}</b><br/>${n.title || 'No details'}`;
+        });
+        g.addEventListener('mouseleave', () => {
+          tooltip.style.display = 'none';
+        });
+        g.addEventListener('mousedown', (evt) => {
+          draggingId = n.id;
+          tooltip.style.display = 'none';
+          evt.preventDefault();
+        });
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', p.x);
+        circle.setAttribute('cy', p.y);
+        circle.setAttribute('r', 14);
+        circle.setAttribute('class', 'node-circle');
+        g.appendChild(circle);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', p.x);
+        text.setAttribute('y', p.y + 26);
+        text.setAttribute('class', 'node-label');
+        text.setAttribute('text-anchor', 'middle');
+        text.textContent = n.label;
+        g.appendChild(text);
+
+        svg.appendChild(g);
+      });
+    }
+
+    function onMouseMove(evt) {
+      if (!draggingId) return;
+      const p = nodePos[draggingId];
+      p.x = evt.clientX;
+      p.y = evt.clientY;
+      velocity[draggingId].x = 0;
+      velocity[draggingId].y = 0;
+    }
+    function onMouseUp() { draggingId = null; }
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+
+    resize();
+    function loop() {
+      applyForces();
+      draw();
+      requestAnimationFrame(loop);
+    }
+    loop();
+  </script>
+</body>
+</html>
