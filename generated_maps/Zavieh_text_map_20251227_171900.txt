@@ -1,0 +1,33 @@
+Site: Zavieh
+Generated: 2025-12-27T17:19:00
+Devices: 15 | Connection entries: 26
+
+- Device-10.192.86.131 (10.192.86.131) | unknown | cisco WS-C2960S-48FPS-L
+  link: cdp GigabitEthernet1/0/26
+  - MikroTik (10.192.86.253) | unknown | MikroTik
+  link: cdp GigabitEthernet1/0/46
+  - SW(12)-Soleh6-2.OKCO.ir (10.192.86.141) | unknown | cisco WS-C2960S-48FPS-L
+    link: cdp GigabitEthernet2/0/47
+    - SW(11)-Soleh6-1.OKCO.ir (10.192.86.140) | unknown | cisco WS-C2960S-48FPS-L
+  link: cdp GigabitEthernet1/0/47
+  - SW(15)-Soleh7-1.OKCO.ir (10.192.86.144) | unknown | cisco WS-C2960S-48FPS-L
+    link: cdp GigabitEthernet2/0/47
+    - SW(16)-Soleh7-2.OKCO.ir (10.192.86.145) | unknown | cisco WS-C2960S-48FPS-L
+  link: cdp GigabitEthernet1/0/41
+  - SW(3)-Soleh1-1.OKCO.ir (10.192.86.132) | unknown | cisco WS-C2960S-48FPS-L
+    link: cdp GigabitEthernet1/0/47
+    - SW(4)-Soleh1-2.OKCO.ir (10.192.86.133) | unknown | cisco WS-C2960S-48FPS-L
+  link: cdp GigabitEthernet1/0/43
+  - SW(5)-Soleh3-1.OKCO.ir (10.192.86.134) | unknown | cisco WS-C2960S-48FPS-L
+    link: cdp GigabitEthernet1/0/47
+    - SW(6)-Soleh3-2.OKCO.ir (10.192.86.135) | unknown | cisco WS-C2960S-48FPS-L
+  link: cdp GigabitEthernet1/0/44
+  - SW(7)-Soleh4-1.OKCO.ir (10.192.86.136) | unknown | cisco WS-C2960S-48FPS-L
+    link: cdp GigabitEthernet1/0/47
+    - SW(8)-Soleh4-2.OKCO.ir (10.192.86.137) | unknown | cisco WS-C2960S-48FPS-L
+  link: cdp GigabitEthernet1/0/45
+  - SW(9)-Soleh5-1.OKCO.ir (10.192.86.138) | unknown | cisco WS-C2960S-48FPS-L
+    link: cdp GigabitEthernet1/0/47
+    - SW(10)-Soleh5-2.OKCO.ir (10.192.86.139) | unknown | cisco WS-C2960X-48FPS-L
+  link: cdp GigabitEthernet1/0/48
+  - Zavie Warehouse (10.192.86.129) | unknown | MikroTik

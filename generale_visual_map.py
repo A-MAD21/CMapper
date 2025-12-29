@@ -136,7 +136,6 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
     .node-label {{ fill: #e8edf2; font-size: 12px; pointer-events: none; }}
     .node-circle {{ fill: #1f8ef1; stroke: #c1ddff; stroke-width: 1; }}
     .edge {{ stroke: #5c7ea8; stroke-width: 1.3; opacity: 0.7; }}
-    .edge-label {{ fill: #c7d7e6; font-size: 11px; }}
     .tooltip {{
       position: absolute;
       background: rgba(10, 20, 35, 0.9);
@@ -179,6 +178,9 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
     let nodePos = Object.fromEntries(nodes.map(n => [n.id, {{ ...basePositions[n.id] }}]));
     let velocity = Object.fromEntries(nodes.map(n => [n.id, {{ x: 0, y: 0 }}]));
     let draggingId = null;
+    let panning = false;
+    let lastPan = null;
+    const transform = {{ x: 0, y: 0, scale: 1 }};
 
     function resize() {{
       const rect = svg.getBoundingClientRect();
@@ -247,6 +249,8 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
 
     function draw() {{
       svg.innerHTML = '';
+      const root = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      root.setAttribute('transform', `translate(${{transform.x}}, ${{transform.y}}) scale(${{transform.scale}})`);
 
       // Draw edges
       edges.forEach(e => {{
@@ -259,18 +263,7 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
         line.setAttribute('x2', b.x);
         line.setAttribute('y2', b.y);
         line.setAttribute('class', 'edge');
-        svg.appendChild(line);
-
-        if (e.label || e.protocol) {{
-          const midX = (a.x + b.x) / 2;
-          const midY = (a.y + b.y) / 2;
-          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          text.setAttribute('x', midX);
-          text.setAttribute('y', midY - 4);
-          text.setAttribute('class', 'edge-label');
-          text.textContent = (e.protocol ? e.protocol + ' ' : '') + (e.label || '');
-          svg.appendChild(text);
-        }}
+        root.appendChild(line);
       }});
 
       // Draw nodes
@@ -310,19 +303,43 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
         text.textContent = n.label;
         g.appendChild(text);
 
-        svg.appendChild(g);
+        root.appendChild(g);
       }});
+
+      svg.appendChild(root);
     }}
 
     function onMouseMove(evt) {{
-      if (!draggingId) return;
-      const p = nodePos[draggingId];
-      p.x = evt.clientX;
-      p.y = evt.clientY;
-      velocity[draggingId].x = 0;
-      velocity[draggingId].y = 0;
+      if (draggingId) {{
+        const p = nodePos[draggingId];
+        const world = toWorld(evt);
+        p.x = world.x;
+        p.y = world.y;
+        velocity[draggingId].x = 0;
+        velocity[draggingId].y = 0;
+      }} else if (panning && lastPan) {{
+        transform.x += evt.clientX - lastPan.x;
+        transform.y += evt.clientY - lastPan.y;
+        lastPan = {{ x: evt.clientX, y: evt.clientY }};
+      }}
     }}
-    function onMouseUp() {{ draggingId = null; }}
+    function onMouseUp() {{ draggingId = null; panning = false; }}
+
+    // Zoom/pan controls
+    svg.addEventListener('wheel', (evt) => {{
+      evt.preventDefault();
+      const scaleDelta = evt.deltaY < 0 ? 1.1 : 0.9;
+      const mouse = toWorld(evt);
+      transform.scale = Math.min(3, Math.max(0.4, transform.scale * scaleDelta));
+      transform.x = evt.clientX - mouse.x * transform.scale;
+      transform.y = evt.clientY - mouse.y * transform.scale;
+    }}, {{ passive: false }});
+
+    svg.addEventListener('mousedown', (evt) => {{
+      if (evt.target.tagName === 'circle' || evt.target.tagName === 'text') return;
+      panning = true;
+      lastPan = {{ x: evt.clientX, y: evt.clientY }};
+    }});
 
     window.addEventListener('resize', resize);
     window.addEventListener('mousemove', onMouseMove);
@@ -335,6 +352,13 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
       requestAnimationFrame(loop);
     }}
     loop();
+
+    function toWorld(evt) {{
+      return {{
+        x: (evt.clientX - transform.x) / transform.scale,
+        y: (evt.clientY - transform.y) / transform.scale
+      }};
+    }}
   </script>
 </body>
 </html>
