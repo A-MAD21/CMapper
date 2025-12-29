@@ -3,6 +3,12 @@
  * Everything works with real data from the backend
  */
 
+const replaceIcons = () => {
+    if (window.feather && typeof feather.replace === 'function') {
+        feather.replace();
+    }
+};
+
 class NetworkPlatform {
     constructor() {
         this.currentSite = '';
@@ -88,7 +94,7 @@ class NetworkPlatform {
         // Show loading state
         showMapBtn.innerHTML = '<i data-feather="loader"></i> Loading...';
         showMapBtn.disabled = true;
-        feather.replace();
+        replaceIcons();
         
         // Show map container
         mapContainer.style.display = 'block';
@@ -127,7 +133,7 @@ class NetworkPlatform {
             // Reset button
             showMapBtn.innerHTML = '<i data-feather="eye"></i> Show Map';
             showMapBtn.disabled = false;
-            feather.replace();
+            replaceIcons();
         }
     }
 
@@ -148,7 +154,7 @@ class NetworkPlatform {
                 Go to Topology
             </button>
         `;
-        feather.replace();
+        replaceIcons();
     }
     
         // ==================== INITIALIZATION ====================
@@ -200,7 +206,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', function() 
     
     btn.innerHTML = '<i data-feather="loader"></i> Generating...';
     btn.disabled = true;
-    feather.replace();
+    replaceIcons();
     
     fetch('/api/generate_text_map', {
         method: 'POST',
@@ -223,7 +229,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', function() 
     .finally(() => {
         btn.innerHTML = originalText;
         btn.disabled = false;
-        feather.replace();
+        replaceIcons();
     });
 });
 
@@ -242,7 +248,7 @@ document.getElementById('showTextMapBtn')?.addEventListener('click', async () =>
         
         btn.innerHTML = '<i data-feather="loader"></i> Generating...';
         btn.disabled = true;
-        feather.replace();
+        replaceIcons();
         
         try {
             // Generate text map for selected site
@@ -272,7 +278,7 @@ document.getElementById('showTextMapBtn')?.addEventListener('click', async () =>
         } finally {
             btn.innerHTML = '<i data-feather="list"></i> Text Map';
             btn.disabled = false;
-            feather.replace();
+            replaceIcons();
         }
     }
 });
@@ -286,7 +292,7 @@ document.getElementById('showVisualMapBtn')?.addEventListener('click', async () 
         
         btn.innerHTML = '<i data-feather="loader"></i> Generating...';
         btn.disabled = true;
-        feather.replace();
+        replaceIcons();
         
         try {
             // Generate visual map for selected site
@@ -313,7 +319,7 @@ document.getElementById('showVisualMapBtn')?.addEventListener('click', async () 
         } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
-            feather.replace();
+            replaceIcons();
         }
     }
 });
@@ -331,7 +337,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
     
     btn.innerHTML = '<i data-feather="loader"></i> Generating...';
     btn.disabled = true;
-    feather.replace();
+    replaceIcons();
     
     try {
         // Generate text map for selected site
@@ -359,7 +365,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
     } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;
-        feather.replace();
+        replaceIcons();
     }
 });
         // Edit Device
@@ -388,7 +394,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 
                 btn.innerHTML = '<i data-feather="loader"></i> Loading...';
                 btn.disabled = true;
-                feather.replace();
+                replaceIcons();
                 
                 try {
                     // Try to load existing visual map first
@@ -434,7 +440,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 } finally {
                     btn.innerHTML = originalText;
                     btn.disabled = false;
-                    feather.replace();
+                    replaceIcons();
                 }
             }
         });
@@ -602,7 +608,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             `;
         }
         
-        feather.replace();
+        replaceIcons();
     }
 
     updateSitesTab() {
@@ -663,7 +669,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             `;
         }
         
-        feather.replace();
+        replaceIcons();
     }
 
     updateDevicesTab() {
@@ -740,7 +746,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             `;
         }
         
-        feather.replace();
+        replaceIcons();
     }
 
     updateTopologyTab() {
@@ -788,7 +794,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         // Update active jobs
         this.updateModuleJobs();
         
-        feather.replace();
+        replaceIcons();
     }
 
     updateSettingsTab() {
@@ -1099,7 +1105,7 @@ formHTML += `
             `;
         }
         
-        feather.replace();
+        replaceIcons();
     }
 
     async cancelModule(threadId) {
