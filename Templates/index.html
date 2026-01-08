@@ -243,6 +243,25 @@
                             </button>
                         </div>
                     </div>
+                    <div class="card-header" style="padding-top: 0;">
+                        <div class="header-actions" style="width: 100%; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+                            <div style="padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.04);">
+                                Selected: <span id="mapSelectedLabel">None</span>
+                            </div>
+                            <button class="btn btn-primary" id="mapAddBtn">
+                                <i data-feather="plus"></i>
+                                Add Node
+                            </button>
+                            <button class="btn btn-secondary" id="mapEditBtn" disabled>
+                                <i data-feather="edit-2"></i>
+                                Edit Node
+                            </button>
+                            <button class="btn btn-secondary" id="mapRemoveBtn" disabled>
+                                <i data-feather="trash-2"></i>
+                                Remove Node
+                            </button>
+                        </div>
+                    </div>
                     
                     <div class="map-container" id="mapContainer" style="padding: 24px; display: none;">
                         <div class="map-controls" style="margin-bottom: 16px; display: flex; gap: 12px;">
@@ -412,6 +431,18 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label for="editDeviceOS">Operating System</label>
+                            <input type="text" id="editDeviceOS" placeholder="IOS-XE, RouterOS, Windows, Linux">
+                        </div>
+                        <div class="form-group">
+                            <label for="editDeviceVendor">Vendor</label>
+                            <input type="text" id="editDeviceVendor" placeholder="Cisco, MikroTik, HP">
+                        </div>
+                        <div class="form-group">
+                            <label for="editDevicePlatform">Platform / Model</label>
+                            <input type="text" id="editDevicePlatform" placeholder="WS-C2960S-48FPS-L">
+                        </div>
+                        <div class="form-group">
                             <label for="editDeviceStatus">Status</label>
                             <select id="editDeviceStatus">
                                 <option value="online">Online</option>
@@ -422,6 +453,19 @@
                         <div class="form-group">
                             <label for="editDeviceNotes">Notes</label>
                             <textarea id="editDeviceNotes" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Connections</label>
+                            <div id="editConnectionsWrap"></div>
+                            <button class="btn btn-secondary" type="button" id="addConnectionRowBtn">
+                                Add Connection
+                            </button>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="editCreateMissingNodes" checked>
+                                <span>Create missing nodes from connection list</span>
+                            </label>
                         </div>
                         <div class="form-group">
                             <label class="checkbox-label">
@@ -441,8 +485,10 @@
 
     <script src="/static/js/dashboard.js"></script>
     <script>
-        // Initialize Feather icons
-        feather.replace();
+        // Initialize Feather icons (guard if CDN is blocked)
+        if (window.feather && typeof feather.replace === 'function') {
+            feather.replace();
+        }
         
         // Initialize dashboard when page loads
         document.addEventListener('DOMContentLoaded', function() {

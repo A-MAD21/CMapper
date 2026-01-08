@@ -7,13 +7,6 @@
   "entry_point": "add_device.py",
   "inputs": [
     {
-      "name": "ip",
-      "type": "text",
-      "required": true,
-      "label": "IP Address",
-      "placeholder": "192.168.1.1"
-    },
-    {
       "name": "name",
       "type": "text",
       "required": true,
@@ -21,12 +14,82 @@
       "placeholder": "router-01"
     },
     {
+      "name": "ip",
+      "type": "text",
+      "required": false,
+      "label": "IP Address",
+      "placeholder": "192.168.1.1"
+    },
+    {
       "name": "device_type",
       "type": "select",
-      "required": false,
-      "default": "router",
-      "options": ["router", "switch", "firewall", "ap", "server"],
+      "required": true,
+      "default": "switch",
+      "options": ["switch", "router", "firewall", "ap", "server", "pc", "printer", "camera", "other"],
       "label": "Device Type"
+    },
+    {
+      "name": "os",
+      "type": "text",
+      "required": false,
+      "label": "Operating System",
+      "placeholder": "IOS-XE, RouterOS, Windows, Linux"
+    },
+    {
+      "name": "platform",
+      "type": "text",
+      "required": false,
+      "label": "Platform / Model",
+      "placeholder": "WS-C2960S-48FPS-L"
+    },
+    {
+      "name": "vendor",
+      "type": "text",
+      "required": false,
+      "label": "Vendor",
+      "placeholder": "Cisco, MikroTik, HP"
+    },
+    {
+      "name": "notes",
+      "type": "text",
+      "required": false,
+      "label": "Notes",
+      "placeholder": "Optional notes"
+    },
+    {
+      "name": "remote_device_id",
+      "type": "device_select",
+      "required": false,
+      "label": "Connect to existing device"
+    },
+    {
+      "name": "local_interface",
+      "type": "text",
+      "required": false,
+      "label": "Local Interface",
+      "placeholder": "Ether0, Gi0/1"
+    },
+    {
+      "name": "remote_interface",
+      "type": "text",
+      "required": false,
+      "label": "Remote Interface",
+      "placeholder": "Gi0/46"
+    },
+    {
+      "name": "protocol",
+      "type": "select",
+      "required": false,
+      "default": "manual",
+      "options": ["manual", "cdp", "lldp", "snmp", "other"],
+      "label": "Link Protocol"
+    },
+    {
+      "name": "add_reverse_links",
+      "type": "checkbox",
+      "required": false,
+      "default": false,
+      "label": "Add reverse links on remote devices"
     }
   ],
   "outputs": [

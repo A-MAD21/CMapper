@@ -549,11 +549,127 @@ def handle_device(device_id):
         update_data = request.json
         current_device = data["devices"][device_index]
         
-        updatable_fields = ["name", "ip", "type", "status", "notes", "locked"]
+        updatable_fields = [
+            "name",
+            "ip",
+            "type",
+            "status",
+            "notes",
+            "locked",
+            "os",
+            "vendor",
+            "platform",
+            "model",
+        ]
         for field in updatable_fields:
             if field in update_data:
                 current_device[field] = update_data[field]
-        
+
+        def _parse_connections(text):
+            if not text:
+                return []
+            lines = [line.strip() for line in str(text).splitlines() if line.strip()]
+            parsed = []
+            for line in lines:
+                parts = [part.strip() for part in line.split(",")]
+                if len(parts) < 2:
+                    continue
+                while len(parts) < 4:
+                    parts.append("")
+                parsed.append(
+                    {
+                        "local_interface": parts[0] or "unknown",
+                        "remote_lookup": parts[1],
+                        "remote_interface": parts[2] or "unknown",
+                        "protocol": parts[3] or "manual",
+                    }
+                )
+            return parsed
+
+        if "connections_input" in update_data or "connections_list" in update_data:
+            create_missing = bool(update_data.get("create_missing_nodes", True))
+            parsed = _parse_connections(update_data.get("connections_input"))
+            list_entries = update_data.get("connections_list")
+            if isinstance(list_entries, list):
+                for entry in list_entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    parsed.append(
+                        {
+                            "local_interface": entry.get("local_interface") or "unknown",
+                            "remote_lookup": entry.get("remote_device_id") or entry.get("remote_lookup") or "",
+                            "remote_interface": entry.get("remote_interface") or "unknown",
+                            "protocol": entry.get("protocol") or "manual",
+                            "lookup_by_id": True,
+                        }
+                    )
+            connections = []
+            devices = data.get("devices", [])
+
+            def _find_device(token):
+                token_norm = str(token).strip().lower()
+                for device in devices:
+                    if device.get("site") != current_device.get("site"):
+                        continue
+                    if str(device.get("id", "")).lower() == token_norm:
+                        return device
+                    if str(device.get("name", "")).lower() == token_norm:
+                        return device
+                    if str(device.get("ip", "")).lower() == token_norm:
+                        return device
+                return None
+
+            def _create_placeholder(token):
+                placeholder = {
+                    "id": f"dev_{str(uuid.uuid4())[:8]}",
+                    "site": current_device.get("site"),
+                    "name": token,
+                    "ip": token if str(token).count(".") == 3 else "",
+                    "type": "unknown",
+                    "model": "",
+                    "platform": "",
+                    "vendor": "",
+                    "os": "",
+                    "discovered_by": "manual",
+                    "discovered_at": datetime.now().isoformat(),
+                    "last_seen": datetime.now().isoformat(),
+                    "last_modified": datetime.now().isoformat(),
+                    "status": "unknown",
+                    "reachable": False,
+                    "config_backup": {"enabled": False},
+                    "connections": [],
+                    "credentials_used": None,
+                    "modules_successful": [],
+                    "modules_failed": [],
+                    "locked": False,
+                    "notes": "Placeholder created via manual edit"
+                }
+                devices.append(placeholder)
+                return placeholder
+
+            for entry in parsed:
+                remote_token = entry.get("remote_lookup")
+                if not remote_token:
+                    continue
+                remote_device = _find_device(remote_token)
+                if not remote_device and create_missing:
+                    remote_device = _create_placeholder(remote_token)
+                if not remote_device:
+                    continue
+                connections.append(
+                    {
+                        "id": f"conn_{str(uuid.uuid4())[:8]}",
+                        "local_interface": entry.get("local_interface") or "unknown",
+                        "remote_device": remote_device.get("id"),
+                        "remote_interface": entry.get("remote_interface") or "unknown",
+                        "protocol": entry.get("protocol") or "manual",
+                        "discovered_at": datetime.now().isoformat(),
+                        "status": "up",
+                    }
+                )
+
+            current_device["connections"] = connections
+
         current_device["last_modified"] = datetime.now().isoformat()
         write_database(data)
         return jsonify(current_device)

@@ -20,6 +20,7 @@ class NetworkPlatform {
         // ADD MAP-SPECIFIC PROPERTIES
         this.mapLoaded = false;
         this.currentMapSite = '';
+        this.mapSelectedDeviceId = '';
         
         // Initialize
         this.initEventListeners();
@@ -28,6 +29,14 @@ class NetworkPlatform {
         
         // Start background updates
         this.startBackgroundUpdates();
+
+        // Map selection messages from iframe
+        window.addEventListener('message', (event) => {
+            const data = event.data || {};
+            if (data.type === 'cmapp:select' && data.deviceId) {
+                this.setMapSelection(data.deviceId);
+            }
+        });
     }
 
     // ==================== INITIALIZATION ====================
@@ -78,6 +87,54 @@ class NetworkPlatform {
         if (!siteSelect || !showMapBtn) return;
         
         showMapBtn.disabled = !siteSelect.value;
+    }
+
+    setMapSelection(deviceId) {
+        this.mapSelectedDeviceId = deviceId || '';
+        const label = document.getElementById('mapSelectedLabel');
+        const editBtn = document.getElementById('mapEditBtn');
+        const removeBtn = document.getElementById('mapRemoveBtn');
+
+        const device = (this.devices || []).find(d => d.id === this.mapSelectedDeviceId);
+        if (!device) {
+            this.mapSelectedDeviceId = '';
+        }
+
+        if (this.mapSelectedDeviceId && device) {
+            const ip = device.ip ? ` (${device.ip})` : '';
+            label.textContent = `${device.name}${ip}`;
+            editBtn.disabled = false;
+            removeBtn.disabled = false;
+            if (device.site && device.site !== this.currentSite) {
+                this.currentSite = device.site;
+                this.updateCurrentSiteDisplay();
+                this.updateMapTab();
+            }
+        } else {
+            label.textContent = 'None';
+            editBtn.disabled = true;
+            removeBtn.disabled = true;
+        }
+    }
+
+    syncMapSelection() {
+        if (!this.mapSelectedDeviceId) {
+            this.setMapSelection('');
+            return;
+        }
+        const exists = (this.devices || []).some(d => d.id === this.mapSelectedDeviceId);
+        if (!exists) {
+            this.setMapSelection('');
+        }
+    }
+
+    openModuleById(moduleId, prefill = {}) {
+        const module = (this.modules || []).find(m => m.id === moduleId);
+        if (!module) {
+            this.showError(`Module '${moduleId}' not found`);
+            return;
+        }
+        this.showModuleForm(module, prefill);
     }
 
     async loadMapForSite(siteName) {
@@ -378,11 +435,42 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             this.saveSettings();
         });
 
+        document.getElementById('addConnectionRowBtn')?.addEventListener('click', () => {
+            this.addConnectionRow();
+        });
+
         // ==================== MAP TAB EVENT LISTENERS ====================
         
         // Map site selection
         document.getElementById('mapSiteSelect')?.addEventListener('change', (e) => {
             this.updateShowMapButton();
+        });
+
+        document.getElementById('mapAddBtn')?.addEventListener('click', () => {
+            if (!this.currentSite) {
+                this.showError('Select a site first');
+                return;
+            }
+            this.openModuleById('add_device_manual');
+        });
+
+        document.getElementById('mapEditBtn')?.addEventListener('click', () => {
+            if (!this.mapSelectedDeviceId) {
+                this.showError('Select a node first');
+                return;
+            }
+            this.showEditDeviceModal(this.mapSelectedDeviceId);
+        });
+
+        document.getElementById('mapRemoveBtn')?.addEventListener('click', () => {
+            if (!this.mapSelectedDeviceId) {
+                this.showError('Select a node first');
+                return;
+            }
+            this.openModuleById('remove_device', {
+                device_id: this.mapSelectedDeviceId,
+                keep_dependents: true
+            });
         });
         
         // Show Map button
@@ -492,6 +580,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         
         // ADD THIS LINE:
         this.updateMapTab(); // Update map dropdown
+        this.syncMapSelection();
         
     } catch (error) {
         console.error('Error loading data:', error);
@@ -852,7 +941,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         this.showModuleForm(module);
     }
 
-    showModuleForm(module) {
+    showModuleForm(module, prefill = {}) {
         const modal = document.getElementById('moduleRunnerModal');
         const title = document.getElementById('moduleModalTitle');
         const formContainer = document.getElementById('moduleFormContainer');
@@ -868,7 +957,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         // Build form from module inputs
 let formHTML = '';
 
-if (module.inputs && module.inputs.length > 0) {
+        if (module.inputs && module.inputs.length > 0) {
     module.inputs.forEach(input => {
         // Skip site field - we use the selected site
         if (input.name === 'site') {
@@ -884,6 +973,43 @@ if (module.inputs && module.inputs.length > 0) {
                             `<option value="${opt}" ${opt === input.default ? 'selected' : ''}>${opt}</option>`
                         ).join('')}
                     </select>
+                </div>
+            `;
+        } else if (input.type === 'device_select') {
+            const siteDevices = (this.devices || []).filter(d => !this.currentSite || d.site === this.currentSite);
+            const options = siteDevices.map(d => {
+                const ip = d.ip ? ` (${d.ip})` : '';
+                const dtype = d.type ? ` [${d.type}]` : '';
+                return `<option value="${d.id}">${d.name}${ip}${dtype}</option>`;
+            }).join('');
+            formHTML += `
+                <div class="form-group">
+                    <label for="module_${input.name}">${input.label} ${input.required ? '*' : ''}</label>
+                    <select id="module_${input.name}" ${input.required ? 'required' : ''}>
+                        <option value="">Select device</option>
+                        ${options}
+                    </select>
+                </div>
+            `;
+        } else if (input.type === 'checkbox') {
+            formHTML += `
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox"
+                               id="module_${input.name}"
+                               ${input.default ? 'checked' : ''}>
+                        <span>${input.label}</span>
+                    </label>
+                </div>
+            `;
+        } else if (input.type === 'textarea') {
+            formHTML += `
+                <div class="form-group">
+                    <label for="module_${input.name}">${input.label} ${input.required ? '*' : ''}</label>
+                    <textarea id="module_${input.name}"
+                              placeholder="${input.placeholder || ''}"
+                              ${input.required ? 'required' : ''}
+                              rows="4">${input.default || ''}</textarea>
                 </div>
             `;
         } else {
@@ -917,7 +1043,18 @@ formHTML += `
         // Add site field (hidden, auto-filled)
         formHTML += `<input type="hidden" id="module_site" value="${this.currentSite}">`;
         
-        formContainer.innerHTML = formHTML;
+          formContainer.innerHTML = formHTML;
+          Object.entries(prefill || {}).forEach(([key, value]) => {
+              const element = document.getElementById(`module_${key}`);
+              if (!element) {
+                  return;
+              }
+              if (element.type === 'checkbox') {
+                  element.checked = Boolean(value);
+              } else {
+                  element.value = value;
+              }
+          });
         
         // Show modal
         modal.classList.add('active');
@@ -1257,6 +1394,11 @@ selectSite(siteName) {
         document.getElementById('editDeviceStatus').value = device.status || 'unknown';
         document.getElementById('editDeviceNotes').value = device.notes || '';
         document.getElementById('editDeviceLocked').checked = device.locked || false;
+        document.getElementById('editDeviceOS').value = device.os || '';
+        document.getElementById('editDeviceVendor').value = device.vendor || '';
+        document.getElementById('editDevicePlatform').value = device.platform || device.model || '';
+        document.getElementById('editCreateMissingNodes').checked = true;
+        this.renderConnectionRows(device);
         
         // Store device ID
         document.getElementById('editDeviceModal').dataset.deviceId = deviceId;
@@ -1278,13 +1420,18 @@ selectSite(siteName) {
             name: document.getElementById('editDeviceName').value.trim(),
             ip: document.getElementById('editDeviceIP').value.trim(),
             type: document.getElementById('editDeviceType').value,
+            os: document.getElementById('editDeviceOS').value.trim(),
+            vendor: document.getElementById('editDeviceVendor').value.trim(),
+            platform: document.getElementById('editDevicePlatform').value.trim(),
             status: document.getElementById('editDeviceStatus').value,
             notes: document.getElementById('editDeviceNotes').value.trim(),
-            locked: document.getElementById('editDeviceLocked').checked
+            locked: document.getElementById('editDeviceLocked').checked,
+            connections_list: this.collectConnectionRows(),
+            create_missing_nodes: document.getElementById('editCreateMissingNodes').checked
         };
         
-        if (!updates.name || !updates.ip) {
-            this.showError('Device name and IP are required');
+        if (!updates.name) {
+            this.showError('Device name is required');
             return;
         }
         
@@ -1305,6 +1452,78 @@ selectSite(siteName) {
             console.error('Error updating device:', error);
             this.showError('Failed to update device');
         }
+    }
+
+    renderConnectionRows(device) {
+        const wrap = document.getElementById('editConnectionsWrap');
+        if (!wrap) {
+            return;
+        }
+        wrap.innerHTML = '';
+        const connections = device.connections || [];
+        if (!connections.length) {
+            this.addConnectionRow();
+            return;
+        }
+        connections.forEach(conn => {
+            this.addConnectionRow({
+                local_interface: conn.local_interface || '',
+                remote_device: conn.remote_device || '',
+                remote_interface: conn.remote_interface || '',
+                protocol: conn.protocol || 'manual'
+            });
+        });
+    }
+
+    addConnectionRow(prefill = {}) {
+        const wrap = document.getElementById('editConnectionsWrap');
+        if (!wrap) {
+            return;
+        }
+        const row = document.createElement('div');
+        row.className = 'connection-row';
+        const siteDevices = (this.devices || []).filter(d => !this.currentSite || d.site === this.currentSite);
+        const options = siteDevices.map(d => {
+            const ip = d.ip ? ` (${d.ip})` : '';
+            const dtype = d.type ? ` [${d.type}]` : '';
+            return `<option value="${d.id}">${d.name}${ip}${dtype}</option>`;
+        }).join('');
+        row.innerHTML = `
+            <input type="text" class="conn-local" placeholder="Local interface" value="${prefill.local_interface || ''}">
+            <select class="conn-remote">
+                <option value="">Select device</option>
+                ${options}
+            </select>
+            <input type="text" class="conn-remote-intf" placeholder="Remote interface" value="${prefill.remote_interface || ''}">
+            <select class="conn-proto">
+                ${['manual','cdp','lldp','snmp','other'].map(p => `<option value="${p}">${p}</option>`).join('')}
+            </select>
+            <button type="button" class="btn btn-secondary conn-remove">Remove</button>
+        `;
+        const remoteSelect = row.querySelector('.conn-remote');
+        remoteSelect.value = prefill.remote_device || '';
+        const protoSelect = row.querySelector('.conn-proto');
+        protoSelect.value = prefill.protocol || 'manual';
+        row.querySelector('.conn-remove').addEventListener('click', () => {
+            row.remove();
+        });
+        wrap.appendChild(row);
+    }
+
+    collectConnectionRows() {
+        const wrap = document.getElementById('editConnectionsWrap');
+        if (!wrap) {
+            return [];
+        }
+        const rows = Array.from(wrap.querySelectorAll('.connection-row'));
+        return rows.map(row => {
+            return {
+                local_interface: row.querySelector('.conn-local')?.value.trim() || '',
+                remote_device_id: row.querySelector('.conn-remote')?.value || '',
+                remote_interface: row.querySelector('.conn-remote-intf')?.value.trim() || '',
+                protocol: row.querySelector('.conn-proto')?.value || 'manual'
+            };
+        }).filter(entry => entry.remote_device_id);
     }
 
     async deleteDevice(deviceId) {

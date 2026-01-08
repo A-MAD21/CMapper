@@ -135,6 +135,7 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
     .muted {{ color: #9fb3c8; font-size: 13px; }}
     .node-label {{ fill: #e8edf2; font-size: 12px; pointer-events: none; }}
     .node-circle {{ fill: #1f8ef1; stroke: #c1ddff; stroke-width: 1; }}
+    .node-circle.selected {{ fill: #f5b642; stroke: #ffffff; stroke-width: 2; }}
     .edge {{ stroke: #5c7ea8; stroke-width: 1.3; opacity: 0.7; }}
     .tooltip {{
       position: absolute;
@@ -178,6 +179,7 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
     let nodePos = Object.fromEntries(nodes.map(n => [n.id, {{ ...basePositions[n.id] }}]));
     let velocity = Object.fromEntries(nodes.map(n => [n.id, {{ x: 0, y: 0 }}]));
     let draggingId = null;
+    let selectedId = null;
     let panning = false;
     let lastPan = null;
     const transform = {{ x: 0, y: 0, scale: 1 }};
@@ -283,16 +285,21 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
           tooltip.style.display = 'none';
         }});
         g.addEventListener('mousedown', (evt) => {{
+          selectedId = n.id;
+          if (window.parent && window.parent !== window) {{
+            window.parent.postMessage({{ type: 'cmapp:select', deviceId: n.id }}, '*');
+          }}
           draggingId = n.id;
           tooltip.style.display = 'none';
           evt.preventDefault();
+          evt.stopPropagation();
         }});
 
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         circle.setAttribute('cx', p.x);
         circle.setAttribute('cy', p.y);
         circle.setAttribute('r', 14);
-        circle.setAttribute('class', 'node-circle');
+        circle.setAttribute('class', 'node-circle' + (n.id === selectedId ? ' selected' : ''));
         g.appendChild(circle);
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -344,6 +351,12 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
     window.addEventListener('resize', resize);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('message', (evt) => {{
+      const data = evt.data || {{}};
+      if (data.type === 'cmapp:select' && data.deviceId) {{
+        selectedId = data.deviceId;
+      }}
+    }});
 
     resize();
     function loop() {{

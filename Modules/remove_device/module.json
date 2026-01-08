@@ -1,0 +1,35 @@
+{
+  "id": "remove_device",
+  "name": "Remove Device",
+  "version": "1.0",
+  "description": "Remove a device and optionally its directly connected neighbors",
+  "author": "System",
+  "entry_point": "remove_device.py",
+  "inputs": [
+    {
+      "name": "device_id",
+      "type": "device_select",
+      "required": true,
+      "label": "Device to remove"
+    },
+    {
+      "name": "keep_dependents",
+      "type": "checkbox",
+      "required": false,
+      "default": true,
+      "label": "Do not remove connected nodes (leave isolated)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "device_removed",
+      "type": "boolean",
+      "description": "Whether device was removed"
+    },
+    {
+      "name": "devices_removed",
+      "type": "number",
+      "description": "Number of devices removed"
+    }
+  ]
+}
