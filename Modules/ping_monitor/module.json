@@ -1,0 +1,9 @@
+{
+  "id": "ping_monitor",
+  "name": "Ping Monitor (5s)",
+  "version": "1.0",
+  "description": "Ping all devices in the selected site for ~5 seconds and update monitoring status",
+  "author": "System",
+  "entry_point": "ping_monitor.py",
+  "inputs": []
+}

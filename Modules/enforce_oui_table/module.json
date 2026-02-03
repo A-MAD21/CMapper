@@ -1,0 +1,9 @@
+{
+  "id": "enforce_oui_table",
+  "name": "Enforce OUI Table",
+  "version": "1.0",
+  "description": "Rename MAC-named devices using OUI vendor and optionally set device type from vendor mapping.",
+  "author": "System",
+  "entry_point": "enforce_oui_table.py",
+  "inputs": []
+}

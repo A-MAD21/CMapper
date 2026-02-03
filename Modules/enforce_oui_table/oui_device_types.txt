@@ -1,0 +1,5 @@
+ubiquiti=ap
+mikrotik=router
+cisco=switch
+apunifi=ap
+univiewnvr=nvr

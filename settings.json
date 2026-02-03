@@ -1,7 +1,75 @@
 {
-  "default_site": "",
+  "default_site": "Zavieh",
   "backup_path": "./backups",
   "default_scan_depth": 3,
   "auto_refresh": false,
-  "refresh_interval": 30
+  "refresh_interval": 30,
+  "auth": {
+    "enabled": true,
+    "users": [
+      {
+        "username": "abdi",
+        "password_hash": "scrypt:32768:8:1$4JTXZpZe394jbqIB$3c6f198d7bbe819165a770469fad6ff1bdbf65bdcdeb102a7201e60c8ddec7e9385b4d3d589dcec305eede49188aafd85186b1ba27330f5c9830fe35a39acbbe",
+        "role": "admin",
+        "allowed_sites": [
+          "*"
+        ],
+        "disabled": false
+      },
+      {
+        "username": "mahmoudian",
+        "password_hash": "scrypt:32768:8:1$9mFu0vz1pUwz3cJf$075e4ee6be6c8da27c6c843b6a8b146f875d5a8afaf1d694dbd701fe2c312d00c95ec595cfd253c3c09da096f235576e9d1eb2272848953deed2da2e7b1651b4",
+        "role": "admin",
+        "allowed_sites": [
+          "*"
+        ],
+        "disabled": false
+      },
+      {
+        "username": "gpanah",
+        "password_hash": "scrypt:32768:8:1$2YCQsVmaCrRzEsAI$7f28ce528a2228d5d939b16be0cfdabd5de7903481e32269ecc93033cd34f1daf48087d9ecfd1681bd4442a13e610aa29bf7befbc171b65d64afb6d6b31cbeaa",
+        "role": "operator",
+        "allowed_sites": [
+          "*"
+        ],
+        "disabled": false
+      },
+      {
+        "username": "Guest",
+        "password_hash": "scrypt:32768:8:1$Z5IUR2vQx3sJMj4a$dae161108328aa7bb0c23cad091142af6bc4aa0e092ee66f31d676977a09b71e2ae818d3449572facb62e0d5b039eba0940dc30d0092d04ada4d87e627c35339",
+        "role": "guest",
+        "allowed_sites": [
+          "Zavieh"
+        ],
+        "disabled": false
+      },
+      {
+        "username": "admin",
+        "password_hash": "scrypt:32768:8:1$RdKNpYvqI5PmSJ8D$9f67e4b959b008d09e21fc443c3a050478307dfc6d3ac49b122fbc6db348028cf45257f4ce86bd2a6d6bed5650324d7aed3d93c781df620170de152d6bba3fbb",
+        "role": "admin",
+        "allowed_sites": [
+          "*"
+        ],
+        "disabled": false
+      },
+      {
+        "username": "seify",
+        "password_hash": "scrypt:32768:8:1$p5Pu812di9SjKmTf$975080ba5d785863d7005448f12f480156ec86a6df4076978346fe389b54db609d491ea4aaa5189e0e4ab48713c034061855a632e395ee51d3ddf4d10b56324a",
+        "role": "admin",
+        "allowed_sites": [
+          "*"
+        ],
+        "disabled": false
+      },
+      {
+        "username": "jafari",
+        "password_hash": "scrypt:32768:8:1$oZSDbSQyljq9xdza$0b653531a48c6956e521fce5064daf6482f521ed5c56d7fec5558470d581c7b46c374d225d1a86d9175ec45e012f980e0b4f9503bea9d9f6604df5dff8e5e5a7",
+        "role": "admin",
+        "allowed_sites": [
+          "*"
+        ],
+        "disabled": false
+      }
+    ]
+  }
 }

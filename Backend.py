@@ -3,13 +3,18 @@
 Network Discovery Platform - COMPLETE WORKING BACKEND
 """
 
-from flask import Flask, render_template, jsonify, request, send_file
+from flask import Flask, render_template, jsonify, request, send_file, session, g
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 import json
 import os
 import threading
 import time
 import subprocess
+import sys
 import uuid
+import zipfile
+import io
 from datetime import datetime
 import portalocker 
 
@@ -22,10 +27,30 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DATABASE_FILE = os.path.join(BASE_DIR, "devices.db")
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
+MONITORING_FILE = os.path.join(BASE_DIR, "monitoring.db")
+MONITORING_INTERVAL_SEC = 5
+MONITORING_LOCK = threading.Lock()
+LOGS_DIR = os.path.join(BASE_DIR, "logs")
+LOG_RETENTION_DAYS = 60
 
 MODULES_DIR = os.path.join(BASE_DIR, "Modules")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "Templates")
 STATIC_DIR = os.path.join(BASE_DIR, "Static")
+OUI_RANGES_FILE = os.path.join(MODULES_DIR, "mikrotik_mac_discovery", "oui_ranges.txt")
+
+DEFAULT_MONITORING_LAYOUT = {
+    "top": 90,
+    "bottom": 90,
+    "left": 120,
+    "right": 120,
+    "labels": {
+        "top": "Top",
+        "left": "Left",
+        "center": "Center",
+        "right": "Right",
+        "bottom": "Bottom"
+    }
+}
 
 GENERATED_MAPS_DIR = os.path.join(BASE_DIR, "generated_maps")
 
@@ -57,6 +82,7 @@ app = Flask(
     static_folder=STATIC_DIR,
     static_url_path="/static",
 )
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-change-me")
 
 
 
@@ -90,6 +116,10 @@ DEFAULT_SETTINGS = {
     "default_scan_depth": 3,
     "auto_refresh": False,
     "refresh_interval": 30,
+    "auth": {
+        "enabled": False,
+        "users": []
+    },
 }
 
 def init_settings():
@@ -99,6 +129,130 @@ def init_settings():
         settings = DEFAULT_SETTINGS.copy()
         with open(SETTINGS_FILE, 'w') as f:
             json.dump(settings, f, indent=2)
+
+DEFAULT_MONITORING_RULES_LIST = [
+    {"id": "loss", "type": "loss", "threshold": 100, "enabled": True},
+    {"id": "latency", "type": "latency", "threshold": 500, "enabled": True},
+]
+
+def init_monitoring():
+    if not os.path.exists(MONITORING_FILE):
+        data = {
+            "version": "1.0",
+            "meta": {
+                "created": datetime.now().isoformat(),
+                "last_modified": datetime.now().isoformat()
+            },
+            "sites": {}
+        }
+        with open(MONITORING_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+    if not os.path.exists(LOGS_DIR):
+        os.makedirs(LOGS_DIR, exist_ok=True)
+
+def read_monitoring():
+    try:
+        if os.path.exists(MONITORING_FILE):
+            with portalocker.Lock(MONITORING_FILE, 'r', timeout=2, encoding='utf-8') as f:
+                return json.load(f)
+        init_monitoring()
+        return read_monitoring()
+    except (json.JSONDecodeError, FileNotFoundError):
+        init_monitoring()
+        return read_monitoring()
+    except PermissionError:
+        return {"version": "1.0", "meta": {"last_modified": datetime.now().isoformat()}, "sites": {}}
+    except portalocker.exceptions.LockException:
+        return {"version": "1.0", "meta": {"last_modified": datetime.now().isoformat()}, "sites": {}}
+
+def write_monitoring(data):
+    data.setdefault("meta", {})
+    data["meta"]["last_modified"] = datetime.now().isoformat()
+    with portalocker.Lock(MONITORING_FILE, 'w', timeout=2, encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
+
+def _safe_log_name(site_name):
+    safe = _safe_site_name(site_name)
+    return safe or "site"
+
+def _cleanup_logs():
+    cutoff = time.time() - (LOG_RETENTION_DAYS * 86400)
+    try:
+        for name in os.listdir(LOGS_DIR):
+            path = os.path.join(LOGS_DIR, name)
+            if not os.path.isfile(path):
+                continue
+            if os.path.getmtime(path) < cutoff:
+                os.remove(path)
+    except OSError:
+        pass
+
+def log_event(site_name, message):
+    init_monitoring()
+    safe = _safe_log_name(site_name)
+    log_path = os.path.join(LOGS_DIR, f"{safe}.log")
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    line = f"[{timestamp}] {message}\n"
+    try:
+        with portalocker.Lock(log_path, 'a', timeout=2, encoding='utf-8') as f:
+            f.write(line)
+    except portalocker.exceptions.LockException:
+        pass
+    _cleanup_logs()
+
+def _get_monitoring_site(data, site_name):
+    sites = data.setdefault("sites", {})
+    entry = sites.get(site_name)
+    if not isinstance(entry, dict):
+        entry = {}
+        sites[site_name] = entry
+    entry.setdefault("devices", {})
+    if "rules" not in entry:
+        entry["rules"] = [rule.copy() for rule in DEFAULT_MONITORING_RULES_LIST]
+    elif isinstance(entry.get("rules"), dict):
+        legacy = entry.get("rules", {})
+        entry["rules"] = [
+            {"id": "loss", "type": "loss", "threshold": int(legacy.get("loss_threshold", 100)), "enabled": True},
+            {"id": "latency", "type": "latency", "threshold": int(legacy.get("latency_threshold_ms", 500)), "enabled": True},
+        ]
+    return entry
+
+def _get_device_monitoring(site_entry, device_id):
+    devices = site_entry.setdefault("devices", {})
+    entry = devices.get(device_id)
+    if not isinstance(entry, dict):
+        entry = {}
+        devices[device_id] = entry
+    entry.setdefault("enabled", False)
+    entry.setdefault("placed", False)
+    entry.setdefault("dock", "center")
+    entry.setdefault("last_status", None)
+    if "rules" not in entry:
+        entry["rules"] = []
+    return entry
+
+def _get_monitoring_layout(site_entry):
+    layout = site_entry.get("layout")
+    if not isinstance(layout, dict):
+        layout = {}
+    merged = {
+        "top": int(layout.get("top", DEFAULT_MONITORING_LAYOUT["top"])),
+        "bottom": int(layout.get("bottom", DEFAULT_MONITORING_LAYOUT["bottom"])),
+        "left": int(layout.get("left", DEFAULT_MONITORING_LAYOUT["left"])),
+        "right": int(layout.get("right", DEFAULT_MONITORING_LAYOUT["right"])),
+        "labels": DEFAULT_MONITORING_LAYOUT["labels"].copy()
+    }
+    labels = layout.get("labels")
+    if isinstance(labels, dict):
+        for key in merged["labels"].keys():
+            if isinstance(labels.get(key), str) and labels.get(key).strip():
+                merged["labels"][key] = labels[key].strip()
+    site_entry["layout"] = merged
+    return merged
+
+def _log_perf(label, start_time):
+    duration = time.perf_counter() - start_time
+    print(f"[PERF] {label} took {duration:.2f}s")
 
 def read_database():
     """Read database.json.
@@ -161,6 +315,164 @@ def write_settings(settings):
     with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
+def read_oui_ranges():
+    if not os.path.exists(OUI_RANGES_FILE):
+        return ""
+    with open(OUI_RANGES_FILE, "r", encoding="utf-8") as f:
+        return f.read()
+
+def write_oui_ranges(content: str):
+    os.makedirs(os.path.dirname(OUI_RANGES_FILE), exist_ok=True)
+    with open(OUI_RANGES_FILE, "w", encoding="utf-8") as f:
+        f.write(content or "")
+
+def _get_auth_config():
+    settings = read_settings()
+    auth = settings.get("auth") if isinstance(settings, dict) else {}
+    if not isinstance(auth, dict):
+        auth = {}
+    users = auth.get("users", [])
+    if not isinstance(users, list):
+        users = []
+    enabled = bool(auth.get("enabled", False))
+    return {"enabled": enabled, "users": users}
+
+def _safe_site_name(site_name):
+    if not site_name:
+        return ""
+    return "".join(ch for ch in str(site_name) if ch.isalnum() or ch in ("-", "_")).strip().lower()
+
+def _auth_required():
+    auth = _get_auth_config()
+    return auth["enabled"] and len(auth["users"]) > 0
+
+def _get_effective_user():
+    if not _auth_required():
+        return {
+            "username": "local",
+            "role": "admin",
+            "allowed_sites": [],
+            "disabled": False,
+        }
+    username = session.get("user")
+    user = _find_user(username) if username else None
+    if user and user.get("disabled"):
+        session.pop("user", None)
+        return None
+    return user
+
+def _find_user(username):
+    if not username:
+        return None
+    auth = _get_auth_config()
+    for user in auth["users"]:
+        if isinstance(user, dict) and user.get("username") == username:
+            return user
+    return None
+
+def _is_admin(user):
+    return bool(user) and user.get("role") == "admin"
+
+def _allowed_sites(user):
+    sites = user.get("allowed_sites") if user else []
+    if not isinstance(sites, list):
+        return []
+    return [s for s in sites if isinstance(s, str)]
+
+def _can_read_site(user, site_name):
+    if _is_admin(user):
+        return True
+    if not user or not site_name:
+        return False
+    allowed = _allowed_sites(user)
+    return "*" in allowed or site_name in allowed
+
+def _can_write_site(user, site_name):
+    if _is_admin(user):
+        return True
+    if not user or user.get("role") != "operator":
+        return False
+    if not site_name:
+        return False
+    allowed = _allowed_sites(user)
+    return "*" in allowed or site_name in allowed
+
+def _filter_sites_for_user(sites, user):
+    if _is_admin(user):
+        return sites
+    allowed = set(_allowed_sites(user))
+    if "*" in allowed:
+        return sites
+    return [site for site in sites if site.get("name") in allowed]
+
+def _filter_devices_for_user(devices, user):
+    if _is_admin(user):
+        return devices
+    allowed = set(_allowed_sites(user))
+    if "*" in allowed:
+        return devices
+    return [device for device in devices if device.get("site") in allowed]
+
+def _site_from_module_config(config):
+    if not isinstance(config, dict):
+        return None
+    for key in ("site_name", "site", "site_id", "target_site"):
+        value = config.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+def _require_role(*roles):
+    user = _get_effective_user()
+    if not user:
+        return None, (jsonify({"error": "auth_required"}), 401)
+    if roles and user.get("role") not in roles:
+        return user, (jsonify({"error": "forbidden"}), 403)
+    return user, None
+
+def _sanitize_user(user):
+    if not isinstance(user, dict):
+        return None
+    return {
+        "username": user.get("username"),
+        "role": user.get("role", "guest"),
+        "allowed_sites": _allowed_sites(user),
+        "disabled": bool(user.get("disabled", False)),
+    }
+
+@app.before_request
+def enforce_auth():
+    if not _auth_required():
+        return None
+    path = request.path or ""
+    if path.startswith("/static/"):
+        return None
+    if path.startswith("/api/auth"):
+        return None
+    if path == "/":
+        return None
+    if path.startswith("/api/") or path.startswith("/generated_maps/") or path.startswith("/static/maps/"):
+        user = _get_effective_user()
+        if not user:
+            session.pop("user", None)
+            if path.startswith("/api/"):
+                return jsonify({"error": "auth_required"}), 401
+            return ("Unauthorized", 401)
+    return None
+
+@app.before_request
+def start_timer():
+    g._req_start = time.perf_counter()
+
+@app.after_request
+def log_request(response):
+    start = getattr(g, "_req_start", None)
+    if start is not None:
+        path = request.path or ""
+        if path.startswith("/api/") or path.startswith("/generated_maps/") or path.startswith("/static/maps/"):
+            _log_perf(path, start)
+    return response
+
 # ==================== MODULE SYSTEM ====================
 
 def discover_modules():
@@ -201,13 +513,15 @@ class ModuleRunner:
         
         def module_thread():
             try:
+                log_file = os.path.join(BASE_DIR, f"module_log_{thread_id}.txt")
                 # Update status
                 with self.lock:
                     self.running_modules[thread_id] = {
                         "module_id": module_id,
                         "status": "running",
                         "start_time": datetime.now().isoformat(),
-                        "progress": 0
+                        "progress": 0,
+                        "log_file": log_file
                     }
                 
                 print(f"=== DEBUG: Starting module {module_id} ===", file=sys.stderr)
@@ -229,8 +543,10 @@ class ModuleRunner:
                 temp_config = {
                     **config,
                     "database_path": os.path.abspath(DATABASE_FILE),
+                    "monitoring_db_path": os.path.abspath(MONITORING_FILE),
                     "module_id": module_id,
-                    "thread_id": thread_id
+                    "thread_id": thread_id,
+                    "log_file": log_file
                 }
                 
                 config_file = f"module_config_{thread_id}.json"
@@ -273,21 +589,24 @@ class ModuleRunner:
                             self.module_results[thread_id] = {
                                 "status": "completed",
                                 "output": module_output,
-                                "completed_at": datetime.now().isoformat()
+                                "completed_at": datetime.now().isoformat(),
+                                "log_file": log_file
                             }
                     except json.JSONDecodeError:
                         with self.lock:
                             self.module_results[thread_id] = {
                                 "status": "completed",
                                 "output": {"message": result.stdout.strip()},
-                                "completed_at": datetime.now().isoformat()
+                                "completed_at": datetime.now().isoformat(),
+                                "log_file": log_file
                             }
                 else:
                     with self.lock:
                         self.module_results[thread_id] = {
                             "status": "failed",
                             "error": result.stderr,
-                            "completed_at": datetime.now().isoformat()
+                            "completed_at": datetime.now().isoformat(),
+                            "log_file": log_file
                         }
                 
                 # Update final status
@@ -336,9 +655,12 @@ class ModuleRunner:
     
     def cleanup_thread(self, thread_id):
         """Clean up old thread data"""
+        log_file = None
         with self.lock:
-            self.running_modules.pop(thread_id, None)
-            self.module_results.pop(thread_id, None)
+            running = self.running_modules.pop(thread_id, None)
+            result = self.module_results.pop(thread_id, None)
+            log_file = (running or {}).get("log_file") or (result or {}).get("log_file")
+        # Keep log files for troubleshooting; manual cleanup if needed.
     
     def get_all_status(self):
         """Get status of all modules"""
@@ -364,16 +686,26 @@ def index():
 @app.route('/api/database')
 def get_database():
     """Get complete database"""
+    user, err = _require_role("admin")
+    if err:
+        return err
     return jsonify(read_database())
 
 @app.route('/api/sites', methods=['GET', 'POST'])
 def handle_sites():
     """Manage sites"""
     if request.method == 'GET':
+        user = _get_effective_user()
+        if not user:
+            return jsonify({"error": "auth_required"}), 401
         data = read_database()
-        return jsonify(data.get("sites", []))
+        sites = _filter_sites_for_user(data.get("sites", []), user)
+        return jsonify(sites)
     
     elif request.method == 'POST':
+        user, err = _require_role("admin")
+        if err:
+            return err
         site_data = request.json
         
         if not site_data.get("name") or not site_data.get("root_ip"):
@@ -406,6 +738,11 @@ def handle_sites():
 def api_generate_map():
     """Generate map from database"""
     try:
+        user = _get_effective_user()
+        if not user:
+            return jsonify({"error": "auth_required"}), 401
+        if user.get("role") not in ("admin", "operator"):
+            return jsonify({"error": "forbidden"}), 403
         # Import the generator function
         from generate_map import generate_map_from_database
         
@@ -432,6 +769,11 @@ def api_generate_visual_map():
     try:
         data = request.get_json() or {}
         site_name = data.get('site_name')
+        user = _get_effective_user()
+        if not user:
+            return jsonify({"error": "auth_required"}), 401
+        if not _can_write_site(user, site_name):
+            return jsonify({"error": "forbidden"}), 403
 
         from generale_visual_map import generate_visual_map
 
@@ -463,6 +805,11 @@ def api_generate_text_map():
         
         if not site_name:
             return jsonify({"error": "site_name is required"}), 400
+        user = _get_effective_user()
+        if not user:
+            return jsonify({"error": "auth_required"}), 401
+        if not _can_write_site(user, site_name):
+            return jsonify({"error": "forbidden"}), 403
         
         from generate_map import generate_map_from_database
         
@@ -488,6 +835,9 @@ def api_generate_text_map():
 @app.route('/api/sites/<site_id>', methods=['PUT', 'DELETE'])
 def handle_site(site_id):
     """Update or delete a site"""
+    user, err = _require_role("admin")
+    if err:
+        return err
     data = read_database()
     
     # Find site
@@ -521,11 +871,17 @@ def handle_site(site_id):
 @app.route('/api/devices')
 def get_devices():
     """Get all devices"""
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
     data = read_database()
     site_filter = request.args.get('site')
     
     devices = data.get("devices", [])
+    devices = _filter_devices_for_user(devices, user)
     if site_filter:
+        if not _can_read_site(user, site_filter):
+            return jsonify({"error": "forbidden"}), 403
         devices = [d for d in devices if d.get("site") == site_filter]
     
     return jsonify(devices)
@@ -533,6 +889,11 @@ def get_devices():
 @app.route('/api/devices/<device_id>', methods=['PUT', 'DELETE'])
 def handle_device(device_id):
     """Update or delete a device"""
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if user.get("role") == "guest":
+        return jsonify({"error": "forbidden"}), 403
     data = read_database()
     
     # Find device
@@ -544,6 +905,8 @@ def handle_device(device_id):
     
     if device_index is None:
         return jsonify({"error": "Device not found"}), 404
+    if not _can_write_site(user, data["devices"][device_index].get("site")):
+        return jsonify({"error": "forbidden"}), 403
     
     if request.method == 'PUT':
         update_data = request.json
@@ -552,14 +915,21 @@ def handle_device(device_id):
         updatable_fields = [
             "name",
             "ip",
+            "mac",
             "type",
             "status",
             "notes",
             "locked",
+            "always_show_on_map",
             "os",
             "vendor",
             "platform",
             "model",
+            "oui",
+            "oui_label",
+            "oui_range_start",
+            "oui_range_end",
+            "vlan",
         ]
         for field in updatable_fields:
             if field in update_data:
@@ -682,6 +1052,9 @@ def handle_device(device_id):
 @app.route('/api/modules')
 def get_modules():
     """Get all available modules"""
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
     print("=== /api/modules endpoint called ===", file=sys.stderr)
     modules = discover_modules()
     print(f"Found {len(modules)} modules", file=sys.stderr)
@@ -690,10 +1063,25 @@ def get_modules():
 @app.route('/api/modules/<module_id>/run', methods=['POST'])
 def run_module(module_id):
     """Run a module"""
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if user.get("role") not in ("admin", "operator"):
+        return jsonify({"error": "forbidden"}), 403
     print(f"=== /api/modules/{module_id}/run called ===", file=sys.stderr)
     
     config = request.json
-    print(f"Request data: {json.dumps(config, indent=2)}", file=sys.stderr)
+    safe_config = json.loads(json.dumps(config or {}))
+    if isinstance(safe_config, dict):
+        params = safe_config.get("parameters")
+        if isinstance(params, dict) and "password" in params:
+            params["password"] = "********"
+        if "password" in safe_config:
+            safe_config["password"] = "********"
+    print(f"Request data: {json.dumps(safe_config, indent=2)}", file=sys.stderr)
+    site_name = _site_from_module_config(config)
+    if site_name and not _can_write_site(user, site_name):
+        return jsonify({"error": "forbidden"}), 403
     
     # Validate module exists
     modules = discover_modules()
@@ -717,6 +1105,11 @@ def run_module(module_id):
 @app.route('/api/modules/status/<thread_id>')
 def get_module_status(thread_id):
     """Get module execution status"""
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if user.get("role") not in ("admin", "operator"):
+        return jsonify({"error": "forbidden"}), 403
     status = module_runner.get_module_status(thread_id)
     
     if status:
@@ -724,10 +1117,267 @@ def get_module_status(thread_id):
     else:
         return jsonify({"error": "Thread not found"}), 404
 
+@app.route('/api/modules/log/<thread_id>')
+def get_module_log(thread_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if user.get("role") not in ("admin", "operator"):
+        return jsonify({"error": "forbidden"}), 403
+    delete_after = request.args.get("delete") == "1"
+    status = module_runner.get_module_status(thread_id)
+    log_file = status.get("log_file") if isinstance(status, dict) else None
+    if not log_file:
+        candidate = os.path.join(BASE_DIR, f"module_log_{thread_id}.txt")
+        if os.path.exists(candidate):
+            log_file = candidate
+    if not log_file or not os.path.exists(log_file):
+        return jsonify({"lines": []})
+    try:
+        with open(log_file, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()[-200:]
+        if delete_after:
+            try:
+                os.remove(log_file)
+            except OSError:
+                pass
+        return jsonify({"lines": lines})
+    except OSError:
+        return jsonify({"lines": []})
+
 @app.route('/api/modules/status')
 def get_all_module_status():
     """Get status of all modules"""
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if user.get("role") not in ("admin", "operator"):
+        return jsonify({"error": "forbidden"}), 403
     return jsonify(module_runner.get_all_status())
+
+@app.route('/api/users', methods=['GET', 'POST'])
+def handle_users():
+    user, err = _require_role("admin")
+    if err:
+        return err
+    settings = read_settings()
+    auth = settings.get("auth", {})
+    users = auth.get("users", [])
+    if request.method == 'GET':
+        return jsonify([_sanitize_user(u) for u in users if isinstance(u, dict)])
+
+    data = request.get_json() or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    role = data.get("role") or "guest"
+    allowed_sites = data.get("allowed_sites") or []
+    disabled = bool(data.get("disabled", False))
+
+    if not username or not password:
+        return jsonify({"error": "username_and_password_required"}), 400
+    if role not in ("admin", "operator", "guest"):
+        return jsonify({"error": "invalid_role"}), 400
+    if not isinstance(allowed_sites, list):
+        allowed_sites = []
+
+    if any(isinstance(u, dict) and u.get("username") == username for u in users):
+        return jsonify({"error": "user_exists"}), 400
+
+    users.append({
+        "username": username,
+        "password_hash": generate_password_hash(password),
+        "role": role,
+        "allowed_sites": allowed_sites,
+        "disabled": disabled
+    })
+    auth["users"] = users
+    settings["auth"] = auth
+    write_settings(settings)
+    return jsonify({"success": True, "user": username})
+
+@app.route('/api/users/<username>', methods=['PUT', 'DELETE'])
+def handle_user(username):
+    current_user, err = _require_role("admin")
+    if err:
+        return err
+    settings = read_settings()
+    auth = settings.get("auth", {})
+    users = auth.get("users", [])
+
+    target = None
+    for entry in users:
+        if isinstance(entry, dict) and entry.get("username") == username:
+            target = entry
+            break
+    if not target:
+        return jsonify({"error": "user_not_found"}), 404
+
+    if request.method == 'DELETE':
+        auth["users"] = [u for u in users if not (isinstance(u, dict) and u.get("username") == username)]
+        settings["auth"] = auth
+        write_settings(settings)
+        if current_user.get("username") == username:
+            session.pop("user", None)
+        return jsonify({"success": True})
+
+    data = request.get_json() or {}
+    role = data.get("role")
+    allowed_sites = data.get("allowed_sites")
+    disabled = data.get("disabled")
+    password = data.get("password")
+
+    if role:
+        if role not in ("admin", "operator", "guest"):
+            return jsonify({"error": "invalid_role"}), 400
+        target["role"] = role
+    if allowed_sites is not None:
+        if not isinstance(allowed_sites, list):
+            return jsonify({"error": "invalid_allowed_sites"}), 400
+        target["allowed_sites"] = allowed_sites
+    if disabled is not None:
+        target["disabled"] = bool(disabled)
+    if password:
+        target["password_hash"] = generate_password_hash(password)
+
+    auth["users"] = users
+    settings["auth"] = auth
+    write_settings(settings)
+    return jsonify({"success": True})
+
+@app.route('/api/auth/me')
+def auth_me():
+    auth = _get_auth_config()
+    user = _get_effective_user()
+    return jsonify({
+        "auth_required": auth["enabled"] and len(auth["users"]) > 0,
+        "authenticated": bool(user),
+        "user": user.get("username") if user else None,
+        "role": user.get("role") if user else None,
+        "allowed_sites": _allowed_sites(user) if user else []
+    })
+
+@app.route('/api/auth/login', methods=['POST'])
+def auth_login():
+    auth = _get_auth_config()
+    if not (auth["enabled"] and auth["users"]):
+        return jsonify({"error": "auth_not_configured"}), 400
+    data = request.get_json() or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    user = _find_user(username)
+    if not user or user.get("disabled") or not check_password_hash(user.get("password_hash", ""), password):
+        return jsonify({"error": "invalid_credentials"}), 401
+    session["user"] = username
+    return jsonify({
+        "authenticated": True,
+        "user": username,
+        "role": user.get("role", "guest"),
+        "allowed_sites": _allowed_sites(user)
+    })
+
+@app.route('/api/auth/logout', methods=['POST'])
+def auth_logout():
+    session.pop("user", None)
+    return jsonify({"authenticated": False})
+
+@app.route('/api/auth/setup', methods=['POST'])
+def auth_setup():
+    data = request.get_json() or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    enabled = bool(data.get("enabled", True))
+    if not username or not password:
+        return jsonify({"error": "username_and_password_required"}), 400
+
+    settings = read_settings()
+    auth = settings.get("auth")
+    if not isinstance(auth, dict):
+        auth = {}
+    users = auth.get("users", [])
+    if not isinstance(users, list):
+        users = []
+
+    if users:
+        current_user = _get_effective_user()
+        if not _is_admin(current_user):
+            return jsonify({"error": "auth_required"}), 403
+
+    users = [
+        user for user in users
+        if not (isinstance(user, dict) and user.get("username") == username)
+    ]
+    existing = _find_user(username)
+    if not users:
+        role = "admin"
+    else:
+        role = data.get("role") or (existing.get("role") if existing else "guest")
+    allowed_sites = data.get("allowed_sites", []) if data.get("allowed_sites") is not None else (existing.get("allowed_sites") if existing else [])
+    if not isinstance(allowed_sites, list):
+        allowed_sites = []
+    disabled = bool(data.get("disabled", False))
+
+    users.append({
+        "username": username,
+        "password_hash": generate_password_hash(password),
+        "role": role,
+        "allowed_sites": allowed_sites,
+        "disabled": disabled
+    })
+    auth["users"] = users
+    auth["enabled"] = enabled
+    settings["auth"] = auth
+    write_settings(settings)
+    session["user"] = username
+
+    return jsonify({
+        "success": True,
+        "user": username,
+        "auth_required": enabled,
+        "role": role,
+        "allowed_sites": allowed_sites
+    })
+
+@app.route('/api/auth/change_password', methods=['POST'])
+def auth_change_password():
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    data = request.get_json() or {}
+    current = data.get("current_password") or ""
+    new_password = data.get("new_password") or ""
+    if not current or not new_password:
+        return jsonify({"error": "passwords_required"}), 400
+    if not check_password_hash(user.get("password_hash", ""), current):
+        return jsonify({"error": "invalid_credentials"}), 401
+    settings = read_settings()
+    auth = settings.get("auth", {})
+    users = auth.get("users", [])
+    for entry in users:
+        if isinstance(entry, dict) and entry.get("username") == user.get("username"):
+            entry["password_hash"] = generate_password_hash(new_password)
+            break
+    auth["users"] = users
+    settings["auth"] = auth
+    write_settings(settings)
+    return jsonify({"success": True})
+
+@app.route('/api/auth/config', methods=['PUT'])
+def auth_config():
+    user, err = _require_role("admin")
+    if err:
+        return err
+    data = request.get_json() or {}
+    enabled = bool(data.get("enabled", True))
+    settings = read_settings()
+    auth = settings.get("auth", {})
+    if not isinstance(auth, dict):
+        auth = {}
+    auth["enabled"] = enabled
+    if "users" not in auth:
+        auth["users"] = []
+    settings["auth"] = auth
+    write_settings(settings)
+    return jsonify({"success": True, "enabled": enabled})
 
 
 @app.route('/static/maps/<filename>')
@@ -736,6 +1386,19 @@ def serve_map_file(filename):
     try:
         # Clean filename to prevent directory traversal
         filename = os.path.basename(filename)
+        user = _get_effective_user()
+        if not user:
+            return ("Unauthorized", 401)
+        if not _is_admin(user):
+            allowed = _allowed_sites(user)
+            if "*" in allowed:
+                allowed = []
+            lowered = filename.lower()
+            if allowed and not any(
+                lowered.startswith(f"{_safe_site_name(site)}_") or lowered.startswith(f"{site.lower()}_")
+                for site in allowed
+            ):
+                return ("Forbidden", 403)
         
         # Look for the file directly
         if os.path.exists(filename):
@@ -765,6 +1428,19 @@ def serve_generated_map_file(filename):
     try:
         # Clean filename to prevent directory traversal
         filename = os.path.basename(filename)
+        user = _get_effective_user()
+        if not user:
+            return ("Unauthorized", 401)
+        if not _is_admin(user):
+            allowed = _allowed_sites(user)
+            if "*" in allowed:
+                allowed = []
+            lowered = filename.lower()
+            if allowed and not any(
+                lowered.startswith(f"{_safe_site_name(site)}_") or lowered.startswith(f"{site.lower()}_")
+                for site in allowed
+            ):
+                return ("Forbidden", 403)
         
         # Look for the file in generated_maps directory
         generated_path = f"generated_maps/{filename}"
@@ -783,6 +1459,9 @@ def serve_generated_map_file(filename):
 @app.route('/api/debug/files')
 def debug_files():
     """Debug endpoint to see available files"""
+    user, err = _require_role("admin")
+    if err:
+        return err
     import glob
     
     files = []
@@ -808,6 +1487,13 @@ def get_map_for_site(site_name):
     """Get map URL for a specific site"""
     try:
         import glob
+        user = _get_effective_user()
+        if not user:
+            return jsonify({"error": "auth_required"}), 401
+        if not _can_read_site(user, site_name):
+            return jsonify({"error": "forbidden"}), 403
+
+        safe_site = _safe_site_name(site_name)
 
         def _find_latest(patterns):
             candidates = []
@@ -822,20 +1508,28 @@ def get_map_for_site(site_name):
             f"generated_maps/{site_name}_visual_map*.html",
             f"maps/{site_name}_visual_map*.html",
             f"{site_name}_visual_map*.html",
+            f"generated_maps/{safe_site}_visual_map*.html",
+            f"maps/{safe_site}_visual_map*.html",
+            f"{safe_site}_visual_map*.html",
         ])
         text = _find_latest([
             f"generated_maps/{site_name}_text_map*.txt",
             f"generated_maps/{site_name}_map*.html",
             f"maps/{site_name}_map*.html",
             f"{site_name}_map*.html",
+            f"generated_maps/{safe_site}_text_map*.txt",
+            f"generated_maps/{safe_site}_map*.html",
+            f"maps/{safe_site}_map*.html",
+            f"{safe_site}_map*.html",
         ])
 
         path = visual or text
 
         if path and os.path.exists(path):
-            if path.startswith("generated_maps/"):
+            normalized = path.replace("\\", "/")
+            if normalized.startswith("generated_maps/"):
                 url_path = f"/generated_maps/{os.path.basename(path)}"
-            elif path.startswith("maps/"):
+            elif normalized.startswith("maps/"):
                 url_path = f"/static/maps/{os.path.basename(path)}"
             else:
                 url_path = f"/static/maps/{os.path.basename(path)}"
@@ -863,30 +1557,135 @@ def get_map_for_site(site_name):
         }), 500
 
 
+
+@app.route('/api/export')
+def export_data():
+    user, err = _require_role("admin")
+    if err:
+        return err
+
+    file_map = {
+        "devices.db": DATABASE_FILE,
+        "settings.json": SETTINGS_FILE,
+        "monitoring.db": MONITORING_FILE,
+    }
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+        for name, path in file_map.items():
+            if os.path.exists(path):
+                zf.write(path, arcname=name)
+    buf.seek(0)
+
+    return send_file(
+        buf,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name='cmapp_export.zip'
+    )
+
+
+@app.route('/api/import', methods=['POST'])
+def import_data():
+    user, err = _require_role("admin")
+    if err:
+        return err
+    if 'file' not in request.files:
+        return jsonify({"error": "file_required"}), 400
+
+    upload = request.files['file']
+    if not upload.filename:
+        return jsonify({"error": "file_required"}), 400
+
+    try:
+        data = upload.read()
+        buf = io.BytesIO(data)
+        with zipfile.ZipFile(buf, 'r') as zf:
+            allowed = {
+                'devices.db': DATABASE_FILE,
+                'settings.json': SETTINGS_FILE,
+                'monitoring.db': MONITORING_FILE,
+            }
+            for name in zf.namelist():
+                if name in allowed:
+                    target = allowed[name]
+                    with zf.open(name) as src, open(target, 'wb') as dst:
+                        dst.write(src.read())
+        init_settings()
+        init_database()
+        init_monitoring()
+        return jsonify({"success": True})
+    except zipfile.BadZipFile:
+        return jsonify({"error": "invalid_zip"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/settings', methods=['GET', 'PUT'])
 def handle_settings():
     """Manage settings"""
     if request.method == 'GET':
-        return jsonify(read_settings())
+        user = _get_effective_user()
+        if not user:
+            return jsonify({"error": "auth_required"}), 401
+        settings = read_settings()
+        auth = settings.get("auth", {})
+        settings["auth"] = {
+            "enabled": bool(auth.get("enabled", False))
+        }
+        if not _is_admin(user):
+            settings = {k: v for k, v in settings.items() if k != "auth"}
+        return jsonify(settings)
     
     elif request.method == 'PUT':
+        user, err = _require_role("admin")
+        if err:
+            return err
         new_settings = request.json
         current_settings = read_settings()
-        current_settings.update(new_settings)
+        if isinstance(new_settings, dict):
+            if "auth" in new_settings:
+                auth = current_settings.get("auth", {})
+                if not isinstance(auth, dict):
+                    auth = {}
+                auth["enabled"] = bool(new_settings.get("auth", {}).get("enabled", auth.get("enabled", False)))
+                if "users" not in auth:
+                    auth["users"] = []
+                current_settings["auth"] = auth
+                new_settings = {k: v for k, v in new_settings.items() if k != "auth"}
+            current_settings.update(new_settings)
         write_settings(current_settings)
+        auth = current_settings.get("auth", {})
+        current_settings["auth"] = {"enabled": bool(auth.get("enabled", False))}
         return jsonify(current_settings)
+
+@app.route('/api/oui_ranges', methods=['GET', 'PUT'])
+def handle_oui_ranges():
+    user, err = _require_role("admin")
+    if err:
+        return err
+    if request.method == 'GET':
+        return jsonify({"content": read_oui_ranges()})
+    data = request.json or {}
+    content = data.get("content", "")
+    write_oui_ranges(content)
+    return jsonify({"success": True})
 
 @app.route('/api/stats')
 def get_stats():
     """Get statistics"""
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
     data = read_database()
     
-    devices = data.get("devices", [])
+    devices = _filter_devices_for_user(data.get("devices", []), user)
     online_devices = len([d for d in devices if d.get("status") == "online"])
     offline_devices = len([d for d in devices if d.get("status") == "offline"])
     
+    sites = _filter_sites_for_user(data.get("sites", []), user)
     stats = {
-        "total_sites": len(data.get("sites", [])),
+        "total_sites": len(sites),
         "total_devices": len(devices),
         "online_devices": online_devices,
         "offline_devices": offline_devices,
@@ -895,6 +1694,367 @@ def get_stats():
     }
     
     return jsonify(stats)
+
+@app.route('/api/monitoring/site/<site_name>')
+def get_monitoring_site(site_name):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if not _can_read_site(user, site_name):
+        return jsonify({"error": "forbidden"}), 403
+
+    monitoring = read_monitoring()
+    site_entry = _get_monitoring_site(monitoring, site_name)
+    layout = _get_monitoring_layout(site_entry)
+    site_rules = site_entry.get("rules", [rule.copy() for rule in DEFAULT_MONITORING_RULES_LIST])
+
+    data = read_database()
+    devices = [d for d in data.get("devices", []) if d.get("site") == site_name]
+    now = datetime.now()
+
+    results = []
+    for device in devices:
+        device_id = device.get("id")
+        m = site_entry.get("devices", {}).get(device_id, {}) if device_id else {}
+        enabled = bool(m.get("enabled", False))
+        last_check = m.get("last_check")
+        last_check_dt = None
+        if last_check:
+            try:
+                last_check_dt = datetime.fromisoformat(last_check)
+            except ValueError:
+                last_check_dt = None
+
+        status = "unknown"
+        if not enabled:
+            status = "unknown"
+        elif last_check_dt:
+            age = (now - last_check_dt).total_seconds()
+            loss = m.get("packet_loss")
+            latency = m.get("avg_latency_ms")
+            status = "ok"
+            rules = m.get("rules") or site_rules
+            for rule in rules:
+                if not isinstance(rule, dict) or not rule.get("enabled", True):
+                    continue
+                rtype = rule.get("type")
+                threshold = rule.get("threshold")
+                if rtype == "stale" and threshold is not None and age > float(threshold):
+                    status = "not_ok"
+                    break
+                if rtype == "loss" and loss is not None and threshold is not None and loss >= float(threshold):
+                    status = "not_ok"
+                    break
+                if rtype == "latency" and latency is not None and threshold is not None and latency >= float(threshold):
+                    status = "not_ok"
+                    break
+
+        results.append({
+            "id": device_id,
+            "name": device.get("name"),
+            "ip": device.get("ip"),
+            "status": status,
+            "packet_loss": m.get("packet_loss"),
+            "avg_latency_ms": m.get("avg_latency_ms"),
+            "last_check": last_check,
+            "enabled": enabled,
+            "rules": m.get("rules") or [],
+            "placed": bool(m.get("placed", False)),
+            "dock": m.get("dock", "center")
+        })
+
+    return jsonify({
+        "site": site_name,
+        "rules": site_rules,
+        "devices": results,
+        "layout": layout
+    })
+
+
+@app.route('/api/monitoring/logs/<site_name>')
+def get_monitoring_logs(site_name):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if not _can_read_site(user, site_name):
+        return jsonify({"error": "forbidden"}), 403
+    init_monitoring()
+    safe = _safe_log_name(site_name)
+    log_path = os.path.join(LOGS_DIR, f"{safe}.log")
+    if not os.path.exists(log_path):
+        return jsonify({"site": site_name, "lines": []})
+    try:
+        with portalocker.Lock(log_path, 'r', timeout=2, encoding='utf-8') as f:
+            lines = f.read().splitlines()[-100:]
+        return jsonify({"site": site_name, "lines": lines})
+    except (portalocker.exceptions.LockException, OSError):
+        return jsonify({"site": site_name, "lines": []})
+
+@app.route('/api/monitoring/rules/<site_name>', methods=['PUT'])
+def update_monitoring_rules(site_name):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if not _can_write_site(user, site_name):
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json() or {}
+    init_monitoring()
+    with MONITORING_LOCK:
+        monitoring = read_monitoring()
+    site_entry = _get_monitoring_site(monitoring, site_name)
+    device_id = data.get("device_id")
+    rules = data.get("rules")
+    enabled = data.get("enabled")
+
+    if rules is None:
+        # Backwards-compatible payload (site rules)
+        rules = [
+            {"id": "loss", "type": "loss", "threshold": int(data.get("loss_threshold", 100)), "enabled": True},
+            {"id": "latency", "type": "latency", "threshold": int(data.get("latency_threshold_ms", 500)), "enabled": True},
+        ]
+    if not isinstance(rules, list):
+        return jsonify({"error": "invalid_rules"}), 400
+    sanitized = []
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        rtype = rule.get("type")
+        if rtype not in ("loss", "latency"):
+            continue
+        threshold = rule.get("threshold")
+        try:
+            threshold_val = float(threshold)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid_threshold"}), 400
+        sanitized.append({
+            "id": rule.get("id") or rtype,
+            "type": rtype,
+            "threshold": threshold_val,
+            "enabled": bool(rule.get("enabled", True)),
+        })
+
+    if device_id:
+        device_entry = _get_device_monitoring(site_entry, device_id)
+        device_entry["rules"] = sanitized
+        if enabled is not None:
+            device_entry["enabled"] = bool(enabled)
+        with MONITORING_LOCK:
+            write_monitoring(monitoring)
+        log_event(site_name, f"rules updated for device {device_id}")
+        return jsonify({"success": True, "device_id": device_id, "rules": device_entry["rules"], "enabled": device_entry["enabled"]})
+
+    site_entry["rules"] = sanitized or [
+        {"id": "loss", "type": "loss", "threshold": 100, "enabled": True},
+        {"id": "latency", "type": "latency", "threshold": 500, "enabled": True},
+    ]
+    with MONITORING_LOCK:
+        write_monitoring(monitoring)
+    log_event(site_name, "site rules updated")
+    return jsonify({"success": True, "rules": site_entry["rules"]})
+
+@app.route('/api/monitoring/layout/<site_name>', methods=['PUT'])
+def update_monitoring_layout(site_name):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if not _can_write_site(user, site_name):
+        return jsonify({"error": "forbidden"}), 403
+    payload = request.get_json() or {}
+    layout = payload.get("layout")
+    if not isinstance(layout, dict):
+        return jsonify({"error": "invalid_layout"}), 400
+
+    init_monitoring()
+    with MONITORING_LOCK:
+        monitoring = read_monitoring()
+    site_entry = _get_monitoring_site(monitoring, site_name)
+    merged = _get_monitoring_layout(site_entry)
+    for key in ("top", "bottom", "left", "right"):
+        if key in layout:
+            try:
+                merged[key] = int(layout[key])
+            except (TypeError, ValueError):
+                pass
+    labels = layout.get("labels")
+    if isinstance(labels, dict):
+        merged_labels = merged.get("labels", {})
+        for key in merged_labels.keys():
+            if isinstance(labels.get(key), str):
+                merged_labels[key] = labels[key].strip() or merged_labels[key]
+        merged["labels"] = merged_labels
+    site_entry["layout"] = merged
+    with MONITORING_LOCK:
+        write_monitoring(monitoring)
+    return jsonify({"success": True, "layout": merged})
+
+
+@app.route('/api/monitoring/device/<site_name>/<device_id>', methods=['PUT'])
+def update_monitoring_device(site_name, device_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if not _can_write_site(user, site_name):
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json() or {}
+    init_monitoring()
+    with MONITORING_LOCK:
+        monitoring = read_monitoring()
+    site_entry = _get_monitoring_site(monitoring, site_name)
+    device_entry = _get_device_monitoring(site_entry, device_id)
+
+    if "placed" in data:
+        device_entry["placed"] = bool(data.get("placed"))
+
+    if "dock" in data:
+        dock = data.get("dock")
+        if dock not in ("top", "right", "bottom", "left", "center"):
+            return jsonify({"error": "invalid_dock"}), 400
+        device_entry["dock"] = dock
+
+    if "enabled" in data:
+        device_entry["enabled"] = bool(data.get("enabled"))
+
+    if "rules" in data and isinstance(data.get("rules"), list):
+        device_entry["rules"] = data.get("rules")
+
+    with MONITORING_LOCK:
+        write_monitoring(monitoring)
+    if "dock" in data or "placed" in data:
+        log_event(site_name, f"layout updated for device {device_id}")
+    if "enabled" in data:
+        state = "enabled" if device_entry.get("enabled") else "disabled"
+        log_event(site_name, f"monitoring {state} for device {device_id}")
+
+    return jsonify({
+        "success": True,
+        "device_id": device_id,
+        "dock": device_entry.get("dock", "center"),
+        "enabled": device_entry.get("enabled", False),
+        "rules": device_entry.get("rules", []),
+        "placed": device_entry.get("placed", False)
+    })
+
+
+def _ping_host_once(ip: str) -> tuple[int | None, int | None]:
+    if os.name == "nt":
+        cmd = ["ping", "-n", "1", "-w", "1000", ip]
+    else:
+        cmd = ["ping", "-c", "1", "-W", "1", ip]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+    except subprocess.TimeoutExpired:
+        return 100, None
+    output = result.stdout + "\n" + result.stderr
+    loss = None
+    avg = None
+    for line in output.splitlines():
+        if "Packets:" in line and "% loss" in line:
+            try:
+                loss_part = line.split("% loss")[0]
+                loss = int(loss_part.split("(")[-1].strip())
+            except ValueError:
+                pass
+        if "packet loss" in line:
+            try:
+                loss = int(line.split("%")[0].split()[-1])
+            except ValueError:
+                pass
+        if "Average =" in line:
+            try:
+                avg_text = line.split("Average =")[-1].strip().replace("ms", "")
+                avg = int(avg_text)
+            except ValueError:
+                pass
+        if "min/avg/max" in line:
+            try:
+                avg_text = line.split("=")[-1].strip().split("/")[1]
+                avg = int(float(avg_text))
+            except (ValueError, IndexError):
+                pass
+    if loss is None:
+        loss = 100 if result.returncode != 0 else 0
+    return loss, avg
+
+
+def _monitoring_cycle():
+    data = read_database()
+    monitoring = read_monitoring()
+    now = datetime.now().isoformat()
+    for site in data.get("sites", []):
+        site_name = site.get("name")
+        if not site_name:
+            continue
+        site_known_ids = set()
+        site_entry = _get_monitoring_site(monitoring, site_name)
+        site_rules = site_entry.get("rules", DEFAULT_MONITORING_RULES_LIST)
+        devices = [d for d in data.get("devices", []) if d.get("site") == site_name]
+        for device in devices:
+            device_id = device.get("id")
+            ip = device.get("ip")
+            if not device_id:
+                continue
+            site_known_ids.add(device_id)
+            device_entry = _get_device_monitoring(site_entry, device_id)
+            if not device_entry.get("enabled", False):
+                continue
+            if not ip:
+                device_entry.update({
+                    "ip": ip,
+                    "packet_loss": 100,
+                    "avg_latency_ms": None,
+                    "last_check": now
+                })
+            else:
+                loss, avg = _ping_host_once(ip)
+                device_entry.update({
+                    "ip": ip,
+                    "packet_loss": loss,
+                    "avg_latency_ms": avg,
+                    "last_check": now
+                })
+                if loss is not None and loss >= 100:
+                    log_event(site_name, f"ping failed for device {device_id}")
+
+            # Update last_status for lean logging
+            status = "unknown"
+            if device_entry.get("enabled"):
+                status = "ok"
+                rules = device_entry.get("rules") or site_rules
+                for rule in rules:
+                    if not isinstance(rule, dict) or not rule.get("enabled", True):
+                        continue
+                    threshold = rule.get("threshold")
+                    if rule.get("type") == "loss" and threshold is not None:
+                        if device_entry.get("packet_loss") is not None and device_entry["packet_loss"] >= float(threshold):
+                            status = "not_ok"
+                            break
+            if device_entry.get("last_status") != status:
+                device_entry["last_status"] = status
+                log_event(site_name, f"status {status} for device {device_id}")
+
+        # Prune removed devices for this site
+        site_entry["devices"] = {
+            did: entry for did, entry in site_entry.get("devices", {}).items()
+            if did in site_known_ids
+        }
+
+    write_monitoring(monitoring)
+
+
+def start_monitoring_loop():
+    def loop():
+        while True:
+            try:
+                with MONITORING_LOCK:
+                    _monitoring_cycle()
+            except Exception as exc:
+                print(f"[MONITOR] Error: {exc}", file=sys.stderr)
+            time.sleep(MONITORING_INTERVAL_SEC)
+
+    thread = threading.Thread(target=loop, daemon=True)
+    thread.start()
 
 # ==================== MAIN ====================
 
@@ -915,13 +2075,17 @@ if __name__ == '__main__':
     # Initialize files
     init_database()
     init_settings()
+    init_monitoring()
+
+    # Start background monitoring loop
+    start_monitoring_loop()
     
     # Create modules directory if it doesn't exist
     if not os.path.exists(MODULES_DIR):
         os.makedirs(MODULES_DIR)
     
     # Create example modules if they don't exist
-    example_modules = ['add_device_manual', 'cdp_discovery', 'view_map']
+    example_modules = ['add_device_manual', 'cdp_discovery', 'view_map', 'ping_monitor', 'enforce_oui_table', 'ubiquiti_cdp_reader']
     
     for module_name in example_modules:
         module_dir = os.path.join(MODULES_DIR, module_name)

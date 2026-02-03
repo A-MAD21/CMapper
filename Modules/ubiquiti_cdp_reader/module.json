@@ -1,0 +1,75 @@
+{
+  "id": "ubiquiti_cdp_reader",
+  "name": "Read CDP (Ubiquiti)",
+  "version": "1.0",
+  "description": "SSH to Ubiquiti devices and parse CDP from tcpdump to learn parent switch details.",
+  "author": "System",
+  "entry_point": "ubiquiti_cdp_reader.py",
+  "inputs": [
+    {
+      "name": "targets",
+      "type": "device_table",
+      "required": true,
+      "label": "Target Devices",
+      "description": "Select Ubiquiti devices (preselected) or add manual IPs."
+    },
+    {
+      "name": "username",
+      "type": "text",
+      "required": true,
+      "label": "SSH Username",
+      "placeholder": "admin"
+    },
+    {
+      "name": "password",
+      "type": "password",
+      "required": true,
+      "label": "SSH Password",
+      "placeholder": "••••••"
+    },
+    {
+      "name": "interface",
+      "type": "text",
+      "required": false,
+      "label": "Interface",
+      "placeholder": "eth0",
+      "description": "Interface to capture on (default eth0)."
+    },
+    {
+      "name": "capture_seconds",
+      "type": "number",
+      "required": false,
+      "default": 12,
+      "label": "Capture Duration (seconds)",
+      "min": 3,
+      "max": 60
+    },
+    {
+      "name": "batch_size",
+      "type": "number",
+      "required": false,
+      "default": 30,
+      "label": "Batch Size",
+      "min": 1,
+      "max": 60
+    },
+    {
+      "name": "trace_output",
+      "type": "select",
+      "required": false,
+      "default": "false",
+      "options": ["false", "true"],
+      "label": "Trace SSH Output",
+      "description": "Write raw tcpdump output per device to the live log."
+    },
+    {
+      "name": "override_existing_switch",
+      "type": "select",
+      "required": false,
+      "default": "false",
+      "options": ["false", "true"],
+      "label": "Override Existing Switch",
+      "description": "If the switch already exists, overwrite its name/IP/platform with CDP data."
+    }
+  ]
+}

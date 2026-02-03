@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import glob
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -57,7 +58,19 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
     db_path = os.path.join(base_dir, "devices.db")
     fallback_db_path = os.path.join(base_dir, "database.json")
     out_dir = os.path.join(base_dir, "generated_maps")
+    icons_dir = os.path.join(base_dir, "static", "icons", "map")
+    icon_web_base = "/static/icons/map"
     os.makedirs(out_dir, exist_ok=True)
+
+    def _prune_old_maps(out_dir: str, safe_site: str, keep: int = 10) -> None:
+        pattern = os.path.join(out_dir, f"{safe_site}_visual_map_*.html")
+        files = glob.glob(pattern)
+        files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        for old_path in files[keep:]:
+            try:
+                os.remove(old_path)
+            except OSError:
+                pass
 
     try:
         data = _load_database(db_path, fallback_db_path)
@@ -85,7 +98,20 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
         id_map = {d.get("id"): d for d in devices if d.get("id")}
         nodes: List[Dict[str, Any]] = []
         edges: List[Dict[str, Any]] = []
+        connected_ids = set()
         seen_edges = set()
+        icon_map = {
+            "router": "router.png",
+            "switch": "switch.png",
+            "firewall": "firewall.png",
+            "ap": "ap.png",
+            "phone": "phone.png",
+            "host": "host.png",
+            "server": "server.png",
+            "nvr": "nvr.png",
+            "pda": "pda.png",
+            "unknown": "unknown.png"
+        }
 
         for d in devices:
             did = d.get("id")
@@ -96,7 +122,12 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
             dtype = d.get("type") or ""
             platform = d.get("platform") or d.get("model") or ""
             title = " | ".join([x for x in [ip, dtype, platform] if x])
-            nodes.append({"id": did, "label": label, "title": title})
+            icon_name = icon_map.get(dtype.lower(), icon_map["unknown"])
+            icon_path = os.path.join(icons_dir, icon_name)
+            icon_url = f"{icon_web_base}/{icon_name}" if os.path.exists(icon_path) else ""
+            nodes.append({"id": did, "label": label, "title": title, "icon": icon_url, "type": dtype})
+            if d.get("always_show_on_map"):
+                connected_ids.add(did)
 
             for c in d.get("connections") or []:
                 rid = c.get("remote_device")
@@ -107,12 +138,24 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
                 if key in seen_edges:
                     continue
                 seen_edges.add(key)
+                from_type = (d.get("type") or "").lower()
+                to_type = (id_map.get(rid, {}).get("type") or "").lower()
+                thick_types = {"router", "switch", "server"}
+                edge_width = 8.0 if (from_type in thick_types and to_type in thick_types) else 1.3
                 edges.append({
                     "from": did,
                     "to": rid,
                     "label": c.get("local_interface") or "",
                     "protocol": (c.get("protocol") or "").upper(),
+                    "width": edge_width,
                 })
+                connected_ids.add(did)
+                connected_ids.add(rid)
+
+        if connected_ids:
+            nodes = [n for n in nodes if n["id"] in connected_ids]
+        else:
+            return {"status": "error", "message": f"No connected devices found for site '{site_name}'"}
 
         positions = _simple_positions(nodes)
 
@@ -134,9 +177,10 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
     #network {{ height: calc(100% - 54px); background: radial-gradient(circle at 20% 20%, #123, #0b1826); position: relative; overflow: hidden; }}
     .muted {{ color: #9fb3c8; font-size: 13px; }}
     .node-label {{ fill: #e8edf2; font-size: 12px; pointer-events: none; }}
-    .node-circle {{ fill: #1f8ef1; stroke: #c1ddff; stroke-width: 1; }}
-    .node-circle.selected {{ fill: #f5b642; stroke: #ffffff; stroke-width: 2; }}
-    .edge {{ stroke: #5c7ea8; stroke-width: 1.3; opacity: 0.7; }}
+    .node-circle {{ stroke: #c1ddff; stroke-width: 1; }}
+    .node-circle.selected {{ stroke: #ffffff; stroke-width: 2; }}
+    .node-icon {{ pointer-events: none; }}
+    .edge {{ stroke: #5c7ea8; opacity: 0.7; }}
     .tooltip {{
       position: absolute;
       background: rgba(10, 20, 35, 0.9);
@@ -163,6 +207,15 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
     const nodes = {json.dumps(nodes)};
     const edges = {json.dumps(edges)};
     const basePositions = {json.dumps(positions)};
+    const typeColors = {{
+      router: '#F9A8A8',
+      switch: '#A5D8FF',
+      unknown: '#1f8ef1',
+      ap: '#FFFFFF',
+      firewall: '#D8B4FE',
+      nvr: '#A7F3D0',
+      server: '#FBCFE8'
+    }};
 
     const svg = document.getElementById('svg');
     const tooltip = document.getElementById('tooltip');
@@ -265,6 +318,7 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
         line.setAttribute('x2', b.x);
         line.setAttribute('y2', b.y);
         line.setAttribute('class', 'edge');
+        line.setAttribute('stroke-width', e.width || 1.3);
         root.appendChild(line);
       }});
 
@@ -300,7 +354,21 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
         circle.setAttribute('cy', p.y);
         circle.setAttribute('r', 14);
         circle.setAttribute('class', 'node-circle' + (n.id === selectedId ? ' selected' : ''));
+        const dtype = (n.type || '').toLowerCase();
+        const baseColor = typeColors[dtype] || typeColors.unknown;
+        circle.setAttribute('fill', n.id === selectedId ? '#f5b642' : baseColor);
         g.appendChild(circle);
+
+        if (n.icon) {{
+          const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+          img.setAttribute('href', n.icon);
+          img.setAttribute('x', p.x - 9);
+          img.setAttribute('y', p.y - 9);
+          img.setAttribute('width', 18);
+          img.setAttribute('height', 18);
+          img.setAttribute('class', 'node-icon');
+          g.appendChild(img);
+        }}
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', p.x);
@@ -380,6 +448,7 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(html)
 
+        _prune_old_maps(out_dir, safe_site)
         return {
             "status": "success",
             "message": "Visual map generated successfully",

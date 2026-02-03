@@ -1,0 +1,1809 @@
+{
+  "version": "1.0",
+  "meta": {
+    "created": "2026-01-20T14:51:58.142052",
+    "last_modified": "2026-02-03T15:16:40.824936"
+  },
+  "sites": {
+    "Zavieh": {
+      "devices": {
+        "dev_a16e5874": {
+          "ip": "10.192.86.131",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "placed": true,
+          "dock": "top",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "last_status": "not_ok"
+        },
+        "dev_5eb20915": {
+          "ip": "10.192.86.253",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "placed": true,
+          "dock": "left",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "last_status": "not_ok"
+        },
+        "dev_88dac4b9": {
+          "ip": "10.192.86.129",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "placed": true,
+          "dock": "top",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "last_status": "not_ok"
+        },
+        "dev_e42cd467": {
+          "ip": "10.192.86.144",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "last_status": "not_ok"
+        },
+        "dev_142f5138": {
+          "ip": "10.192.86.141",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "last_status": "not_ok"
+        },
+        "dev_156b2e51": {
+          "ip": "10.192.86.138",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "last_status": "not_ok"
+        },
+        "dev_3d37fedf": {
+          "ip": "10.192.86.132",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "dock": "center",
+          "placed": true,
+          "last_status": "not_ok"
+        },
+        "dev_d4c982d3": {
+          "ip": "10.192.86.136",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "dock": "center",
+          "placed": true,
+          "last_status": "not_ok"
+        },
+        "dev_b47be5c5": {
+          "ip": "10.192.86.134",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "last_status": "not_ok"
+        },
+        "dev_e3382443": {
+          "ip": "10.192.86.145",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "dock": "center",
+          "placed": true,
+          "last_status": "not_ok"
+        },
+        "dev_e7db2cfe": {
+          "ip": "10.192.86.140",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "dock": "center",
+          "placed": true,
+          "last_status": "not_ok"
+        },
+        "dev_80eca742": {
+          "ip": "10.192.86.139",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "dock": "center",
+          "placed": true,
+          "last_status": "not_ok"
+        },
+        "dev_5ee1aa96": {
+          "ip": "10.192.86.133",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "dock": "center",
+          "placed": true,
+          "last_status": "not_ok"
+        },
+        "dev_8aa3838a": {
+          "ip": "10.192.86.137",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "dock": "center",
+          "placed": true,
+          "last_status": "not_ok"
+        },
+        "dev_e480888a": {
+          "ip": "10.192.86.135",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "dock": "center",
+          "placed": true,
+          "last_status": "not_ok"
+        },
+        "dev_1b44ea2c": {
+          "ip": "10.192.86.149",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "dock": "center",
+          "placed": true,
+          "last_status": "not_ok"
+        },
+        "dev_57f85f93": {
+          "ip": "10.192.86.148",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "dock": "center",
+          "placed": true,
+          "last_status": "not_ok"
+        },
+        "dev_bc9fd99c": {
+          "enabled": true,
+          "placed": true,
+          "dock": "bottom",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            },
+            {
+              "id": "latency",
+              "type": "latency",
+              "threshold": 500.0,
+              "enabled": true
+            }
+          ],
+          "ip": "10.192.0.251",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "last_status": "not_ok"
+        }
+      },
+      "rules": [
+        {
+          "id": "loss",
+          "type": "loss",
+          "threshold": 100,
+          "enabled": true
+        },
+        {
+          "id": "latency",
+          "type": "latency",
+          "threshold": 50,
+          "enabled": true
+        },
+        {
+          "id": "stale",
+          "type": "stale",
+          "threshold": 300,
+          "enabled": true
+        }
+      ],
+      "layout": {
+        "top": 333,
+        "bottom": 370,
+        "left": 131,
+        "right": 120,
+        "labels": {
+          "top": "Top",
+          "left": "Left",
+          "center": "Center",
+          "right": "Right",
+          "bottom": "Clients"
+        }
+      }
+    },
+    "Hamedan - Dry": {
+      "devices": {
+        "dev_a97ee31f": {
+          "ip": "10.192.111.3",
+          "packet_loss": 0,
+          "avg_latency_ms": 22,
+          "last_check": "2026-02-03T15:16:19.939742",
+          "enabled": true,
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "dock": "center",
+          "placed": true,
+          "last_status": "ok"
+        },
+        "dev_5a29f237": {
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "10.192.111.13",
+          "packet_loss": 0,
+          "avg_latency_ms": 21,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_d710fab8": {
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "10.192.111.5",
+          "packet_loss": 0,
+          "avg_latency_ms": 18,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_f7df95a3": {
+          "enabled": true,
+          "placed": true,
+          "dock": "top",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "10.192.111.15",
+          "packet_loss": 0,
+          "avg_latency_ms": 16,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_8a02ff98": {
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "last_status": "not_ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "10.192.111.4",
+          "packet_loss": 100,
+          "avg_latency_ms": null,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_f07eac5a": {
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "10.192.111.7",
+          "packet_loss": 0,
+          "avg_latency_ms": 18,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_5052b99a": {
+          "enabled": true,
+          "placed": true,
+          "dock": "top",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "10.192.111.14",
+          "packet_loss": 0,
+          "avg_latency_ms": 49,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_2d0ac826": {
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "10.192.111.11",
+          "packet_loss": 0,
+          "avg_latency_ms": 19,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_5c64e3e1": {
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "10.192.111.5",
+          "packet_loss": 0,
+          "avg_latency_ms": 18,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_mac_ac162d8d32fc_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_24e9b3afb1d0_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c292ccf66_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_20370677b8c0_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c4143c79cbc0_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_5061bfefd140_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0c68037e0bc0_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c4143c79d640_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c6044ad_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_001761112ad4_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6cdd30f7c140_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000830f5cdc0_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c40acbc9bdc0_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_68bc0cef3d40_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64d814662bc0_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c239bcce_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e063da337937_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_18e829cc0937_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e063da33551a_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e063dab0cf9e_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e063da3373f4_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_18e8291021b4_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e063da33764a_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_38d547135bd3_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_1831bf07f88b_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d04b_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d943_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d9bf_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d92b_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6045cb6d16d6_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc3c3_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d983_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_249ad84742d1_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0017611300dd_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc078_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830a9c_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64db4378d8b3_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc1d9_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4c1154c0f51e_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_18c04dde9b7f_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0050ba8c0f4b_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_a85e456d5100_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_cc28aa34734a_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_18c04d65d0d5_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c6044b3_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c60449d_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830a6e_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ac8b_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_88d7f67e6c27_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830ae4_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f75ba6_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830aa1_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ac69_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ac83_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_001761117b44_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4cedfbbf4a90_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830ace_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d9c5_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d896e2f_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_805ec0bb819a_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830ae7_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c60441b_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c6044b1_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_3c7c3f146195_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c60439d_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830a4e_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c60438d_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_d8b370a6a352_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_3c5ec31c9940_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64db4378d8ca_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f20263_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ac81_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc36e_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc3be_hamedan___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        }
+      },
+      "rules": [
+        {
+          "id": "loss",
+          "type": "loss",
+          "threshold": 100,
+          "enabled": true
+        },
+        {
+          "id": "latency",
+          "type": "latency",
+          "threshold": 500,
+          "enabled": true
+        },
+        {
+          "id": "stale",
+          "type": "stale",
+          "threshold": 300,
+          "enabled": true
+        }
+      ]
+    },
+    "Hamedan - Dry -TEST": {
+      "devices": {
+        "dev_mac_ac162d8d32fc_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c292ccf66_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_24e9b3afb1d0_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_20370677b8c0_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c4143c79cbc0_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_5061bfefd140_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0c68037e0bc0_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c4143c79d640_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_001761112ad4_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6cdd30f7c140_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c40acbc9bdc0_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000830f5cdc0_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64d814662bc0_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_68bc0cef3d40_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c239bcce_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e063da337937_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e063da33764a_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e063da3373f4_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e063da33551a_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e063dab0cf9e_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_18e829cc0937_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_18e8291021b4_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d04b_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_38d547135bd3_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_1831bf07f88b_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d943_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d92b_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f2027a_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d94b_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830a64_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6045cb6d16d6_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc3c3_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d983_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc3be_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64db4378d8ca_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_249ad84742d1_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0017611300dd_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc1d9_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64db4378d8b3_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830a9c_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830aed_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_18c04dde9b7f_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_a85e456d5100_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_18c04d65d0d5_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_cc28aa34734a_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c60449d_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830a6e_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ac8b_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_88d7f67e6c27_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830aa1_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ac7f_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ac69_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ac83_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4cedfbbf4a90_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_001761117b44_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2d9c5_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc088_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc36e_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830ab9_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c6044b1_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_805ec0bb819a_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830ae7_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830ace_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f9c836_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ac81_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d830a4e_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c60441b_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c6044ad_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c6044b3_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_3c7c3f146195_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c60439d_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c60438d_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_d8b370a6a352_hamedan___dry__test": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_65c65245": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        }
+      },
+      "rules": [
+        {
+          "id": "loss",
+          "type": "loss",
+          "threshold": 100,
+          "enabled": true
+        },
+        {
+          "id": "latency",
+          "type": "latency",
+          "threshold": 500,
+          "enabled": true
+        }
+      ]
+    },
+    "ZahdanFmrStore": {
+      "devices": {
+        "dev_706fc884": {
+          "enabled": true,
+          "placed": true,
+          "dock": "top",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "172.18.16.17",
+          "packet_loss": 0,
+          "avg_latency_ms": 182,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_b36fffe8": {
+          "enabled": true,
+          "placed": true,
+          "dock": "top",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "172.18.16.13",
+          "packet_loss": 0,
+          "avg_latency_ms": 107,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_e0af63c9": {
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "172.18.16.101",
+          "packet_loss": 0,
+          "avg_latency_ms": 90,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_92870125": {
+          "enabled": true,
+          "placed": true,
+          "dock": "top",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "172.18.16.1",
+          "packet_loss": 0,
+          "avg_latency_ms": 96,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_432338af": {
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "172.18.16.102",
+          "packet_loss": 0,
+          "avg_latency_ms": 52,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_582354f5": {
+          "enabled": true,
+          "placed": true,
+          "dock": "top",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "172.18.16.14",
+          "packet_loss": 0,
+          "avg_latency_ms": 426,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_1a86c593": {
+          "enabled": true,
+          "placed": true,
+          "dock": "top",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "172.18.16.15",
+          "packet_loss": 0,
+          "avg_latency_ms": 172,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_95a672f7": {
+          "enabled": true,
+          "placed": true,
+          "dock": "top",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "172.18.16.16",
+          "packet_loss": 0,
+          "avg_latency_ms": 176,
+          "last_check": "2026-02-03T15:16:19.939742"
+        },
+        "dev_721b4ca6": {
+          "enabled": true,
+          "placed": true,
+          "dock": "center",
+          "last_status": "ok",
+          "rules": [
+            {
+              "id": "loss",
+              "type": "loss",
+              "threshold": 100.0,
+              "enabled": true
+            }
+          ],
+          "ip": "172.18.16.103",
+          "packet_loss": 0,
+          "avg_latency_ms": 131,
+          "last_check": "2026-02-03T15:16:19.939742"
+        }
+      },
+      "rules": [
+        {
+          "id": "loss",
+          "type": "loss",
+          "threshold": 100,
+          "enabled": true
+        },
+        {
+          "id": "latency",
+          "type": "latency",
+          "threshold": 500,
+          "enabled": true
+        }
+      ],
+      "layout": {
+        "top": 90,
+        "bottom": 90,
+        "left": 120,
+        "right": 120,
+        "labels": {
+          "top": "Top",
+          "left": "Left",
+          "center": "Center",
+          "right": "Right",
+          "bottom": "Bottom"
+        }
+      }
+    }
+  }
+}

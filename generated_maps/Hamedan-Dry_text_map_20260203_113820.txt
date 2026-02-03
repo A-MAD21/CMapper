@@ -1,0 +1,13 @@
+Site: Hamedan - Dry
+Generated: 2026-02-03T11:38:20
+Devices: 83 | Connection entries: 22
+
+- SWC2.OKCO.ir (10.192.111.3) | switch | cisco WS-C2960S-48FPS-L
+  link: cdp GigabitEthernet1/0/48 -> unknown
+  - SWC1 (10.192.111.13) | switch | cisco WS-C2960S-24PS-L
+    link: cdp GigabitEthernet1/0/46 -> unknown
+    - SW1-soole3-dry-Hamedan.OKCO.ir (10.192.111.15) | switch | cisco WS-C2960S-24PS-L
+    link: cdp GigabitEthernet1/0/48 -> unknown
+    - SWC4.OKCO.ir (10.192.111.5) | switch | cisco WS-C2960S-48FPS-L
+      link: cdp GigabitEthernet2/0/45 -> unknown
+      - SWC3.OKCO.ir (10.192.111.4) | switch | cisco WS-C2960S-48FPS-L

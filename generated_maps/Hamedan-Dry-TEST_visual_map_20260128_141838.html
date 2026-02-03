@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>CMapper - Hamedan - Dry -TEST visual map</title>
+  <style>
+    html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; background: #0c1b2a; color: #e8edf2; }
+    #topbar { padding: 12px 16px; border-bottom: 1px solid #1e3147; background: #13263b; }
+    #network { height: calc(100% - 54px); background: radial-gradient(circle at 20% 20%, #123, #0b1826); position: relative; overflow: hidden; }
+    .muted { color: #9fb3c8; font-size: 13px; }
+    .node-label { fill: #e8edf2; font-size: 12px; pointer-events: none; }
+    .node-circle { fill: #1f8ef1; stroke: #c1ddff; stroke-width: 1; }
+    .node-circle.selected { fill: #f5b642; stroke: #ffffff; stroke-width: 2; }
+    .edge { stroke: #5c7ea8; stroke-width: 1.3; opacity: 0.7; }
+    .tooltip {
+      position: absolute;
+      background: rgba(10, 20, 35, 0.9);
+      color: #e8edf2;
+      padding: 6px 10px;
+      border: 1px solid #234;
+      border-radius: 6px;
+      pointer-events: none;
+      font-size: 12px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="topbar">
+    <div><b>Site:</b> Hamedan - Dry -TEST <span class="muted">(76 devices, 0 links)</span></div>
+    <div class="muted">Generated 2026-01-28T14:18:38</div>
+  </div>
+  <div id="network">
+    <svg id="svg" width="100%" height="100%"></svg>
+    <div id="tooltip" class="tooltip"></div>
+  </div>
+  <script>
+    const nodes = [{"id": "dev_mac_24e9b3afb1d0_hamedan___dry__test", "label": "24:E9:B3:AF:B1:D0", "title": "10.192.111.1 | unknown"}, {"id": "dev_mac_18c04d65d0d5_hamedan___dry__test", "label": "18:C0:4D:65:D0:D5", "title": "10.192.111.88 | unknown"}, {"id": "dev_mac_18e8291021b4_hamedan___dry__test", "label": "18:E8:29:10:21:B4", "title": "10.192.111.28 | unknown"}, {"id": "dev_mac_e4f14c60449d_hamedan___dry__test", "label": "E4:F1:4C:60:44:9D", "title": "10.192.111.121 | unknown"}, {"id": "dev_mac_e4f14c6044b3_hamedan___dry__test", "label": "E4:F1:4C:60:44:B3", "title": "10.192.111.119 | unknown"}, {"id": "dev_mac_e063da337937_hamedan___dry__test", "label": "E0:63:DA:33:79:37", "title": "10.192.111.22 | unknown"}, {"id": "dev_mac_e4f14c6044ad_hamedan___dry__test", "label": "E4:F1:4C:60:44:AD", "title": "10.192.111.115 | unknown"}, {"id": "dev_mac_000c292ccf66_hamedan___dry__test", "label": "00:0C:29:2C:CF:66", "title": "10.192.111.10 | unknown"}, {"id": "dev_mac_ac162d8d32fc_hamedan___dry__test", "label": "AC:16:2D:8D:32:FC", "title": "10.192.111.8 | unknown"}, {"id": "dev_mac_20370677b8c0_hamedan___dry__test", "label": "20:37:06:77:B8:C0", "title": "10.192.111.7 | unknown"}, {"id": "dev_mac_c4143c79d640_hamedan___dry__test", "label": "C4:14:3C:79:D6:40", "title": "10.192.111.4 | unknown"}, {"id": "dev_mac_5061bfefd140_hamedan___dry__test", "label": "50:61:BF:EF:D1:40", "title": "10.192.111.6 | unknown"}, {"id": "dev_mac_0c68037e0bc0_hamedan___dry__test", "label": "0C:68:03:7E:0B:C0", "title": "10.192.111.5 | unknown"}, {"id": "dev_mac_c4143c79cbc0_hamedan___dry__test", "label": "C4:14:3C:79:CB:C0", "title": "10.192.111.3 | unknown"}, {"id": "dev_mac_001761112ad4_hamedan___dry__test", "label": "00:17:61:11:2A:D4", "title": "10.192.111.19 | unknown"}, {"id": "dev_mac_c40acbc9bdc0_hamedan___dry__test", "label": "C4:0A:CB:C9:BD:C0", "title": "10.192.111.16 | unknown"}, {"id": "dev_mac_000830f5cdc0_hamedan___dry__test", "label": "00:08:30:F5:CD:C0", "title": "10.192.111.14 | unknown"}, {"id": "dev_mac_64d814662bc0_hamedan___dry__test", "label": "64:D8:14:66:2B:C0", "title": "10.192.111.13 | unknown"}, {"id": "dev_mac_68bc0cef3d40_hamedan___dry__test", "label": "68:BC:0C:EF:3D:40", "title": "10.192.111.15 | unknown"}, {"id": "dev_mac_6cdd30f7c140_hamedan___dry__test", "label": "6C:DD:30:F7:C1:40", "title": "10.192.111.11 | unknown"}, {"id": "dev_mac_7483c239bcce_hamedan___dry__test", "label": "Ubiquiti", "title": "10.192.111.20 | unknown"}, {"id": "dev_mac_18e829cc0937_hamedan___dry__test", "label": "18:E8:29:CC:09:37", "title": "10.192.111.23 | unknown"}, {"id": "dev_mac_e063dab0cf9e_hamedan___dry__test", "label": "E0:63:DA:B0:CF:9E", "title": "10.192.111.26 | unknown"}, {"id": "dev_mac_e063da3373f4_hamedan___dry__test", "label": "E0:63:DA:33:73:F4", "title": "10.192.111.27 | unknown"}, {"id": "dev_mac_e063da33551a_hamedan___dry__test", "label": "E0:63:DA:33:55:1A", "title": "10.192.111.25 | unknown"}, {"id": "dev_mac_e063da33764a_hamedan___dry__test", "label": "E0:63:DA:33:76:4A", "title": "10.192.111.21 | unknown"}, {"id": "dev_mac_1831bf07f88b_hamedan___dry__test", "label": "18:31:BF:07:F8:8B", "title": "10.192.111.57 | unknown"}, {"id": "dev_mac_38d547135bd3_hamedan___dry__test", "label": "38:D5:47:13:5B:D3", "title": "10.192.111.54 | unknown"}, {"id": "dev_mac_64cba3f2d04b_hamedan___dry__test", "label": "64:CB:A3:F2:D0:4B", "title": "10.192.111.50 | unknown"}, {"id": "dev_mac_b4293d830a64_hamedan___dry__test", "label": "B4:29:3D:83:0A:64", "title": "10.192.111.51 | unknown"}, {"id": "dev_mac_64cba3f2d92b_hamedan___dry__test", "label": "64:CB:A3:F2:D9:2B", "title": "10.192.111.59 | unknown"}, {"id": "dev_mac_64cba3f2d943_hamedan___dry__test", "label": "64:CB:A3:F2:D9:43", "title": "10.192.111.58 | unknown"}, {"id": "dev_mac_64cba3f2d94b_hamedan___dry__test", "label": "64:CB:A3:F2:D9:4B", "title": "10.192.111.52 | unknown"}, {"id": "dev_mac_64cba3f2d9bf_hamedan___dry__test", "label": "64:CB:A3:F2:D9:BF", "title": "10.192.111.60 | unknown"}, {"id": "dev_mac_002406f2027a_hamedan___dry__test", "label": "00:24:06:F2:02:7A", "title": "10.192.111.56 | unknown"}, {"id": "dev_mac_6045cb6d16d6_hamedan___dry__test", "label": "60:45:CB:6D:16:D6", "title": "10.192.111.67 | unknown"}, {"id": "dev_mac_b4293d7fc3c3_hamedan___dry__test", "label": "B4:29:3D:7F:C3:C3", "title": "10.192.111.62 | unknown"}, {"id": "dev_mac_b4293d7fc3be_hamedan___dry__test", "label": "B4:29:3D:7F:C3:BE", "title": "10.192.111.61 | unknown"}, {"id": "dev_mac_64db4378d8ca_hamedan___dry__test", "label": "64:DB:43:78:D8:CA", "title": "10.192.111.64 | unknown"}, {"id": "dev_mac_0017611300dd_hamedan___dry__test", "label": "00:17:61:13:00:DD", "title": "10.192.111.74 | unknown"}, {"id": "dev_mac_249ad84742d1_hamedan___dry__test", "label": "24:9A:D8:47:42:D1", "title": "10.192.111.71 | unknown"}, {"id": "dev_mac_b4293d7fc078_hamedan___dry__test", "label": "B4:29:3D:7F:C0:78", "title": "10.192.111.68 | unknown"}, {"id": "dev_mac_b4293d830a9c_hamedan___dry__test", "label": "B4:29:3D:83:0A:9C", "title": "10.192.111.75 | unknown"}, {"id": "dev_mac_b4293d7fc1d9_hamedan___dry__test", "label": "B4:29:3D:7F:C1:D9", "title": "10.192.111.77 | unknown"}, {"id": "dev_mac_64db4378d8b3_hamedan___dry__test", "label": "64:DB:43:78:D8:B3", "title": "10.192.111.73 | unknown"}, {"id": "dev_mac_18c04dde9b7f_hamedan___dry__test", "label": "18:C0:4D:DE:9B:7F", "title": "10.192.111.81 | unknown"}, {"id": "dev_mac_a85e456d5100_hamedan___dry__test", "label": "A8:5E:45:6D:51:00", "title": "10.192.111.84 | unknown"}, {"id": "dev_mac_cc28aa34734a_hamedan___dry__test", "label": "CC:28:AA:34:73:4A", "title": "10.192.111.87 | unknown"}, {"id": "dev_mac_64cba3f5ac8b_hamedan___dry__test", "label": "64:CB:A3:F5:AC:8B", "title": "10.192.111.89 | unknown"}, {"id": "dev_mac_b4293d830a6e_hamedan___dry__test", "label": "B4:29:3D:83:0A:6E", "title": "10.192.111.90 | unknown"}, {"id": "dev_mac_88d7f67e6c27_hamedan___dry__test", "label": "88:D7:F6:7E:6C:27", "title": "10.192.111.99 | unknown"}, {"id": "dev_mac_b4293d830ae4_hamedan___dry__test", "label": "B4:29:3D:83:0A:E4", "title": "10.192.111.93 | unknown"}, {"id": "dev_mac_64cba3f75ba6_hamedan___dry__test", "label": "64:CB:A3:F7:5B:A6", "title": "10.192.111.94 | unknown"}, {"id": "dev_mac_64cba3f5ac69_hamedan___dry__test", "label": "64:CB:A3:F5:AC:69", "title": "10.192.111.92 | unknown"}, {"id": "dev_mac_64cba3f5ac83_hamedan___dry__test", "label": "64:CB:A3:F5:AC:83", "title": "10.192.111.96 | unknown"}, {"id": "dev_mac_b4293d830aa1_hamedan___dry__test", "label": "B4:29:3D:83:0A:A1", "title": "10.192.111.95 | unknown"}, {"id": "dev_mac_64cba3f5ac7f_hamedan___dry__test", "label": "64:CB:A3:F5:AC:7F", "title": "10.192.111.91 | unknown"}, {"id": "dev_mac_001761117b44_hamedan___dry__test", "label": "00:17:61:11:7B:44", "title": "10.192.111.107 | unknown"}, {"id": "dev_mac_4cedfbbf4a90_hamedan___dry__test", "label": "4C:ED:FB:BF:4A:90", "title": "10.192.111.109 | unknown"}, {"id": "dev_mac_b4293d830ae7_hamedan___dry__test", "label": "B4:29:3D:83:0A:E7", "title": "10.192.111.106 | unknown"}, {"id": "dev_mac_64cba3f2d9c5_hamedan___dry__test", "label": "64:CB:A3:F2:D9:C5", "title": "10.192.111.100 | unknown"}, {"id": "dev_mac_b4293d7fc088_hamedan___dry__test", "label": "B4:29:3D:7F:C0:88", "title": "10.192.111.98 | unknown"}, {"id": "dev_mac_b4293d896e2f_hamedan___dry__test", "label": "B4:29:3D:89:6E:2F", "title": "10.192.111.97 | unknown"}, {"id": "dev_mac_805ec0bb819a_hamedan___dry__test", "label": "80:5E:C0:BB:81:9A", "title": "10.192.111.111 | unknown"}, {"id": "dev_mac_b4293d830ace_hamedan___dry__test", "label": "B4:29:3D:83:0A:CE", "title": "10.192.111.103 | unknown"}, {"id": "dev_mac_b4293d830a4e_hamedan___dry__test", "label": "B4:29:3D:83:0A:4E", "title": "10.192.111.112 | unknown"}, {"id": "dev_mac_64cba3f5ac81_hamedan___dry__test", "label": "64:CB:A3:F5:AC:81", "title": "10.192.111.110 | unknown"}, {"id": "dev_mac_b4293d7fc36e_hamedan___dry__test", "label": "B4:29:3D:7F:C3:6E", "title": "10.192.111.102 | unknown"}, {"id": "dev_mac_b4293d830ab9_hamedan___dry__test", "label": "B4:29:3D:83:0A:B9", "title": "10.192.111.105 | unknown"}, {"id": "dev_mac_e4f14c60441b_hamedan___dry__test", "label": "E4:F1:4C:60:44:1B", "title": "10.192.111.116 | unknown"}, {"id": "dev_mac_e4f14c6044b1_hamedan___dry__test", "label": "E4:F1:4C:60:44:B1", "title": "10.192.111.118 | unknown"}, {"id": "dev_mac_3c7c3f146195_hamedan___dry__test", "label": "3C:7C:3F:14:61:95", "title": "10.192.111.117 | unknown"}, {"id": "dev_mac_e4f14c60438d_hamedan___dry__test", "label": "E4:F1:4C:60:43:8D", "title": "10.192.111.122 | unknown"}, {"id": "dev_mac_e4f14c60439d_hamedan___dry__test", "label": "E4:F1:4C:60:43:9D", "title": "10.192.111.123 | unknown"}, {"id": "dev_mac_d8b370a6a352_hamedan___dry__test", "label": "D8:B3:70:A6:A3:52", "title": "10.192.111.125 | unknown"}, {"id": "dev_mac_b4293d830af2_hamedan___dry__test", "label": "B4:29:3D:83:0A:F2", "title": "10.192.111.114 | unknown"}];
+    const edges = [];
+    const basePositions = {"dev_mac_24e9b3afb1d0_hamedan___dry__test": {"x": 5472.0, "y": 3040.0}, "dev_mac_18c04d65d0d5_hamedan___dry__test": {"x": 5463.693486992221, "y": 3240.832968188712}, "dev_mac_18e8291021b4_hamedan___dry__test": {"x": 5438.830689875421, "y": 3440.2940435627447}, "dev_mac_e4f14c60449d_hamedan___dry__test": {"x": 5397.581446764451, "y": 3637.0207047264234}, "dev_mac_e4f14c6044b3_hamedan___dry__test": {"x": 5340.227531815944, "y": 3829.66910910579}, "dev_mac_e063da337937_hamedan___dry__test": {"x": 5267.160730425099, "y": 4016.9232727560216}, "dev_mac_e4f14c6044ad_hamedan___dry__test": {"x": 5178.8801629341815, "y": 4197.504059866163}, "dev_mac_000c292ccf66_hamedan___dry__test": {"x": 5075.98887513447, "y": 4370.177920553742}, "dev_mac_ac162d8d32fc_hamedan___dry__test": {"x": 4959.189718852029, "y": 4533.765317261272}, "dev_mac_20370677b8c0_hamedan___dry__test": {"x": 4829.280550757056, "y": 4687.148782193803}, "dev_mac_c4143c79d640_hamedan___dry__test": {"x": 4687.148782193803, "y": 4829.280550757056}, "dev_mac_5061bfefd140_hamedan___dry__test": {"x": 4533.765317261273, "y": 4959.189718852029}, "dev_mac_0c68037e0bc0_hamedan___dry__test": {"x": 4370.177920553742, "y": 5075.98887513447}, "dev_mac_c4143c79cbc0_hamedan___dry__test": {"x": 4197.504059866163, "y": 5178.8801629341815}, "dev_mac_001761112ad4_hamedan___dry__test": {"x": 4016.923272756022, "y": 5267.160730425099}, "dev_mac_c40acbc9bdc0_hamedan___dry__test": {"x": 3829.6691091057905, "y": 5340.227531815944}, "dev_mac_000830f5cdc0_hamedan___dry__test": {"x": 3637.020704726424, "y": 5397.581446764451}, "dev_mac_64d814662bc0_hamedan___dry__test": {"x": 3440.2940435627443, "y": 5438.830689875421}, "dev_mac_68bc0cef3d40_hamedan___dry__test": {"x": 3240.8329681887126, "y": 5463.693486992221}, "dev_mac_6cdd30f7c140_hamedan___dry__test": {"x": 3040.0, "y": 5472.0}, "dev_mac_7483c239bcce_hamedan___dry__test": {"x": 2839.167031811288, "y": 5463.693486992221}, "dev_mac_18e829cc0937_hamedan___dry__test": {"x": 2639.7059564372553, "y": 5438.830689875421}, "dev_mac_e063dab0cf9e_hamedan___dry__test": {"x": 2442.979295273577, "y": 5397.581446764452}, "dev_mac_e063da3373f4_hamedan___dry__test": {"x": 2250.3308908942104, "y": 5340.227531815944}, "dev_mac_e063da33551a_hamedan___dry__test": {"x": 2063.0767272439784, "y": 5267.160730425099}, "dev_mac_e063da33764a_hamedan___dry__test": {"x": 1882.4959401338372, "y": 5178.8801629341815}, "dev_mac_1831bf07f88b_hamedan___dry__test": {"x": 1709.8220794462575, "y": 5075.98887513447}, "dev_mac_38d547135bd3_hamedan___dry__test": {"x": 1546.2346827387278, "y": 4959.189718852029}, "dev_mac_64cba3f2d04b_hamedan___dry__test": {"x": 1392.8512178061983, "y": 4829.2805507570565}, "dev_mac_b4293d830a64_hamedan___dry__test": {"x": 1250.719449242944, "y": 4687.148782193803}, "dev_mac_64cba3f2d92b_hamedan___dry__test": {"x": 1120.8102811479712, "y": 4533.765317261273}, "dev_mac_64cba3f2d943_hamedan___dry__test": {"x": 1004.0111248655312, "y": 4370.177920553743}, "dev_mac_64cba3f2d94b_hamedan___dry__test": {"x": 901.119837065819, "y": 4197.5040598661635}, "dev_mac_64cba3f2d9bf_hamedan___dry__test": {"x": 812.8392695749003, "y": 4016.9232727560216}, "dev_mac_002406f2027a_hamedan___dry__test": {"x": 739.7724681840564, "y": 3829.6691091057896}, "dev_mac_6045cb6d16d6_hamedan___dry__test": {"x": 682.4185532355486, "y": 3637.0207047264244}, "dev_mac_b4293d7fc3c3_hamedan___dry__test": {"x": 641.1693101245792, "y": 3440.294043562745}, "dev_mac_b4293d7fc3be_hamedan___dry__test": {"x": 616.3065130077789, "y": 3240.832968188712}, "dev_mac_64db4378d8ca_hamedan___dry__test": {"x": 608.0, "y": 3040.0000000000005}, "dev_mac_0017611300dd_hamedan___dry__test": {"x": 616.3065130077789, "y": 2839.167031811289}, "dev_mac_249ad84742d1_hamedan___dry__test": {"x": 641.1693101245792, "y": 2639.7059564372553}, "dev_mac_b4293d7fc078_hamedan___dry__test": {"x": 682.4185532355482, "y": 2442.979295273577}, "dev_mac_b4293d830a9c_hamedan___dry__test": {"x": 739.7724681840564, "y": 2250.33089089421}, "dev_mac_b4293d7fc1d9_hamedan___dry__test": {"x": 812.8392695749003, "y": 2063.076727243979}, "dev_mac_64db4378d8b3_hamedan___dry__test": {"x": 901.119837065818, "y": 1882.4959401338383}, "dev_mac_18c04dde9b7f_hamedan___dry__test": {"x": 1004.0111248655305, "y": 1709.8220794462575}, "dev_mac_a85e456d5100_hamedan___dry__test": {"x": 1120.81028114797, "y": 1546.2346827387287}, "dev_mac_cc28aa34734a_hamedan___dry__test": {"x": 1250.7194492429442, "y": 1392.8512178061974}, "dev_mac_64cba3f5ac8b_hamedan___dry__test": {"x": 1392.8512178061976, "y": 1250.719449242944}, "dev_mac_b4293d830a6e_hamedan___dry__test": {"x": 1546.2346827387273, "y": 1120.8102811479712}, "dev_mac_88d7f67e6c27_hamedan___dry__test": {"x": 1709.8220794462577, "y": 1004.0111248655305}, "dev_mac_b4293d830ae4_hamedan___dry__test": {"x": 1882.4959401338358, "y": 901.1198370658194}, "dev_mac_64cba3f75ba6_hamedan___dry__test": {"x": 2063.0767272439793, "y": 812.8392695748998}, "dev_mac_64cba3f5ac69_hamedan___dry__test": {"x": 2250.3308908942095, "y": 739.7724681840564}, "dev_mac_64cba3f5ac83_hamedan___dry__test": {"x": 2442.9792952735766, "y": 682.4185532355486}, "dev_mac_b4293d830aa1_hamedan___dry__test": {"x": 2639.7059564372557, "y": 641.1693101245792}, "dev_mac_64cba3f5ac7f_hamedan___dry__test": {"x": 2839.167031811287, "y": 616.3065130077789}, "dev_mac_001761117b44_hamedan___dry__test": {"x": 3039.9999999999995, "y": 608.0}, "dev_mac_4cedfbbf4a90_hamedan___dry__test": {"x": 3240.832968188712, "y": 616.3065130077789}, "dev_mac_b4293d830ae7_hamedan___dry__test": {"x": 3440.2940435627434, "y": 641.1693101245792}, "dev_mac_64cba3f2d9c5_hamedan___dry__test": {"x": 3637.0207047264225, "y": 682.4185532355482}, "dev_mac_b4293d7fc088_hamedan___dry__test": {"x": 3829.66910910579, "y": 739.7724681840564}, "dev_mac_b4293d896e2f_hamedan___dry__test": {"x": 4016.9232727560197, "y": 812.8392695748994}, "dev_mac_805ec0bb819a_hamedan___dry__test": {"x": 4197.5040598661635, "y": 901.119837065819}, "dev_mac_b4293d830ace_hamedan___dry__test": {"x": 4370.177920553741, "y": 1004.0111248655301}, "dev_mac_b4293d830a4e_hamedan___dry__test": {"x": 4533.765317261272, "y": 1120.8102811479705}, "dev_mac_64cba3f5ac81_hamedan___dry__test": {"x": 4687.148782193803, "y": 1250.719449242944}, "dev_mac_b4293d7fc36e_hamedan___dry__test": {"x": 4829.280550757056, "y": 1392.851217806197}, "dev_mac_b4293d830ab9_hamedan___dry__test": {"x": 4959.18971885203, "y": 1546.234682738729}, "dev_mac_e4f14c60441b_hamedan___dry__test": {"x": 5075.98887513447, "y": 1709.8220794462577}, "dev_mac_e4f14c6044b1_hamedan___dry__test": {"x": 5178.880162934181, "y": 1882.4959401338356}, "dev_mac_3c7c3f146195_hamedan___dry__test": {"x": 5267.1607304251, "y": 2063.076727243979}, "dev_mac_e4f14c60438d_hamedan___dry__test": {"x": 5340.227531815944, "y": 2250.330890894209}, "dev_mac_e4f14c60439d_hamedan___dry__test": {"x": 5397.58144676445, "y": 2442.9792952735743}, "dev_mac_d8b370a6a352_hamedan___dry__test": {"x": 5438.830689875421, "y": 2639.7059564372557}, "dev_mac_b4293d830af2_hamedan___dry__test": {"x": 5463.693486992221, "y": 2839.1670318112865}};
+
+    const svg = document.getElementById('svg');
+    const tooltip = document.getElementById('tooltip');
+
+    // Layout and physics parameters
+    const params = {
+      repulsion: 18000,
+      spring: 0.015,
+      restLength: 180,
+      damping: 0.85,
+      maxStep: 12
+    };
+
+    let nodePos = Object.fromEntries(nodes.map(n => [n.id, { ...basePositions[n.id] }]));
+    let velocity = Object.fromEntries(nodes.map(n => [n.id, { x: 0, y: 0 }]));
+    let draggingId = null;
+    let selectedId = null;
+    let panning = false;
+    let lastPan = null;
+    const transform = { x: 0, y: 0, scale: 1 };
+
+    function resize() {
+      const rect = svg.getBoundingClientRect();
+      svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+      // Center initial positions
+      Object.values(nodePos).forEach(p => {
+        if (!p._shifted) {
+          p.x += rect.width / 2;
+          p.y += rect.height / 2;
+          p._shifted = true;
+        }
+      });
+    }
+
+    function applyForces() {
+      // Repulsion
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodePos[nodes[i].id];
+          const b = nodePos[nodes[j].id];
+          let dx = a.x - b.x;
+          let dy = a.y - b.y;
+          const dist2 = Math.max(dx*dx + dy*dy, 40); // avoid div/0
+          const force = params.repulsion / dist2;
+          const invDist = 1 / Math.sqrt(dist2);
+          dx *= invDist; dy *= invDist;
+          velocity[nodes[i].id].x += dx * force;
+          velocity[nodes[i].id].y += dy * force;
+          velocity[nodes[j].id].x -= dx * force;
+          velocity[nodes[j].id].y -= dy * force;
+        }
+      }
+
+      // Springs
+      edges.forEach(e => {
+        const a = nodePos[e.from];
+        const b = nodePos[e.to];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        const dist = Math.max(Math.sqrt(dx*dx + dy*dy), 1);
+        const force = params.spring * (dist - params.restLength);
+        const normX = dx / dist;
+        const normY = dy / dist;
+        velocity[e.from].x += force * normX;
+        velocity[e.from].y += force * normY;
+        velocity[e.to].x -= force * normX;
+        velocity[e.to].y -= force * normY;
+      });
+
+      // Integrate
+      const rect = svg.getBoundingClientRect();
+      const minX = 30, minY = 30, maxX = rect.width - 30, maxY = rect.height - 30;
+
+      nodes.forEach(n => {
+        if (draggingId === n.id) return; // don't move while dragging
+        const v = velocity[n.id];
+        v.x *= params.damping;
+        v.y *= params.damping;
+        v.x = Math.max(Math.min(v.x, params.maxStep), -params.maxStep);
+        v.y = Math.max(Math.min(v.y, params.maxStep), -params.maxStep);
+        const p = nodePos[n.id];
+        p.x = Math.min(Math.max(minX, p.x + v.x), maxX);
+        p.y = Math.min(Math.max(minY, p.y + v.y), maxY);
+      });
+    }
+
+    function draw() {
+      svg.innerHTML = '';
+      const root = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      root.setAttribute('transform', `translate(${transform.x}, ${transform.y}) scale(${transform.scale})`);
+
+      // Draw edges
+      edges.forEach(e => {
+        const a = nodePos[e.from];
+        const b = nodePos[e.to];
+        if (!a || !b) return;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', a.x);
+        line.setAttribute('y1', a.y);
+        line.setAttribute('x2', b.x);
+        line.setAttribute('y2', b.y);
+        line.setAttribute('class', 'edge');
+        root.appendChild(line);
+      });
+
+      // Draw nodes
+      nodes.forEach(n => {
+        const p = nodePos[n.id];
+        if (!p) return;
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('cursor', 'pointer');
+        g.addEventListener('mousemove', (evt) => {
+          tooltip.style.display = 'block';
+          tooltip.style.left = `${evt.clientX + 10}px`;
+          tooltip.style.top = `${evt.clientY + 10}px`;
+          tooltip.innerHTML = `<b>${n.label}</b><br/>${n.title || 'No details'}`;
+        });
+        g.addEventListener('mouseleave', () => {
+          tooltip.style.display = 'none';
+        });
+        g.addEventListener('mousedown', (evt) => {
+          selectedId = n.id;
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'cmapp:select', deviceId: n.id }, '*');
+          }
+          draggingId = n.id;
+          tooltip.style.display = 'none';
+          evt.preventDefault();
+          evt.stopPropagation();
+        });
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', p.x);
+        circle.setAttribute('cy', p.y);
+        circle.setAttribute('r', 14);
+        circle.setAttribute('class', 'node-circle' + (n.id === selectedId ? ' selected' : ''));
+        g.appendChild(circle);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', p.x);
+        text.setAttribute('y', p.y + 26);
+        text.setAttribute('class', 'node-label');
+        text.setAttribute('text-anchor', 'middle');
+        text.textContent = n.label;
+        g.appendChild(text);
+
+        root.appendChild(g);
+      });
+
+      svg.appendChild(root);
+    }
+
+    function onMouseMove(evt) {
+      if (draggingId) {
+        const p = nodePos[draggingId];
+        const world = toWorld(evt);
+        p.x = world.x;
+        p.y = world.y;
+        velocity[draggingId].x = 0;
+        velocity[draggingId].y = 0;
+      } else if (panning && lastPan) {
+        transform.x += evt.clientX - lastPan.x;
+        transform.y += evt.clientY - lastPan.y;
+        lastPan = { x: evt.clientX, y: evt.clientY };
+      }
+    }
+    function onMouseUp() { draggingId = null; panning = false; }
+
+    // Zoom/pan controls
+    svg.addEventListener('wheel', (evt) => {
+      evt.preventDefault();
+      const scaleDelta = evt.deltaY < 0 ? 1.1 : 0.9;
+      const mouse = toWorld(evt);
+      transform.scale = Math.min(3, Math.max(0.4, transform.scale * scaleDelta));
+      transform.x = evt.clientX - mouse.x * transform.scale;
+      transform.y = evt.clientY - mouse.y * transform.scale;
+    }, { passive: false });
+
+    svg.addEventListener('mousedown', (evt) => {
+      if (evt.target.tagName === 'circle' || evt.target.tagName === 'text') return;
+      panning = true;
+      lastPan = { x: evt.clientX, y: evt.clientY };
+    });
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('message', (evt) => {
+      const data = evt.data || {};
+      if (data.type === 'cmapp:select' && data.deviceId) {
+        selectedId = data.deviceId;
+      }
+    });
+
+    resize();
+    function loop() {
+      applyForces();
+      draw();
+      requestAnimationFrame(loop);
+    }
+    loop();
+
+    function toWorld(evt) {
+      return {
+        x: (evt.clientX - transform.x) / transform.scale,
+        y: (evt.clientY - transform.y) / transform.scale
+      };
+    }
+  </script>
+</body>
+</html>

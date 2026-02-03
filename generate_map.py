@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import glob
 from collections import defaultdict, deque
 from datetime import datetime
 from typing import Any, Dict, List, Tuple, Optional
@@ -87,6 +88,21 @@ def generate_map_from_database(site_name: str | None = None) -> Dict[str, Any]:
     fallback_db_path = os.path.join(base_dir, "database.json")
     out_dir = os.path.join(base_dir, "generated_maps")
     os.makedirs(out_dir, exist_ok=True)
+
+    def _prune_old_maps(out_dir: str, safe_site: str, keep: int = 10) -> None:
+        patterns = [
+            os.path.join(out_dir, f"{safe_site}_text_map_*.txt"),
+            os.path.join(out_dir, f"{safe_site}_map_*.html"),
+        ]
+        files: List[str] = []
+        for pattern in patterns:
+            files.extend(glob.glob(pattern))
+        files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        for old_path in files[keep:]:
+            try:
+                os.remove(old_path)
+            except OSError:
+                pass
 
     try:
         data = _load_database(db_path, fallback_db_path)
@@ -168,6 +184,7 @@ def generate_map_from_database(site_name: str | None = None) -> Dict[str, Any]:
         with open(out_path, "w", encoding="utf-8") as f:
             f.write("\n".join(out_lines) + "\n")
 
+        _prune_old_maps(out_dir, safe_site)
         return {
             "status": "success",
             "message": "Text map generated successfully",

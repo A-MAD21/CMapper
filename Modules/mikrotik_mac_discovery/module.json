@@ -1,0 +1,83 @@
+{
+  "id": "mikrotik_mac_discovery",
+  "name": "MikroTik MAC Discovery",
+  "version": "1.0",
+  "description": "Discover devices via RouterOS /tool/ip/scan and tag vendor using local OUI ranges.",
+  "author": "System",
+  "entry_point": "mikrotik_mac_discovery.py",
+  "inputs": [
+    {
+      "name": "router_ip",
+      "type": "text",
+      "required": true,
+      "label": "Router IP",
+      "placeholder": "192.168.88.1",
+      "description": "Reachable IP of the MikroTik RouterOS device."
+    },
+    {
+      "name": "username",
+      "type": "text",
+      "required": true,
+      "label": "Username",
+      "placeholder": "admin"
+    },
+    {
+      "name": "password",
+      "type": "password",
+      "required": true,
+      "label": "Password",
+      "placeholder": "••••••"
+    },
+    {
+      "name": "interface",
+      "type": "text",
+      "required": false,
+      "label": "Interface (optional)",
+      "placeholder": "bridge1",
+      "description": "Leave blank to scan all interfaces."
+    },
+    {
+      "name": "address_range",
+      "type": "text",
+      "required": false,
+      "label": "Address Range (optional)",
+      "placeholder": "10.192.111.1-10.192.111.254",
+      "description": "IP range for ip-scan (e.g., 10.0.0.1-10.0.0.254)."
+    },
+    {
+      "name": "scan_duration_s",
+      "type": "number",
+      "required": false,
+      "default": 30,
+      "label": "Scan Duration (seconds)",
+      "description": "How long to let /tool/ip/scan run before collecting results.",
+      "min": 5,
+      "max": 300
+    },
+    {
+      "name": "replace_on_ip",
+      "type": "select",
+      "required": false,
+      "default": "false",
+      "options": ["false", "true"],
+      "label": "Replace on IP Match",
+      "description": "If an IP already exists with a different MAC, replace that device with the new MAC/vendor."
+    },
+    {
+      "name": "trace_output",
+      "type": "select",
+      "required": false,
+      "default": "false",
+      "options": ["false", "true"],
+      "label": "Trace Output",
+      "description": "Print raw RouterOS scan output to the server console."
+    },
+    {
+      "name": "note",
+      "type": "text",
+      "required": false,
+      "label": "Note (optional)",
+      "placeholder": "Discovered via MikroTik scan"
+    }
+  ]
+}

@@ -46,18 +46,38 @@ def generate_network_map(database, site_name, output_dir="static/maps"):
             'unknown': '#073B4C'       # Dark blue
         }
         
+        base_dir = os.path.dirname(output_dir) if os.path.isabs(output_dir) else os.path.dirname(
+            os.path.join(os.getcwd(), output_dir)
+        )
+        icons_dir = os.path.join(base_dir, "icons", "map")
+        icon_web_base = "/static/icons/map"
+        blank_icon = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
+
+        icon_map = {
+            "router": "router.png",
+            "switch": "switch.png",
+            "firewall": "firewall.png",
+            "ap": "ap.png",
+            "phone": "phone.png",
+            "host": "host.png",
+            "server": "server.png",
+            "nvr": "nvr.png",
+            "pda": "pda.png",
+            "unknown": "unknown.png"
+        }
+
         # Process each device
         for device in site_devices:
             device_id = device.get("id", f"dev_{uuid.uuid4().hex[:8]}")
             device_type = device.get("type", "unknown").lower()
             color = type_colors.get(device_type, '#073B4C')
-            
-            # Determine icon based on type
-            icon = "router"
-            if device_type == "switch": icon = "switch"
-            elif device_type == "firewall": icon = "shield"
-            elif device_type == "ap": icon = "wifi"
-            elif device_type in ["phone", "host"]: icon = "desktop"
+
+            icon_name = icon_map.get(device_type, icon_map["unknown"])
+            icon_path = os.path.join(icons_dir, icon_name)
+            if os.path.exists(icon_path):
+                icon_url = f"{icon_web_base}/{icon_name}"
+            else:
+                icon_url = blank_icon
             
             device_node = {
                 'id': device_id,
@@ -69,14 +89,22 @@ def generate_network_map(database, site_name, output_dir="static/maps"):
                 Platform: {device.get('platform', 'N/A')}<br>
                 Status: {device.get('status', 'unknown')}
                 """,
-                'color': color,
-                'shape': 'icon',
-                'icon': {
-                    'face': 'FontAwesome',
-                    'code': self._get_fa_icon(icon),
-                    'size': 40,
-                    'color': color
+                'color': {
+                    'border': '#3B82F6',
+                    'background': '#DBEAFE',
+                    'highlight': {
+                        'border': '#F59E0B',
+                        'background': '#FEF3C7'
+                    },
+                    'hover': {
+                        'border': '#60A5FA',
+                        'background': '#E0F2FE'
+                    }
                 },
+                'shape': 'circularImage',
+                'image': icon_url,
+                'brokenImage': blank_icon,
+                'size': 36,
                 'data': {
                     'ip': device.get("ip"),
                     'type': device.get("type", "unknown"),
@@ -137,19 +165,6 @@ def generate_network_map(database, site_name, output_dir="static/maps"):
         
     except Exception as e:
         return False, f"Error generating map: {str(e)}"
-
-def _get_fa_icon(self, device_type):
-    """Get FontAwesome icon code for device type"""
-    icons = {
-        'router': '\\uf1b9',      # fa-server
-        'switch': '\\uf0e8',      # fa-sitemap
-        'firewall': '\\uf132',    # fa-shield-alt
-        'wifi': '\\uf1eb',        # fa-wifi
-        'desktop': '\\uf108',     # fa-desktop
-        'phone': '\\f095',        # fa-phone
-        'server': '\\uf233'       # fa-server
-    }
-    return icons.get(device_type, '\\uf128')  # default: fa-question
 
 def _generate_html_template(self, site_name, devices_count, connections_count, devices_json, connections_json):
     """Generate complete HTML template with vis.js"""
@@ -416,8 +431,8 @@ def _generate_html_template(self, site_name, devices_count, connections_count, d
         // Network options
         const options = {{
             nodes: {{
-                shape: 'icon',
-                size: 40,
+                shape: 'circularImage',
+                size: 36,
                 font: {{
                     size: 14,
                     face: 'Segoe UI',
