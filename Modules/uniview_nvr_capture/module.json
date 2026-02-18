@@ -1,0 +1,96 @@
+{
+  "id": "uniview_nvr_capture",
+  "name": "Uniview NVR Packet Capture",
+  "version": "1.0",
+  "description": "Login to Uniview NVR via LAPI, start packet capture, and download the pcap.",
+  "author": "System",
+  "entry_point": "uniview_nvr_capture.py",
+  "inputs": [
+    {
+      "name": "targets",
+      "type": "device_table",
+      "required": true,
+      "label": "Target NVRs",
+      "description": "Select NVR devices (preselected) or add manual IPs."
+    },
+    {
+      "name": "username",
+      "type": "text",
+      "required": true,
+      "label": "Username",
+      "placeholder": "admin"
+    },
+    {
+      "name": "password",
+      "type": "password",
+      "required": true,
+      "label": "Password"
+    },
+    {
+      "name": "nic",
+      "type": "select",
+      "required": true,
+      "default": "NIC1",
+      "options": ["NIC1", "NIC2"],
+      "label": "Select NIC"
+    },
+    {
+      "name": "nic_label",
+      "type": "text",
+      "required": false,
+      "default": "",
+      "label": "NIC Label Override (optional)",
+      "placeholder": "NIC1 (10.192.104.22)"
+    },
+    {
+      "name": "packet_size",
+      "type": "number",
+      "required": false,
+      "default": 1500,
+      "label": "Packet Size (bytes)",
+      "min": 64,
+      "max": 1500
+    },
+    {
+      "name": "capture_seconds",
+      "type": "number",
+      "required": false,
+      "default": 60,
+      "label": "Capture Duration (seconds)",
+      "min": 10,
+      "max": 600
+    },
+    {
+      "name": "capture_window_seconds",
+      "type": "number",
+      "required": false,
+      "default": 45,
+      "label": "Capture Window (seconds)",
+      "min": 5,
+      "max": 600
+    },
+    {
+      "name": "ip_mode",
+      "type": "select",
+      "required": false,
+      "default": "all",
+      "options": ["all", "specify", "filter"],
+      "label": "IP Mode"
+    },
+    {
+      "name": "port_mode",
+      "type": "select",
+      "required": false,
+      "default": "all",
+      "options": ["all", "specify", "filter"],
+      "label": "Port Mode"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "pcap_file",
+      "type": "text",
+      "description": "Downloaded pcap file path"
+    }
+  ]
+}

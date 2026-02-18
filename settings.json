@@ -4,6 +4,173 @@
   "default_scan_depth": 3,
   "auto_refresh": false,
   "refresh_interval": 30,
+  "module_credentials": {
+    "ubiquiti_cdp_reader": [
+      {
+        "name": "Ubiq01",
+        "password": "admiN@ok.it.ir",
+        "username": "admin"
+      }
+    ],
+    "uniview_nvr_capture": [
+      {
+        "name": "Uniview01",
+        "password": "][pqwe321456!",
+        "username": "admin"
+      }
+    ],
+    "mikrotik_mac_discovery": [
+      {
+        "name": "Mik-admin",
+        "username": "admin",
+        "password": "Msct@2020"
+      }
+    ]
+  },
+  "module_schedules": [
+    {
+      "name": "Zavieh Disc",
+      "enabled": false,
+      "site_scope": {
+        "mode": "selected",
+        "sites": [
+          "Zavieh"
+        ]
+      },
+      "site_run_mode": "sequential",
+      "delay_between_modules_sec": 30,
+      "repeat_interval_min": 60,
+      "modules": [
+        {
+          "module_id": "mikrotik_mac_discovery",
+          "parameters": {
+            "address_range": "10.192.86.129-10.192.86.253",
+            "interface": "ether1",
+            "note": "",
+            "password": "********",
+            "replace_on_ip": "true",
+            "router_ip": "10.192.86.253",
+            "scan_duration_s": "30",
+            "trace_output": "false",
+            "username": "admin"
+          },
+          "credential_profile": "Mik-admin"
+        },
+        {
+          "module_id": "enforce_oui_table",
+          "parameters": {}
+        },
+        {
+          "module_id": "cdp_discovery",
+          "parameters": {
+            "max_hops": "99",
+            "password": "********",
+            "root_ip": "10.192.86.130",
+            "subnet_mask": "25",
+            "username": "kordestani"
+          }
+        },
+        {
+          "module_id": "uniview_nvr_capture",
+          "parameters": {
+            "capture_seconds": "60",
+            "capture_window_seconds": "45",
+            "ip_mode": "all",
+            "nic": "NIC1",
+            "nic_label": "",
+            "packet_size": "1500",
+            "password": "********",
+            "port_mode": "all",
+            "targets": {
+              "device_ids": [
+                "dev_mac_e4f14c60440b_zavieh",
+                "dev_mac_e4f14c604339_zavieh",
+                "dev_mac_c479057c9075_zavieh",
+                "dev_mac_e4f14c6044b9_zavieh",
+                "dev_mac_e4f14c60433d_zavieh",
+                "dev_mac_e4f14c60434f_zavieh",
+                "dev_mac_e4f14c604367_zavieh",
+                "dev_mac_e4f14c604343_zavieh",
+                "dev_mac_e4f14c604349_zavieh",
+                "dev_mac_e4f14c604461_zavieh",
+                "dev_mac_c479057c8fe5_zavieh"
+              ],
+              "manual_devices": []
+            },
+            "username": "admin"
+          }
+        },
+        {
+          "module_id": "ubiquiti_cdp_reader",
+          "parameters": {
+            "batch_size": "30",
+            "capture_seconds": "30",
+            "interface": "eth0",
+            "override_existing_switch": "false",
+            "password": "********",
+            "targets": {
+              "device_ids": [
+                "dev_mac_d8b370ccfe50_zavieh",
+                "dev_mac_d8b370ccfcc0_zavieh",
+                "dev_mac_28704ed47e44_zavieh",
+                "dev_mac_d8b370ccfd40_zavieh",
+                "dev_mac_d8b370ccfd97_zavieh",
+                "dev_mac_d8b370ccfe79_zavieh",
+                "dev_mac_d8b370ccfdb8_zavieh",
+                "dev_mac_d8b370ccfbcb_zavieh",
+                "dev_mac_d8b370ccfe6f_zavieh",
+                "dev_mac_d8b370ccfd79_zavieh",
+                "dev_mac_28704ed4815c_zavieh",
+                "dev_mac_d8b370ccfe25_zavieh",
+                "dev_mac_d8b370ccfef5_zavieh"
+              ],
+              "manual_devices": []
+            },
+            "trace_output": "false",
+            "username": "admin"
+          },
+          "credential_profile": "Ubiq01"
+        }
+      ],
+      "id": "sched_f71e885e"
+    },
+    {
+      "name": "Global Scanner",
+      "enabled": true,
+      "site_scope": {
+        "mode": "all",
+        "sites": []
+      },
+      "site_run_mode": "sequential",
+      "delay_between_modules_sec": 5,
+      "repeat_interval_min": 360,
+      "modules": [
+        {
+          "module_id": "mikrotik_mac_discovery",
+          "parameters": {
+            "address_range": "",
+            "catch_ip_thieves": true,
+            "interface": "",
+            "note": "",
+            "password": "********",
+            "replace_on_ip": "false",
+            "router_device_id": "",
+            "router_ip": "",
+            "scan_duration_s": "30",
+            "trace_output": "false",
+            "use_dhcp_hostname": "true",
+            "username": "admin"
+          },
+          "credential_profile": "Mik-admin"
+        },
+        {
+          "module_id": "enforce_oui_table",
+          "parameters": {}
+        }
+      ],
+      "id": "sched_9c5fa30d"
+    }
+  ],
   "auth": {
     "enabled": true,
     "users": [

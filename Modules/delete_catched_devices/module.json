@@ -1,0 +1,9 @@
+{
+  "id": "delete_catched_devices",
+  "name": "Delete Catched Devices",
+  "version": "1.0",
+  "description": "Remove devices in the current site whose name starts with Catched- and clean related connections.",
+  "author": "System",
+  "entry_point": "delete_catched_devices.py",
+  "inputs": []
+}

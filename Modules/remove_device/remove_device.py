@@ -4,6 +4,7 @@ Remove Device - module for deleting a device and handling dependencies.
 """
 
 import json
+import portalocker
 import sys
 from datetime import datetime
 
@@ -35,7 +36,7 @@ def main():
         sys.exit(1)
 
     try:
-        with open(db_path, "r") as handle:
+        with portalocker.Lock(db_path, "r", timeout=5, encoding="utf-8") as handle:
             database = json.load(handle)
     except Exception as exc:
         print(json.dumps({"error": f"Failed to read database: {exc}", "status": "failed"}))
@@ -86,7 +87,7 @@ def main():
     database["devices"] = kept_devices
 
     try:
-        with open(db_path, "w") as handle:
+        with portalocker.Lock(db_path, "w", timeout=5, encoding="utf-8") as handle:
             json.dump(database, handle, indent=2)
     except Exception as exc:
         print(json.dumps({"error": f"Failed to write database: {exc}", "status": "failed"}))

@@ -15,8 +15,10 @@ import sys
 import uuid
 import zipfile
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
+import copy
 import portalocker 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 # ===============================
@@ -32,11 +34,15 @@ MONITORING_INTERVAL_SEC = 5
 MONITORING_LOCK = threading.Lock()
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 LOG_RETENTION_DAYS = 60
+CORRUPT_DIR = os.path.join(BASE_DIR, "corrupt_backups")
+CORRUPT_RETENTION_DAYS = 7
+MODULE_LOG_RETENTION_DAYS = 7
 
 MODULES_DIR = os.path.join(BASE_DIR, "Modules")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "Templates")
 STATIC_DIR = os.path.join(BASE_DIR, "Static")
 OUI_RANGES_FILE = os.path.join(MODULES_DIR, "mikrotik_mac_discovery", "oui_ranges.txt")
+OUI_DEVICE_TYPES_FILE = os.path.join(MODULES_DIR, "enforce_oui_table", "oui_device_types.txt")
 
 DEFAULT_MONITORING_LAYOUT = {
     "top": 90,
@@ -116,6 +122,8 @@ DEFAULT_SETTINGS = {
     "default_scan_depth": 3,
     "auto_refresh": False,
     "refresh_interval": 30,
+    "module_credentials": {},
+    "module_schedules": [],
     "auth": {
         "enabled": False,
         "users": []
@@ -180,6 +188,20 @@ def _cleanup_logs():
     try:
         for name in os.listdir(LOGS_DIR):
             path = os.path.join(LOGS_DIR, name)
+            if not os.path.isfile(path):
+                continue
+            if os.path.getmtime(path) < cutoff:
+                os.remove(path)
+    except OSError:
+        pass
+
+def _cleanup_module_logs():
+    cutoff = time.time() - (MODULE_LOG_RETENTION_DAYS * 86400)
+    try:
+        for name in os.listdir(BASE_DIR):
+            if not name.startswith("module_log_") or not name.endswith(".txt"):
+                continue
+            path = os.path.join(BASE_DIR, name)
             if not os.path.isfile(path):
                 continue
             if os.path.getmtime(path) < cutoff:
@@ -259,15 +281,51 @@ def read_database():
 
     If the file is missing or invalid, an empty database will be created.
     """
+    def _cleanup_corrupt_backups():
+        cutoff = time.time() - (CORRUPT_RETENTION_DAYS * 86400)
+        try:
+            if not os.path.isdir(CORRUPT_DIR):
+                return
+            for name in os.listdir(CORRUPT_DIR):
+                path = os.path.join(CORRUPT_DIR, name)
+                if not os.path.isfile(path):
+                    continue
+                if os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+        except OSError:
+            pass
+
     try:
         if os.path.exists(DATABASE_FILE):
-            with open(DATABASE_FILE, 'r', encoding='utf-8') as f:
+            with portalocker.Lock(DATABASE_FILE, 'r', timeout=5, encoding='utf-8') as f:
                 return json.load(f)
 
         init_database()
         return read_database()
 
     except (json.JSONDecodeError, FileNotFoundError):
+        # Attempt salvage: keep the first JSON object if extra data was appended.
+        try:
+            with portalocker.Lock(DATABASE_FILE, 'r', timeout=5, encoding='utf-8') as f:
+                raw = f.read()
+            decoder = json.JSONDecoder()
+            data, idx = decoder.raw_decode(raw)
+            if isinstance(data, dict):
+                os.makedirs(CORRUPT_DIR, exist_ok=True)
+                backup = os.path.join(
+                    CORRUPT_DIR,
+                    f"devices.db.corrupt.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                )
+                try:
+                    os.replace(DATABASE_FILE, backup)
+                except OSError:
+                    pass
+                _cleanup_corrupt_backups()
+                with portalocker.Lock(DATABASE_FILE, 'w', timeout=5, encoding='utf-8') as f:
+                    json.dump(data, f, indent=2)
+                return data
+        except Exception:
+            pass
         init_database()
         return read_database()
 
@@ -275,7 +333,7 @@ def read_database():
 def write_database(data):
     """Write database"""
     try:
-        with open(DATABASE_FILE, 'w') as f:
+        with portalocker.Lock(DATABASE_FILE, 'w', timeout=5, encoding='utf-8') as f:
             json.dump(data, f, indent=2)
         return True
     except Exception as e:
@@ -325,6 +383,172 @@ def write_oui_ranges(content: str):
     os.makedirs(os.path.dirname(OUI_RANGES_FILE), exist_ok=True)
     with open(OUI_RANGES_FILE, "w", encoding="utf-8") as f:
         f.write(content or "")
+
+
+def read_oui_device_types():
+    if not os.path.exists(OUI_DEVICE_TYPES_FILE):
+        return ""
+    with open(OUI_DEVICE_TYPES_FILE, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def write_oui_device_types(content: str):
+    os.makedirs(os.path.dirname(OUI_DEVICE_TYPES_FILE), exist_ok=True)
+    with open(OUI_DEVICE_TYPES_FILE, "w", encoding="utf-8") as f:
+        f.write(content or "")
+
+
+def _mask_sensitive(obj):
+    if isinstance(obj, dict):
+        masked = {}
+        for key, value in obj.items():
+            key_lower = str(key).lower()
+            if key_lower in ("password", "pass", "secret", "token", "api_key"):
+                masked[key] = "********"
+            else:
+                masked[key] = _mask_sensitive(value)
+        return masked
+    if isinstance(obj, list):
+        return [_mask_sensitive(item) for item in obj]
+    return obj
+
+def _normalize_schedule_payload(payload):
+    if not isinstance(payload, dict):
+        return None
+    name = (payload.get("name") or "").strip()
+    if not name:
+        return None
+    enabled = bool(payload.get("enabled", True))
+
+    scope = payload.get("site_scope") if isinstance(payload.get("site_scope"), dict) else {}
+    mode = (scope.get("mode") or "selected").lower()
+    if mode not in ("all", "selected"):
+        mode = "selected"
+    sites = scope.get("sites") or []
+    if not isinstance(sites, list):
+        sites = []
+    sites = [s for s in sites if isinstance(s, str) and s.strip()]
+
+    run_mode = (payload.get("site_run_mode") or "sequential").lower()
+    if run_mode not in ("sequential", "concurrent"):
+        run_mode = "sequential"
+
+    delay_between = int(payload.get("delay_between_modules_sec") or 0)
+    repeat_minutes = int(payload.get("repeat_interval_min") or 0)
+
+    modules = []
+    for entry in payload.get("modules") or []:
+        if not isinstance(entry, dict):
+            continue
+        module_id = entry.get("module_id")
+        if not module_id:
+            continue
+        params = entry.get("parameters") or {}
+        if isinstance(params, str):
+            try:
+                params = json.loads(params) if params.strip() else {}
+            except json.JSONDecodeError:
+                params = {}
+        if not isinstance(params, dict):
+            params = {}
+        mod_entry = {"module_id": module_id, "parameters": params}
+        cred = entry.get("credential_profile")
+        if isinstance(cred, str) and cred.strip():
+            mod_entry["credential_profile"] = cred.strip()
+        modules.append(mod_entry)
+
+    return {
+        "name": name,
+        "enabled": enabled,
+        "site_scope": {"mode": mode, "sites": sites},
+        "site_run_mode": run_mode,
+        "delay_between_modules_sec": delay_between,
+        "repeat_interval_min": repeat_minutes,
+        "modules": modules
+    }
+
+def _serialize_schedule(schedule, state=None):
+    data = copy.deepcopy(schedule)
+    if state:
+        data["status"] = state.get("status", "idle")
+        next_run = state.get("next_run_at")
+        last_run = state.get("last_run_at")
+        if isinstance(next_run, datetime):
+            data["next_run_at"] = next_run.isoformat()
+        elif next_run:
+            data["next_run_at"] = next_run
+        if isinstance(last_run, datetime):
+            data["last_run_at"] = last_run.isoformat()
+        elif last_run:
+            data["last_run_at"] = last_run
+        data["last_result"] = _mask_sensitive(state.get("last_result")) if state.get("last_result") else None
+    data["modules"] = _mask_sensitive(data.get("modules") or [])
+    return data
+
+def _validate_schedule_config(schedule):
+    errors = []
+    if not isinstance(schedule, dict):
+        return ["invalid_schedule"]
+    modules_by_id = {m.get("id"): m for m in discover_modules() if isinstance(m, dict)}
+    settings = read_settings() or {}
+    module_creds = settings.get("module_credentials", {}) if isinstance(settings, dict) else {}
+    database = read_database() or {}
+
+    for entry in schedule.get("modules") or []:
+        if not isinstance(entry, dict):
+            continue
+        module_id = entry.get("module_id")
+        if not module_id:
+            continue
+        module = modules_by_id.get(module_id)
+        if not module:
+            errors.append(f"{module_id}: module not found")
+            continue
+        params = copy.deepcopy(entry.get("parameters") or {})
+        cred_profile = entry.get("credential_profile")
+        if cred_profile:
+            profiles = module_creds.get(module_id, []) if isinstance(module_creds, dict) else []
+            for profile in profiles:
+                if isinstance(profile, dict) and profile.get("name") == cred_profile:
+                    params.setdefault("username", profile.get("username", ""))
+                    params.setdefault("password", profile.get("password", ""))
+                    break
+
+        if module_id == "mikrotik_mac_discovery":
+            has_router = bool(params.get("router_ip") or params.get("router_device_id"))
+            if not has_router:
+                site_name = (schedule.get("site_scope") or {}).get("sites") or []
+                site_name = site_name[0] if site_name else None
+                for dev in database.get("devices", []):
+                    if site_name and dev.get("site") != site_name:
+                        continue
+                    if (dev.get("type") or "").lower() != "server":
+                        continue
+                    name = (dev.get("name") or "").lower()
+                    vendor = (dev.get("vendor") or "").lower()
+                    if "mikrotik" in name or "mikrotik" in vendor:
+                        if dev.get("ip"):
+                            has_router = True
+                            break
+            if not has_router:
+                errors.append("mikrotik_mac_discovery: missing router_ip or router_device_id")
+
+        for field in module.get("inputs", []) or []:
+            if not isinstance(field, dict):
+                continue
+            if not field.get("required"):
+                continue
+            name = field.get("name")
+            if not name:
+                continue
+            value = params.get(name)
+            if value is None:
+                errors.append(f"{module_id}: missing {name}")
+                continue
+            if isinstance(value, str) and not value.strip():
+                errors.append(f"{module_id}: missing {name}")
+
+    return errors
 
 def _get_auth_config():
     settings = read_settings()
@@ -525,7 +749,7 @@ class ModuleRunner:
                     }
                 
                 print(f"=== DEBUG: Starting module {module_id} ===", file=sys.stderr)
-                print(f"Config: {config}", file=sys.stderr)
+                print(f"Config: {_mask_sensitive(config)}", file=sys.stderr)
                 
                 # Prepare module execution
                 module_dir = os.path.join(MODULES_DIR, module_id)
@@ -564,7 +788,11 @@ class ModuleRunner:
                 
                 print(f"Running: {python_executable} {module_script} {config_file}", file=sys.stderr)
                 print(f"Current dir: {os.getcwd()}", file=sys.stderr)
-                
+                try:
+                    with open(log_file, "a", encoding="utf-8") as lf:
+                        lf.write(f"Running: {python_executable} {module_script} {config_file}\n")
+                except Exception:
+                    pass
                 result = subprocess.run(
                     [python_executable, module_script, config_file],
                     capture_output=True,
@@ -577,6 +805,21 @@ class ModuleRunner:
                 print(f"Return code: {result.returncode}", file=sys.stderr)
                 print(f"STDOUT: {result.stdout[:500]}", file=sys.stderr)
                 print(f"STDERR: {result.stderr}", file=sys.stderr)
+                try:
+                    with open(log_file, "a", encoding="utf-8") as lf:
+                        lf.write(f"Return code: {result.returncode}\n")
+                        if result.stdout:
+                            lf.write("STDOUT:\n")
+                            lf.write(result.stdout)
+                            if not result.stdout.endswith("\n"):
+                                lf.write("\n")
+                        if result.stderr:
+                            lf.write("STDERR:\n")
+                            lf.write(result.stderr)
+                            if not result.stderr.endswith("\n"):
+                                lf.write("\n")
+                except Exception:
+                    pass
                 
                 with self.lock:
                     self.running_modules[thread_id]["progress"] = 75
@@ -592,6 +835,8 @@ class ModuleRunner:
                                 "completed_at": datetime.now().isoformat(),
                                 "log_file": log_file
                             }
+                            if thread_id in self.running_modules:
+                                self.running_modules[thread_id]["output"] = module_output
                     except json.JSONDecodeError:
                         with self.lock:
                             self.module_results[thread_id] = {
@@ -600,6 +845,8 @@ class ModuleRunner:
                                 "completed_at": datetime.now().isoformat(),
                                 "log_file": log_file
                             }
+                            if thread_id in self.running_modules:
+                                self.running_modules[thread_id]["output"] = {"message": result.stdout.strip()}
                 else:
                     with self.lock:
                         self.module_results[thread_id] = {
@@ -661,6 +908,7 @@ class ModuleRunner:
             result = self.module_results.pop(thread_id, None)
             log_file = (running or {}).get("log_file") or (result or {}).get("log_file")
         # Keep log files for troubleshooting; manual cleanup if needed.
+        _cleanup_module_logs()
     
     def get_all_status(self):
         """Get status of all modules"""
@@ -670,8 +918,204 @@ class ModuleRunner:
                 "completed": list(self.module_results.keys())
             }
 
+# ==================== SCHEDULED MODULE RUNNER ====================
+
+class ScheduleRunner:
+    def __init__(self, poll_interval=2):
+        self.poll_interval = poll_interval
+        self.state = {}
+        self.lock = threading.Lock()
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
+
+    def _loop(self):
+        while True:
+            try:
+                self._tick()
+            except Exception as exc:
+                print(f"Scheduler error: {exc}", file=sys.stderr)
+            time.sleep(self.poll_interval)
+
+    def _tick(self):
+        settings = read_settings() or {}
+        schedules = settings.get("module_schedules", [])
+        schedule_ids = set()
+        now = datetime.now()
+
+        for schedule in schedules:
+            if not isinstance(schedule, dict):
+                continue
+            schedule_id = schedule.get("id")
+            if not schedule_id:
+                continue
+            schedule_ids.add(schedule_id)
+            enabled = bool(schedule.get("enabled", True))
+
+            with self.lock:
+                state = self.state.setdefault(schedule_id, {
+                    "status": "idle",
+                    "next_run_at": None,
+                    "last_run_at": None,
+                    "last_result": None,
+                    "running": False
+                })
+
+            if not enabled:
+                with self.lock:
+                    state["status"] = "disabled"
+                    state["next_run_at"] = None
+                    state["running"] = False
+                continue
+
+            with self.lock:
+                next_run_at = state["next_run_at"]
+                running = state["running"]
+
+            if running:
+                continue
+
+            if next_run_at and now >= next_run_at:
+                runner = threading.Thread(target=self._run_schedule, args=(copy.deepcopy(schedule),), daemon=True)
+                runner.start()
+
+        with self.lock:
+            for schedule_id in list(self.state.keys()):
+                if schedule_id not in schedule_ids:
+                    self.state.pop(schedule_id, None)
+
+    def _resolve_sites(self, schedule):
+        scope = schedule.get("site_scope", {}) if isinstance(schedule.get("site_scope"), dict) else {}
+        mode = (scope.get("mode") or "selected").lower()
+        selected = scope.get("sites") or []
+        if mode == "all":
+            data = read_database()
+            return [s.get("name") for s in data.get("sites", []) if s.get("name")]
+        return [name for name in selected if isinstance(name, str) and name.strip()]
+
+    def _run_site_pipeline(self, site_name, schedule, available_modules):
+        delay = int(schedule.get("delay_between_modules_sec") or 0)
+        modules = schedule.get("modules") or []
+        results = []
+        settings = read_settings()
+        module_creds = settings.get("module_credentials", {}) if isinstance(settings, dict) else {}
+        for entry in modules:
+            if not isinstance(entry, dict):
+                continue
+            module_id = entry.get("module_id")
+            if not module_id:
+                continue
+            if module_id not in available_modules:
+                results.append({"module_id": module_id, "status": "missing"})
+                continue
+            params = copy.deepcopy(entry.get("parameters") or {})
+            credential_profile = entry.get("credential_profile")
+            if credential_profile:
+                profiles = module_creds.get(module_id, []) if isinstance(module_creds, dict) else []
+                for profile in profiles:
+                    if isinstance(profile, dict) and profile.get("name") == credential_profile:
+                        params["username"] = profile.get("username", "")
+                        params["password"] = profile.get("password", "")
+                        break
+            config = {"site_name": site_name, "parameters": params}
+            thread_id = module_runner.run_module(module_id, config)
+            while True:
+                status = module_runner.get_module_status(thread_id) or {}
+                state = status.get("status")
+                if state in ("completed", "failed", "error", "timeout"):
+                    results.append({"module_id": module_id, "status": state})
+                    break
+                time.sleep(1)
+            if delay > 0:
+                time.sleep(delay)
+        return results
+
+    def _run_schedule(self, schedule):
+        schedule_id = schedule.get("id")
+        if not schedule_id:
+            return
+        with self.lock:
+            state = self.state.setdefault(schedule_id, {})
+            state["status"] = "running"
+            state["running"] = True
+
+        errors = _validate_schedule_config(schedule)
+        if errors:
+            with self.lock:
+                state["last_run_at"] = datetime.now()
+                state["last_result"] = {"error": "invalid_schedule", "details": errors}
+                state["status"] = "idle"
+                state["running"] = False
+                state["next_run_at"] = None
+            return
+
+        sites = self._resolve_sites(schedule)
+        run_mode = (schedule.get("site_run_mode") or "sequential").lower()
+        schedule_result = {"sites": len(sites), "results": {}}
+
+        available_modules = {m.get("id") for m in discover_modules() if isinstance(m, dict)}
+        if not sites:
+            schedule_result["error"] = "no_sites"
+        else:
+            if run_mode == "concurrent":
+                with ThreadPoolExecutor(max_workers=len(sites)) as pool:
+                    future_map = {pool.submit(self._run_site_pipeline, site, schedule, available_modules): site for site in sites}
+                    for future in as_completed(future_map):
+                        site = future_map.get(future)
+                        try:
+                            schedule_result["results"][site] = future.result()
+                        except Exception as exc:
+                            schedule_result["results"][site] = [{"error": str(exc)}]
+            else:
+                for site in sites:
+                    try:
+                        schedule_result["results"][site] = self._run_site_pipeline(site, schedule, available_modules)
+                    except Exception as exc:
+                        schedule_result["results"][site] = [{"error": str(exc)}]
+
+        repeat_minutes = int(schedule.get("repeat_interval_min") or 0)
+        with self.lock:
+            state["last_run_at"] = datetime.now()
+            state["last_result"] = schedule_result
+            state["status"] = "idle"
+            state["running"] = False
+            if repeat_minutes > 0:
+                state["next_run_at"] = datetime.now() + timedelta(minutes=repeat_minutes)
+            else:
+                state["next_run_at"] = None
+
+    def trigger_run(self, schedule_id):
+        with self.lock:
+            state = self.state.setdefault(schedule_id, {})
+            state["next_run_at"] = datetime.now()
+            return True
+
+    def run_now(self, schedule):
+        schedule_id = schedule.get("id")
+        if not schedule_id:
+            return False
+        if not self._resolve_sites(schedule):
+            return False
+        with self.lock:
+            state = self.state.setdefault(schedule_id, {})
+            if state.get("running"):
+                return False
+            state["next_run_at"] = datetime.now()
+        runner = threading.Thread(target=self._run_schedule, args=(copy.deepcopy(schedule),), daemon=True)
+        runner.start()
+        return True
+
+    def get_schedule_state(self, schedule_id):
+        with self.lock:
+            return copy.deepcopy(self.state.get(schedule_id) or {})
+
+    def get_all_states(self):
+        with self.lock:
+            return copy.deepcopy(self.state)
+
 # Global module runner
 module_runner = ModuleRunner()
+# Global scheduler
+schedule_runner = ScheduleRunner()
 
 # ==================== API ENDPOINTS ====================
 
@@ -707,6 +1151,8 @@ def handle_sites():
         if err:
             return err
         site_data = request.json
+        if isinstance(site_data, dict) and isinstance(site_data.get("name"), str):
+            site_data["name"] = site_data["name"].strip()
         
         if not site_data.get("name") or not site_data.get("root_ip"):
             return jsonify({"error": "Name and root_ip are required"}), 400
@@ -789,8 +1235,7 @@ def api_generate_visual_map():
                 "device_count": result['device_count'],
                 "connection_count": result['connection_count']
             })
-        else:
-            return jsonify({"error": result.get('message', 'Unknown error')}), 500
+        return jsonify({"error": result.get('message', 'Unable to generate map')}), 400
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -853,10 +1298,54 @@ def handle_site(site_id):
     if request.method == 'PUT':
         update_data = request.json
         current_site = data["sites"][site_index]
+        old_name = current_site.get("name")
         
         for field in ["name", "root_ip", "notes", "locked"]:
             if field in update_data:
-                current_site[field] = update_data[field]
+                value = update_data[field]
+                if field == "name" and isinstance(value, str):
+                    value = value.strip()
+                current_site[field] = value
+
+        new_name = current_site.get("name")
+        if old_name and new_name and old_name != new_name:
+            for dev in data.get("devices", []):
+                if dev.get("site") == old_name:
+                    dev["site"] = new_name
+
+            settings = read_settings()
+            if isinstance(settings, dict):
+                if settings.get("default_site") == old_name:
+                    settings["default_site"] = new_name
+                schedules = settings.get("module_schedules", []) if isinstance(settings.get("module_schedules"), list) else []
+                for sched in schedules:
+                    if not isinstance(sched, dict):
+                        continue
+                    scope = sched.get("site_scope")
+                    if not isinstance(scope, dict):
+                        continue
+                    sites = scope.get("sites")
+                    if not isinstance(sites, list):
+                        continue
+                    scope["sites"] = [new_name if s == old_name else s for s in sites]
+                write_settings(settings)
+
+            try:
+                monitoring = read_monitoring()
+                sites_entry = monitoring.get("sites", {})
+                if isinstance(sites_entry, dict) and old_name in sites_entry:
+                    sites_entry[new_name] = sites_entry.pop(old_name)
+                    write_monitoring(monitoring)
+            except Exception:
+                pass
+
+            old_log = os.path.join(LOGS_DIR, f"{_safe_log_name(old_name)}.log")
+            new_log = os.path.join(LOGS_DIR, f"{_safe_log_name(new_name)}.log")
+            if os.path.exists(old_log) and not os.path.exists(new_log):
+                try:
+                    os.replace(old_log, new_log)
+                except OSError:
+                    pass
         
         write_database(data)
         return jsonify(current_site)
@@ -1071,6 +1560,19 @@ def run_module(module_id):
     print(f"=== /api/modules/{module_id}/run called ===", file=sys.stderr)
     
     config = request.json
+    if isinstance(config, dict):
+        params = config.get("parameters")
+        if isinstance(params, dict) and params.get("credential_profile"):
+            settings = read_settings()
+            module_creds = settings.get("module_credentials", {}) if isinstance(settings, dict) else {}
+            profiles = module_creds.get(module_id, []) if isinstance(module_creds, dict) else []
+            profile_name = str(params.get("credential_profile")).strip()
+            for profile in profiles:
+                if isinstance(profile, dict) and profile.get("name") == profile_name:
+                    params["username"] = profile.get("username", "")
+                    params["password"] = profile.get("password", "")
+                    break
+            params.pop("credential_profile", None)
     safe_config = json.loads(json.dumps(config or {}))
     if isinstance(safe_config, dict):
         params = safe_config.get("parameters")
@@ -1154,6 +1656,95 @@ def get_all_module_status():
     if user.get("role") not in ("admin", "operator"):
         return jsonify({"error": "forbidden"}), 403
     return jsonify(module_runner.get_all_status())
+
+@app.route('/api/schedules', methods=['GET', 'POST'])
+def handle_schedules():
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if request.method == 'GET':
+        settings = read_settings()
+        schedules = settings.get("module_schedules", []) if isinstance(settings, dict) else []
+        states = schedule_runner.get_all_states()
+        output = []
+        for sched in schedules:
+            if not isinstance(sched, dict):
+                continue
+            state = states.get(sched.get("id")) if sched.get("id") else None
+            output.append(_serialize_schedule(sched, state))
+        return jsonify(output)
+
+    if user.get("role") not in ("admin", "operator"):
+        return jsonify({"error": "forbidden"}), 403
+    payload = request.get_json() or {}
+    normalized = _normalize_schedule_payload(payload)
+    if not normalized:
+        return jsonify({"error": "invalid_schedule"}), 400
+    schedule_id = payload.get("id") or f"sched_{uuid.uuid4().hex[:8]}"
+    normalized["id"] = schedule_id
+    settings = read_settings()
+    schedules = settings.get("module_schedules", []) if isinstance(settings, dict) else []
+    schedules.append(normalized)
+    settings["module_schedules"] = schedules
+    write_settings(settings)
+    state = schedule_runner.get_schedule_state(schedule_id)
+    return jsonify(_serialize_schedule(normalized, state))
+
+@app.route('/api/schedules/<schedule_id>', methods=['PUT', 'DELETE'])
+def handle_schedule(schedule_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if user.get("role") not in ("admin", "operator"):
+        return jsonify({"error": "forbidden"}), 403
+    settings = read_settings()
+    schedules = settings.get("module_schedules", []) if isinstance(settings, dict) else []
+    target = None
+    for sched in schedules:
+        if isinstance(sched, dict) and sched.get("id") == schedule_id:
+            target = sched
+            break
+    if not target:
+        return jsonify({"error": "schedule_not_found"}), 404
+
+    if request.method == 'DELETE':
+        settings["module_schedules"] = [s for s in schedules if not (isinstance(s, dict) and s.get("id") == schedule_id)]
+        write_settings(settings)
+        return jsonify({"success": True})
+
+    payload = request.get_json() or {}
+    normalized = _normalize_schedule_payload(payload)
+    if not normalized:
+        return jsonify({"error": "invalid_schedule"}), 400
+    normalized["id"] = schedule_id
+    settings["module_schedules"] = [normalized if (isinstance(s, dict) and s.get("id") == schedule_id) else s for s in schedules]
+    write_settings(settings)
+    state = schedule_runner.get_schedule_state(schedule_id)
+    return jsonify(_serialize_schedule(normalized, state))
+
+@app.route('/api/schedules/<schedule_id>/run_now', methods=['POST'])
+def run_schedule_now(schedule_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if user.get("role") not in ("admin", "operator"):
+        return jsonify({"error": "forbidden"}), 403
+    settings = read_settings()
+    schedules = settings.get("module_schedules", []) if isinstance(settings, dict) else []
+    target = None
+    for sched in schedules:
+        if isinstance(sched, dict) and sched.get("id") == schedule_id:
+            target = sched
+            break
+    if not target:
+        return jsonify({"error": "schedule_not_found"}), 404
+    if not schedule_runner._resolve_sites(target):
+        return jsonify({"error": "no_sites_selected"}), 400
+    errors = _validate_schedule_config(target)
+    if errors:
+        return jsonify({"error": "invalid_schedule", "details": errors}), 400
+    started = schedule_runner.run_now(target)
+    return jsonify({"success": started})
 
 @app.route('/api/users', methods=['GET', 'POST'])
 def handle_users():
@@ -1634,7 +2225,7 @@ def handle_settings():
             "enabled": bool(auth.get("enabled", False))
         }
         if not _is_admin(user):
-            settings = {k: v for k, v in settings.items() if k != "auth"}
+            settings = {k: v for k, v in settings.items() if k not in ("auth", "module_credentials")}
         return jsonify(settings)
     
     elif request.method == 'PUT':
@@ -1671,6 +2262,19 @@ def handle_oui_ranges():
     write_oui_ranges(content)
     return jsonify({"success": True})
 
+
+@app.route('/api/oui_device_types', methods=['GET', 'PUT'])
+def handle_oui_device_types():
+    user, err = _require_role("admin")
+    if err:
+        return err
+    if request.method == 'GET':
+        return jsonify({"content": read_oui_device_types()})
+    data = request.json or {}
+    content = data.get("content", "")
+    write_oui_device_types(content)
+    return jsonify({"success": True})
+
 @app.route('/api/stats')
 def get_stats():
     """Get statistics"""
@@ -1684,12 +2288,14 @@ def get_stats():
     offline_devices = len([d for d in devices if d.get("status") == "offline"])
     
     sites = _filter_sites_for_user(data.get("sites", []), user)
+    unknown_devices = len([d for d in devices if (d.get("type") or "").lower() in ("", "unknown")])
     stats = {
         "total_sites": len(sites),
         "total_devices": len(devices),
         "online_devices": online_devices,
         "offline_devices": offline_devices,
         "unknown_status": len(devices) - online_devices - offline_devices,
+        "unknown_devices": unknown_devices,
         "last_modified": data.get("meta", {}).get("last_modified", "Never")
     }
     

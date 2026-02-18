@@ -31,12 +31,26 @@ class NetworkPlatform {
         this.monitoringLayout = null;
         this.monitoringLayoutSaveTimer = null;
         this.selectedDeviceIds = new Set();
+        this.devicesPage = 1;
+        this.devicesPageSize = 50;
+        this.devicesPageFilter = '';
+        this.moduleLogCache = new Map();
         this.sortState = {
             dashboardSites: { key: 'name', dir: 'asc' },
             sites: { key: 'name', dir: 'asc' },
             devices: { key: 'name', dir: 'asc' }
         };
         this.ouiRangesText = '';
+        this.moduleCredentials = {};
+        this.moduleCredentialTargets = [
+            { id: 'cdp_discovery', label: 'CDP Discovery' },
+            { id: 'mikrotik_mac_discovery', label: 'MikroTik MAC Discovery' },
+            { id: 'ubiquiti_cdp_reader', label: 'Read CDP (Ubiquiti)' },
+            { id: 'uniview_nvr_capture', label: 'Uniview NVR Packet Capture' }
+        ];
+        this.schedules = [];
+        this.scheduleEditId = null;
+        this.scheduleModuleEditRow = null;
         
         // ADD MAP-SPECIFIC PROPERTIES
         this.mapLoaded = false;
@@ -496,7 +510,8 @@ class NetworkPlatform {
 
         // Site selection
         document.getElementById('deviceSiteFilter').addEventListener('change', (e) => {
-            this.loadDevices(e.target.value);
+            this.devicesPage = 1;
+            this.updateDevicesTab();
         });
         document.getElementById('moduleSiteSelect').addEventListener('change', (e) => {
             this.currentSite = e.target.value;
@@ -593,6 +608,14 @@ document.getElementById('showTextMapBtn')?.addEventListener('click', async () =>
     }
 });
 
+function readErrorMessage(response, fallback) {
+    const fallbackMessage = fallback || 'Request failed';
+    return response
+        .json()
+        .then((data) => data.error || data.message || fallbackMessage)
+        .catch(() => fallbackMessage);
+}
+
 // Show visual map  
 document.getElementById('showVisualMapBtn')?.addEventListener('click', async () => {
     const siteName = document.getElementById('mapSiteSelect').value;
@@ -621,11 +644,12 @@ document.getElementById('showVisualMapBtn')?.addEventListener('click', async () 
                 document.getElementById('mapFrame').style.display = 'block';
                 platform.showMessage(`Visual map generated for ${siteName}!`);
             } else {
-                throw new Error('Failed to generate visual map');
+                const message = await readErrorMessage(response, 'Failed to generate visual map');
+                throw new Error(message);
             }
         } catch (error) {
             console.error('Error generating visual map:', error);
-            platform.showMessage('Error generating visual map', 'error');
+            platform.showMessage(error.message || 'Error generating visual map', 'error');
         } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
@@ -667,11 +691,17 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         if (textResponse.ok && visualResponse.ok) {
             platform.showMessage(`Maps generated for ${siteName}!`);
         } else {
-            throw new Error('Failed to generate one or more maps');
+            let errorMessage = 'Failed to generate one or more maps';
+            if (!textResponse.ok) {
+                errorMessage = await readErrorMessage(textResponse, errorMessage);
+            } else if (!visualResponse.ok) {
+                errorMessage = await readErrorMessage(visualResponse, errorMessage);
+            }
+            throw new Error(errorMessage);
         }
     } catch (error) {
         console.error('Error generating maps:', error);
-        platform.showMessage('Error generating maps', 'error');
+        platform.showMessage(error.message || 'Error generating maps', 'error');
     } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;
@@ -686,6 +716,12 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         // Settings
         document.getElementById('saveSettingsBtn').addEventListener('click', () => {
             this.saveSettings();
+        });
+        document.getElementById('moduleCredSaveBtn')?.addEventListener('click', () => {
+            this.saveModuleCredential();
+        });
+        document.getElementById('moduleCredClearBtn')?.addEventListener('click', () => {
+            this.clearModuleCredentialForm();
         });
 
         document.getElementById('addConnectionRowBtn')?.addEventListener('click', () => {
@@ -783,11 +819,12 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                         platform.updateCurrentSiteDisplay();
                         platform.showMessage(`Visual map loaded for ${siteName}!`);
                     } else {
-                        throw new Error('Failed to generate visual map');
+                        const message = await readErrorMessage(genResponse, 'Failed to generate visual map');
+                        throw new Error(message);
                     }
                 } catch (error) {
                     console.error('Error loading/generating map:', error);
-                    platform.showMessage('Error loading map', 'error');
+                    platform.showMessage(error.message || 'Error loading map', 'error');
                 } finally {
                     btn.innerHTML = originalText;
                     btn.disabled = false;
@@ -848,8 +885,32 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         document.getElementById('deleteSelectedDevicesBtn')?.addEventListener('click', () => {
             this.deleteSelectedDevices();
         });
+        document.getElementById('deleteCatchedDevicesBtn')?.addEventListener('click', () => {
+            this.runDeleteCatchedDevices();
+        });
+        document.getElementById('enforceOuiBtn')?.addEventListener('click', () => {
+            this.runEnforceOui();
+        });
+        document.getElementById('mikrotikDiscoveryBtn')?.addEventListener('click', () => {
+            this.runMikrotikDiscovery();
+        });
+        document.getElementById('addDeviceModuleBtn')?.addEventListener('click', () => {
+            this.runAddDeviceModule();
+        });
         document.getElementById('devicesSelectAll')?.addEventListener('change', (event) => {
             this.toggleSelectAllDevices(event.target.checked);
+        });
+        document.getElementById('devicesPagePrev')?.addEventListener('click', () => {
+            this.changeDevicesPage(-1);
+        });
+        document.getElementById('devicesPageNext')?.addEventListener('click', () => {
+            this.changeDevicesPage(1);
+        });
+        document.getElementById('devicesPageSize')?.addEventListener('change', (event) => {
+            const value = parseInt(event.target.value, 10);
+            if (!Number.isNaN(value) && value > 0) {
+                this.setDevicesPageSize(value);
+            }
         });
         document.getElementById('saveOuiRangesBtn')?.addEventListener('click', () => {
             this.saveOuiRanges();
@@ -871,6 +932,24 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         });
         document.getElementById('saveOuiBtn')?.addEventListener('click', () => {
             this.saveDeviceOui();
+        });
+        document.getElementById('exportDevicesBtn')?.addEventListener('click', () => {
+            this.openExportDevices();
+        });
+        document.getElementById('saveScheduleBtn')?.addEventListener('click', () => {
+            this.saveSchedule();
+        });
+        document.getElementById('clearScheduleBtn')?.addEventListener('click', () => {
+            this.clearScheduleForm();
+        });
+        document.getElementById('addScheduleModuleBtn')?.addEventListener('click', () => {
+            this.addScheduleModuleRow();
+        });
+        document.getElementById('scheduleSiteScope')?.addEventListener('change', () => {
+            this.updateScheduleScopeUI();
+        });
+        document.getElementById('scheduleModuleSaveBtn')?.addEventListener('click', () => {
+            this.saveScheduleModuleConfig();
         });
 
         this.bindSortHeaders();
@@ -926,11 +1005,24 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 if (modules) {
                     this.modules = modules;
                     this.updateTopologyTab();
+                    if (this.currentUserRole === 'admin') {
+                        this.renderModuleCredentials();
+                    }
                 }
             })
             .finally(finishOne);
 
-        Promise.allSettled([siteTask, deviceTask, statsTask, modulesTask])
+        const schedulesTask = this.fetchData('/api/schedules', { timeoutMs: 8000 })
+            .then(schedules => {
+                if (schedules) {
+                    this.schedules = schedules;
+                    this.renderScheduleList();
+                    this.updateScheduleFormSites();
+                }
+            })
+            .finally(finishOne);
+
+        Promise.allSettled([siteTask, deviceTask, statsTask, modulesTask, schedulesTask])
             .then(() => {
                 this.updateCurrentSiteDisplay();
                 if (this.currentUserRole === 'admin') {
@@ -970,7 +1062,11 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             const settings = await this.fetchData('/api/settings');
             if (settings) {
                 this.settings = settings;
+                this.moduleCredentials = settings.module_credentials || {};
                 this.applySettings();
+                if (this.currentUserRole === 'admin') {
+                    this.renderModuleCredentials();
+                }
             }
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -994,6 +1090,43 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         } catch (error) {
             console.error('Error loading OUI ranges:', error);
         }
+    }
+
+    parseOuiRanges(text) {
+        const entries = [];
+        if (!text) return entries;
+        text.split(/\r?\n/).forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('#')) return;
+            if (!trimmed.includes('=') || !trimmed.includes('-')) return;
+            const parts = trimmed.split('=');
+            if (parts.length < 2) return;
+            const rangePart = parts[0].trim();
+            const [start, end] = rangePart.split('-', 2);
+            if (!start || !end) return;
+            const right = parts.slice(1).join('=').trim();
+            let label = right;
+            let dtype = '';
+            if (right.includes(',')) {
+                const tokens = right.split(',').map(t => t.trim()).filter(Boolean);
+                label = tokens[0] || '';
+                tokens.slice(1).forEach(token => {
+                    const lower = token.toLowerCase();
+                    if (lower.startsWith('device_type=')) {
+                        dtype = token.split('=', 2)[1].trim().toLowerCase();
+                    }
+                });
+            }
+            entries.push({ start, end, label, dtype });
+        });
+        return entries;
+    }
+
+    buildOuiRangesText(entries) {
+        return entries.map(entry => {
+            const base = `${entry.start}-${entry.end}=${entry.label}`;
+            return entry.dtype ? `${base},device_type=${entry.dtype}` : base;
+        }).join('\n');
     }
 
     async saveOuiRanges() {
@@ -1044,8 +1177,8 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                     <div class="stat-trend positive">${this.stats.online_devices || 0} online</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">Last Modified</div>
-                    <div class="stat-value" style="font-size: 18px;">${this.formatTime(this.stats.last_modified)}</div>
+                    <div class="stat-label">Unknown Devices</div>
+                    <div class="stat-value">${this.stats.unknown_devices || 0}</div>
                     <div class="stat-trend"></div>
                 </div>
             `;
@@ -1185,15 +1318,35 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         
         // Filter devices
         const filterSite = siteFilter.value;
+        if (filterSite !== this.devicesPageFilter) {
+            this.devicesPage = 1;
+            this.devicesPageFilter = filterSite;
+        }
         const filteredDevices = filterSite 
             ? this.devices.filter(d => d.site === filterSite)
             : this.devices;
         const sortedDevices = this.sortDevices(filteredDevices);
+        const totalDevices = sortedDevices.length;
+        const pageSize = this.devicesPageSize || 50;
+        const totalPages = Math.max(1, Math.ceil(totalDevices / pageSize));
+        if (this.devicesPage > totalPages) {
+            this.devicesPage = totalPages;
+        }
+        const startIndex = (this.devicesPage - 1) * pageSize;
+        const pagedDevices = sortedDevices.slice(startIndex, startIndex + pageSize);
+        const countLabel = document.getElementById('deviceCountLabel');
+        if (countLabel) {
+            const count = filteredDevices.length;
+            const suffix = count === 1 ? 'device' : 'devices';
+            const scope = filterSite ? `in ${filterSite}` : 'total';
+            countLabel.textContent = `${count} ${suffix} (${scope})`;
+        }
+        this.updateDevicesPagination(totalDevices, totalPages);
         
         // Update devices table
         const devicesBody = document.getElementById('devicesTableBody');
-        if (sortedDevices.length > 0) {
-            devicesBody.innerHTML = sortedDevices.map(device => {
+        if (pagedDevices.length > 0) {
+            devicesBody.innerHTML = pagedDevices.map(device => {
                 const checked = this.selectedDeviceIds.has(device.id) ? 'checked' : '';
                 return `
                     <tr>
@@ -1262,10 +1415,42 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 this.toggleDeviceSelection(id, event.target.checked);
             });
         });
-        this.syncSelectAllCheckbox(sortedDevices);
+        this.syncSelectAllCheckbox(pagedDevices);
         this.applySortIndicators('devices');
 
         replaceIcons();
+    }
+
+    updateDevicesPagination(totalDevices, totalPages) {
+        const info = document.getElementById('devicesPageInfo');
+        if (info) {
+            info.textContent = `Page ${this.devicesPage} of ${totalPages} (${totalDevices} devices)`;
+        }
+        const prevBtn = document.getElementById('devicesPagePrev');
+        const nextBtn = document.getElementById('devicesPageNext');
+        if (prevBtn) {
+            prevBtn.disabled = this.devicesPage <= 1;
+        }
+        if (nextBtn) {
+            nextBtn.disabled = this.devicesPage >= totalPages;
+        }
+        const sizeSelect = document.getElementById('devicesPageSize');
+        if (sizeSelect && String(this.devicesPageSize) !== sizeSelect.value) {
+            sizeSelect.value = String(this.devicesPageSize);
+        }
+    }
+
+    changeDevicesPage(delta) {
+        const next = this.devicesPage + delta;
+        if (next < 1) return;
+        this.devicesPage = next;
+        this.updateDevicesTab();
+    }
+
+    setDevicesPageSize(size) {
+        this.devicesPageSize = size;
+        this.devicesPage = 1;
+        this.updateDevicesTab();
     }
 
     bindSortHeaders() {
@@ -1407,6 +1592,59 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         this.loadData();
     }
 
+    runDeleteCatchedDevices() {
+        const siteFilter = document.getElementById('deviceSiteFilter');
+        const siteName = siteFilter ? siteFilter.value : '';
+        if (!siteName) {
+            this.showError('Select a site first');
+            return;
+        }
+        if (!confirm(`Delete all Catched devices in "${siteName}"?`)) {
+            return;
+        }
+        this.currentSite = siteName;
+        this.runModule('delete_catched_devices');
+    }
+
+    runEnforceOui() {
+        const siteFilter = document.getElementById('deviceSiteFilter');
+        const siteName = siteFilter ? siteFilter.value : '';
+        if (!siteName) {
+            this.showError('Select a site first');
+            return;
+        }
+        if (!confirm(`Run Enforce OUI for "${siteName}"?`)) {
+            return;
+        }
+        this.currentSite = siteName;
+        this.runModule('enforce_oui_table');
+    }
+
+    runMikrotikDiscovery() {
+        const siteFilter = document.getElementById('deviceSiteFilter');
+        const siteName = siteFilter ? siteFilter.value : '';
+        if (!siteName) {
+            this.showError('Select a site first');
+            return;
+        }
+        if (!confirm(`Run MikroTik Discovery for "${siteName}"?`)) {
+            return;
+        }
+        this.currentSite = siteName;
+        this.runModule('mikrotik_mac_discovery');
+    }
+
+    runAddDeviceModule() {
+        const siteFilter = document.getElementById('deviceSiteFilter');
+        const siteName = siteFilter ? siteFilter.value : '';
+        if (!siteName) {
+            this.showError('Select a site first');
+            return;
+        }
+        this.currentSite = siteName;
+        this.runModule('add_device_manual');
+    }
+
     normalizeMac(mac) {
         if (!mac) return '';
         return mac.trim().replace(/-/g, ':').toUpperCase();
@@ -1424,6 +1662,15 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             platform.includes('ubiquiti') ||
             platform.includes('apunifi') ||
             dtype === 'ap';
+    }
+
+    isNvrDevice(device) {
+        const vendor = (device.vendor || '').toLowerCase();
+        const platform = (device.platform || '').toLowerCase();
+        const dtype = (device.type || '').toLowerCase();
+        return dtype === 'nvr' ||
+            vendor.includes('univiewnvr') ||
+            platform.includes('uniview');
     }
 
     fillOuiFromMac() {
@@ -1446,10 +1693,12 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         const labelInput = document.getElementById('editDeviceOuiLabel');
         const startInput = document.getElementById('editDeviceOuiStart');
         const endInput = document.getElementById('editDeviceOuiEnd');
+        const typeInput = document.getElementById('editDeviceOuiType');
         if (!labelInput || !startInput || !endInput) return;
         const label = labelInput.value.trim();
         const start = this.normalizeMac(startInput.value);
         const end = this.normalizeMac(endInput.value);
+        const dtype = typeInput ? typeInput.value.trim() : '';
         if (!label || !start || !end) {
             this.showError('OUI label and range are required');
             return;
@@ -1462,12 +1711,18 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 return;
             }
             const current = data.content || '';
-            const line = `${start}-${end}=${label}`;
-            if (current.toLowerCase().includes(line.toLowerCase())) {
-                this.showMessage('OUI range already exists');
-                return;
+            const entries = this.parseOuiRanges(current);
+            const existing = entries.find(entry =>
+                entry.start.toLowerCase() === start.toLowerCase() &&
+                entry.end.toLowerCase() === end.toLowerCase()
+            );
+            if (existing) {
+                existing.label = label;
+                existing.dtype = dtype ? dtype.toLowerCase() : '';
+            } else {
+                entries.push({ start, end, label, dtype: dtype ? dtype.toLowerCase() : '' });
             }
-            const content = current ? `${current.trim()}\n${line}\n` : `${line}\n`;
+            const content = this.buildOuiRangesText(entries);
             const saveResp = await fetch('/api/oui_ranges', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -1498,6 +1753,23 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         document.getElementById('editDeviceOuiLabel').value = device.oui_label || device.vendor || '';
         document.getElementById('editDeviceOuiStart').value = device.oui_range_start || '';
         document.getElementById('editDeviceOuiEnd').value = device.oui_range_end || '';
+        const typeInput = document.getElementById('editDeviceOuiType');
+        if (typeInput) {
+            const entries = this.parseOuiRanges(this.ouiRangesText);
+            const start = (device.oui_range_start || '').trim().toLowerCase();
+            const end = (device.oui_range_end || '').trim().toLowerCase();
+            let match = null;
+            if (start && end) {
+                match = entries.find(entry =>
+                    entry.start.toLowerCase() === start && entry.end.toLowerCase() === end
+                );
+            }
+            if (!match) {
+                const label = (device.oui_label || device.vendor || '').trim().toLowerCase();
+                match = entries.find(entry => entry.label.trim().toLowerCase() === label);
+            }
+            typeInput.value = match ? (match.dtype || '') : '';
+        }
         modal.dataset.deviceId = deviceId;
         const addOuiBtn = document.getElementById('addOuiRangeBtn');
         if (addOuiBtn) {
@@ -1516,6 +1788,8 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             oui_range_start: document.getElementById('editDeviceOuiStart').value.trim(),
             oui_range_end: document.getElementById('editDeviceOuiEnd').value.trim()
         };
+        const dtypeInput = document.getElementById('editDeviceOuiType');
+        const dtype = dtypeInput ? dtypeInput.value.trim() : '';
         try {
             const response = await fetch(`/api/devices/${deviceId}`, {
                 method: 'PUT',
@@ -1524,6 +1798,38 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             });
             if (!response.ok) {
                 throw new Error('Failed to update OUI');
+            }
+            if (updates.oui_label && updates.oui_range_start && updates.oui_range_end) {
+                const responseRanges = await fetch('/api/oui_ranges');
+                const dataRanges = await responseRanges.json();
+                if (responseRanges.ok) {
+                    const current = dataRanges.content || '';
+                    const entries = this.parseOuiRanges(current);
+                    const start = updates.oui_range_start.trim();
+                    const end = updates.oui_range_end.trim();
+                    const existing = entries.find(entry =>
+                        entry.start.toLowerCase() === start.toLowerCase() &&
+                        entry.end.toLowerCase() === end.toLowerCase()
+                    );
+                    if (existing) {
+                        existing.label = updates.oui_label;
+                        existing.dtype = dtype ? dtype.toLowerCase() : '';
+                    } else {
+                        entries.push({
+                            start,
+                            end,
+                            label: updates.oui_label,
+                            dtype: dtype ? dtype.toLowerCase() : ''
+                        });
+                    }
+                    const content = this.buildOuiRangesText(entries);
+                    await fetch('/api/oui_ranges', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content })
+                    });
+                    this.ouiRangesText = content;
+                }
             }
             this.closeAllModals();
             this.showMessage('OUI updated');
@@ -1578,8 +1884,513 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         
         // Update active jobs
         this.updateModuleJobs();
+        this.updateScheduleFormSites();
+        this.renderScheduleList();
+        const scheduleBody = document.getElementById('scheduleModulesBody');
+        if (scheduleBody && scheduleBody.children.length === 0) {
+            this.addScheduleModuleRow();
+        }
         
         replaceIcons();
+    }
+
+    updateScheduleFormSites(selectedSites = null) {
+        const container = document.getElementById('scheduleSitesSelect');
+        if (!container) return;
+        const siteNames = (this.sites || []).map(site => site.name);
+        const selected = Array.isArray(selectedSites) ? selectedSites : this.collectSelectedSites(container);
+        this.renderSiteMultiSelect(container, selected, siteNames);
+        this.updateScheduleScopeUI();
+    }
+
+    updateScheduleScopeUI() {
+        const scopeSelect = document.getElementById('scheduleSiteScope');
+        const container = document.getElementById('scheduleSitesSelect');
+        if (!scopeSelect || !container) return;
+        const mode = scopeSelect.value || 'selected';
+        const allMode = mode === 'all';
+        container.classList.toggle('is-disabled', allMode);
+        const allInput = container.querySelector('input[value="*"]');
+        if (allMode && allInput) {
+            allInput.checked = true;
+        }
+        this.applyAllSitesState(container);
+        this.updateMultiSelectLabel(container);
+    }
+
+    renderScheduleList() {
+        const body = document.getElementById('scheduleListBody');
+        if (!body) return;
+        const schedules = this.schedules || [];
+        if (!schedules.length) {
+            body.innerHTML = '<tr><td colspan="8">No schedules configured.</td></tr>';
+            return;
+        }
+        body.innerHTML = schedules.map(schedule => {
+            const scope = schedule.site_scope || {};
+            const rawSites = scope.sites || [];
+            const sites = scope.mode === 'all'
+                ? 'All sites'
+                : (rawSites.length ? rawSites.join(', ') : 'None');
+            const moduleLabels = (schedule.modules || []).map(mod => {
+                const module = this.modules.find(entry => entry.id === mod.module_id);
+                return module ? module.name : mod.module_id;
+            });
+            const status = schedule.status || (schedule.enabled ? 'idle' : 'disabled');
+            const nextRun = schedule.next_run_at ? this.formatDateTime(schedule.next_run_at) : '—';
+            return `
+                <tr data-id="${schedule.id}">
+                    <td>${schedule.name}</td>
+                    <td>${sites}</td>
+                    <td>${moduleLabels.join(' → ') || '—'}</td>
+                    <td>${schedule.delay_between_modules_sec || 0}s</td>
+                    <td>${schedule.repeat_interval_min || 0}m</td>
+                    <td>${status}</td>
+                    <td>${nextRun}</td>
+                    <td style="display:flex; gap:8px;">
+                        <button class="btn btn-secondary schedule-run" type="button">Run</button>
+                        <button class="btn btn-secondary schedule-edit" type="button">Edit</button>
+                        <button class="btn btn-secondary schedule-toggle" type="button">${schedule.enabled ? 'Disable' : 'Enable'}</button>
+                        <button class="btn btn-secondary schedule-remove" type="button">Delete</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        body.querySelectorAll('.schedule-run').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                const row = event.currentTarget.closest('tr');
+                if (row) {
+                    this.runScheduleNow(row.dataset.id);
+                }
+            });
+        });
+        body.querySelectorAll('.schedule-edit').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                const row = event.currentTarget.closest('tr');
+                if (row) {
+                    this.editSchedule(row.dataset.id);
+                }
+            });
+        });
+        body.querySelectorAll('.schedule-toggle').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                const row = event.currentTarget.closest('tr');
+                if (row) {
+                    this.toggleSchedule(row.dataset.id);
+                }
+            });
+        });
+        body.querySelectorAll('.schedule-remove').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                const row = event.currentTarget.closest('tr');
+                if (row) {
+                    this.deleteSchedule(row.dataset.id);
+                }
+            });
+        });
+    }
+
+    clearScheduleForm() {
+        this.scheduleEditId = null;
+        this.scheduleModuleEditRow = null;
+        const nameInput = document.getElementById('scheduleName');
+        const enabledInput = document.getElementById('scheduleEnabled');
+        const scopeSelect = document.getElementById('scheduleSiteScope');
+        const runMode = document.getElementById('scheduleRunMode');
+        const delayInput = document.getElementById('scheduleDelaySeconds');
+        const repeatInput = document.getElementById('scheduleRepeatMinutes');
+        if (nameInput) nameInput.value = '';
+        if (enabledInput) enabledInput.checked = true;
+        if (scopeSelect) scopeSelect.value = 'selected';
+        if (runMode) runMode.value = 'sequential';
+        if (delayInput) delayInput.value = 30;
+        if (repeatInput) repeatInput.value = 60;
+
+        const body = document.getElementById('scheduleModulesBody');
+        if (body) {
+            body.innerHTML = '';
+        }
+        this.addScheduleModuleRow();
+        this.updateScheduleFormSites([]);
+    }
+
+    addScheduleModuleRow(prefill = {}) {
+        const body = document.getElementById('scheduleModulesBody');
+        if (!body) return;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="schedule-order"></td>
+            <td>
+                <select class="schedule-module-select"></select>
+            </td>
+            <td>
+                <select class="schedule-credential-select">
+                    <option value="">Manual</option>
+                </select>
+            </td>
+            <td>
+                <div style="display:flex; flex-direction: column; gap: 6px;">
+                    <button class="btn btn-secondary schedule-configure" type="button">Configure</button>
+                    <span class="schedule-config-summary">Not configured</span>
+                </div>
+            </td>
+            <td>
+                <button class="btn btn-secondary schedule-move-up" type="button">Up</button>
+                <button class="btn btn-secondary schedule-move-down" type="button">Down</button>
+                <button class="btn btn-secondary schedule-remove-row" type="button">Remove</button>
+            </td>
+        `;
+        body.appendChild(row);
+
+        const moduleSelect = row.querySelector('.schedule-module-select');
+        const credentialSelect = row.querySelector('.schedule-credential-select');
+        const summaryEl = row.querySelector('.schedule-config-summary');
+
+        const options = (this.modules || []).map(module => (
+            `<option value="${module.id}">${module.name || module.id}</option>`
+        )).join('');
+        moduleSelect.innerHTML = options || '<option value="">No modules</option>';
+        moduleSelect.value = prefill.module_id || moduleSelect.value;
+
+        if (prefill.parameters) {
+            row.dataset.parameters = JSON.stringify(prefill.parameters);
+        }
+        this.updateScheduleRowSummary(row);
+
+        const updateProfiles = () => {
+            const moduleId = moduleSelect.value;
+            const profiles = this.getModuleCredentialProfiles(moduleId);
+            const options = ['<option value="">Manual</option>']
+                .concat(profiles.map(profile => `<option value="${profile.name}">${profile.name}</option>`));
+            credentialSelect.innerHTML = options.join('');
+            credentialSelect.value = prefill.credential_profile || '';
+        };
+        updateProfiles();
+
+        moduleSelect.addEventListener('change', () => {
+            prefill = {};
+            updateProfiles();
+            row.dataset.parameters = '';
+            this.updateScheduleRowSummary(row);
+        });
+
+        row.querySelector('.schedule-configure').addEventListener('click', () => {
+            this.openScheduleModuleConfig(row);
+        });
+
+        row.querySelector('.schedule-move-up').addEventListener('click', () => {
+            const prev = row.previousElementSibling;
+            if (prev) {
+                row.parentNode.insertBefore(row, prev);
+                this.updateScheduleOrder();
+            }
+        });
+
+        row.querySelector('.schedule-move-down').addEventListener('click', () => {
+            const next = row.nextElementSibling;
+            if (next) {
+                row.parentNode.insertBefore(next, row);
+                this.updateScheduleOrder();
+            }
+        });
+
+        row.querySelector('.schedule-remove-row').addEventListener('click', () => {
+            row.remove();
+            this.updateScheduleOrder();
+        });
+
+        this.updateScheduleOrder();
+    }
+
+    updateScheduleOrder() {
+        const rows = document.querySelectorAll('#scheduleModulesBody tr');
+        rows.forEach((row, index) => {
+            const orderCell = row.querySelector('.schedule-order');
+            if (orderCell) {
+                orderCell.textContent = String(index + 1);
+            }
+        });
+    }
+
+    updateScheduleRowSummary(row) {
+        if (!row) return;
+        const summaryEl = row.querySelector('.schedule-config-summary');
+        if (!summaryEl) return;
+        const params = row.dataset.parameters;
+        summaryEl.textContent = params ? 'Configured' : 'Not configured';
+    }
+
+    getScheduleEditorSite() {
+        const scopeMode = document.getElementById('scheduleSiteScope')?.value || 'selected';
+        if (scopeMode === 'all') {
+            return this.currentSite || (this.sites?.[0]?.name || '');
+        }
+        const container = document.getElementById('scheduleSitesSelect');
+        const selected = this.collectSelectedSites(container).filter(site => site !== '*');
+        if (selected.length) {
+            return selected[0];
+        }
+        return this.currentSite || (this.sites?.[0]?.name || '');
+    }
+
+    openScheduleModuleConfig(row) {
+        const moduleId = row.querySelector('.schedule-module-select')?.value;
+        const module = this.modules.find(entry => entry.id === moduleId);
+        if (!module) {
+            this.showError('Module not found');
+            return;
+        }
+        this.scheduleModuleEditRow = row;
+        const siteName = this.getScheduleEditorSite();
+        const prefill = row.dataset.parameters ? JSON.parse(row.dataset.parameters) : {};
+        const modal = document.getElementById('scheduleModuleModal');
+        const title = document.getElementById('scheduleModuleTitle');
+        const formContainer = document.getElementById('scheduleModuleFormContainer');
+        if (title) {
+            title.textContent = `Configure: ${module.name || module.id}`;
+        }
+        this.renderModuleFormInto(formContainer, module, siteName, prefill, {
+            includeCredentialProfiles: false,
+            showSiteDisplay: true,
+            idPrefix: 'schedule_module_'
+        });
+        if (!siteName && formContainer) {
+            const note = document.createElement('div');
+            note.style.marginBottom = '12px';
+            note.style.color = 'var(--text-secondary)';
+            note.textContent = 'Select a site to preview device lists.';
+            formContainer.prepend(note);
+        }
+        modal.classList.add('active');
+    }
+
+    saveScheduleModuleConfig() {
+        const row = this.scheduleModuleEditRow;
+        if (!row) {
+            this.closeAllModals();
+            return;
+        }
+        const moduleId = row.querySelector('.schedule-module-select')?.value;
+        const module = this.modules.find(entry => entry.id === moduleId);
+        if (!module) {
+            this.showError('Module not found');
+            return;
+        }
+        const inputResult = this.collectModuleInputs(module, 'schedule_module_');
+        if (!inputResult.isValid) {
+            this.showError(inputResult.error || 'Please fill all required fields');
+            return;
+        }
+        row.dataset.parameters = JSON.stringify(inputResult.inputs || {});
+        this.updateScheduleRowSummary(row);
+        this.scheduleModuleEditRow = null;
+        this.closeAllModals();
+    }
+
+    collectScheduleForm() {
+        const name = document.getElementById('scheduleName')?.value.trim();
+        const enabled = document.getElementById('scheduleEnabled')?.checked ?? true;
+        const scopeMode = document.getElementById('scheduleSiteScope')?.value || 'selected';
+        const siteContainer = document.getElementById('scheduleSitesSelect');
+        let selectedSites = this.collectSelectedSites(siteContainer);
+        if (scopeMode !== 'all') {
+            selectedSites = selectedSites.filter(s => s !== '*');
+            if (!selectedSites.length) {
+                const fallback = this.currentSite || (this.sites?.[0]?.name || '');
+                if (fallback) {
+                    selectedSites = [fallback];
+                } else {
+                    this.showError('Select at least one site for this schedule.');
+                    return null;
+                }
+            }
+        }
+        const runMode = document.getElementById('scheduleRunMode')?.value || 'sequential';
+        const delay = parseInt(document.getElementById('scheduleDelaySeconds')?.value || '0', 10);
+        const repeat = parseInt(document.getElementById('scheduleRepeatMinutes')?.value || '0', 10);
+
+        if (!name) {
+            this.showError('Schedule name is required');
+            return null;
+        }
+        const modules = [];
+        const rows = document.querySelectorAll('#scheduleModulesBody tr');
+        for (const row of rows) {
+            const moduleId = row.querySelector('.schedule-module-select')?.value;
+            const credential = row.querySelector('.schedule-credential-select')?.value || '';
+            if (!moduleId) continue;
+            let params = {};
+            if (row.dataset.parameters) {
+                try {
+                    params = JSON.parse(row.dataset.parameters);
+                } catch (err) {
+                    this.showError('Invalid module configuration data.');
+                    return null;
+                }
+            }
+            const entry = { module_id: moduleId, parameters: params };
+            if (credential) {
+                entry.credential_profile = credential;
+            }
+            modules.push(entry);
+        }
+
+        if (!modules.length) {
+            this.showError('Add at least one module to the schedule');
+            return null;
+        }
+
+        return {
+            id: this.scheduleEditId || undefined,
+            name,
+            enabled,
+            site_scope: { mode: scopeMode, sites: scopeMode === 'all' ? [] : selectedSites },
+            site_run_mode: runMode,
+            delay_between_modules_sec: Number.isFinite(delay) ? delay : 0,
+            repeat_interval_min: Number.isFinite(repeat) ? repeat : 0,
+            modules
+        };
+    }
+
+    async saveSchedule() {
+        const payload = this.collectScheduleForm();
+        if (!payload) return;
+        const method = this.scheduleEditId ? 'PUT' : 'POST';
+        const endpoint = this.scheduleEditId ? `/api/schedules/${this.scheduleEditId}` : '/api/schedules';
+        try {
+            const response = await fetch(endpoint, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                this.showError(data.error || 'Failed to save schedule');
+                return;
+            }
+            this.showMessage('Schedule saved');
+            if (data.enabled) {
+                await this.runScheduleNow(data.id, { silent: true });
+            }
+            await this.refreshSchedules();
+            this.clearScheduleForm();
+        } catch (error) {
+            console.error('Error saving schedule:', error);
+            this.showError('Failed to save schedule');
+        }
+    }
+
+    async refreshSchedules() {
+        const schedules = await this.fetchData('/api/schedules', { timeoutMs: 8000 });
+        if (schedules) {
+            this.schedules = schedules;
+            this.renderScheduleList();
+        }
+    }
+
+    editSchedule(scheduleId) {
+        const schedule = (this.schedules || []).find(entry => entry.id === scheduleId);
+        if (!schedule) {
+            this.showError('Schedule not found');
+            return;
+        }
+        this.scheduleEditId = scheduleId;
+        document.getElementById('scheduleName').value = schedule.name || '';
+        document.getElementById('scheduleEnabled').checked = !!schedule.enabled;
+        document.getElementById('scheduleSiteScope').value = (schedule.site_scope?.mode || 'selected');
+        document.getElementById('scheduleRunMode').value = schedule.site_run_mode || 'sequential';
+        document.getElementById('scheduleDelaySeconds').value = schedule.delay_between_modules_sec ?? 0;
+        document.getElementById('scheduleRepeatMinutes').value = schedule.repeat_interval_min ?? 0;
+
+        const body = document.getElementById('scheduleModulesBody');
+        body.innerHTML = '';
+        (schedule.modules || []).forEach(entry => this.addScheduleModuleRow(entry));
+        if (!(schedule.modules || []).length) {
+            this.addScheduleModuleRow();
+        }
+        this.updateScheduleFormSites(schedule.site_scope?.mode === 'all' ? ['*'] : (schedule.site_scope?.sites || []));
+    }
+
+    async deleteSchedule(scheduleId) {
+        if (!confirm('Delete this schedule?')) return;
+        try {
+            const response = await fetch(`/api/schedules/${scheduleId}`, { method: 'DELETE' });
+            const data = await response.json();
+            if (!response.ok) {
+                this.showError(data.error || 'Failed to delete schedule');
+                return;
+            }
+            this.showMessage('Schedule deleted');
+            await this.refreshSchedules();
+        } catch (error) {
+            console.error('Error deleting schedule:', error);
+            this.showError('Failed to delete schedule');
+        }
+    }
+
+    async runScheduleNow(scheduleId, options = {}) {
+        try {
+            const response = await fetch(`/api/schedules/${scheduleId}/run_now`, { method: 'POST' });
+            const data = await response.json();
+            if (!response.ok) {
+                const details = Array.isArray(data.details) ? data.details.join('; ') : '';
+                const message = details ? `${data.error || 'Failed to run schedule'}: ${details}` : (data.error || 'Failed to run schedule');
+                this.showError(message);
+                return;
+            }
+            if (!options.silent) {
+                this.showMessage('Schedule queued');
+            }
+            await this.refreshSchedules();
+        } catch (error) {
+            console.error('Error running schedule:', error);
+            if (!options.silent) {
+                this.showError('Failed to run schedule');
+            }
+        }
+    }
+
+    async toggleSchedule(scheduleId) {
+        const schedule = (this.schedules || []).find(entry => entry.id === scheduleId);
+        if (!schedule) return;
+        const payload = { ...schedule, enabled: !schedule.enabled };
+        try {
+            const response = await fetch(`/api/schedules/${scheduleId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                this.showError(data.error || 'Failed to update schedule');
+                return;
+            }
+            await this.refreshSchedules();
+        } catch (error) {
+            console.error('Error updating schedule:', error);
+            this.showError('Failed to update schedule');
+        }
+    }
+
+    formatDateTime(isoString) {
+        if (!isoString) return '—';
+        const date = new Date(isoString);
+        if (Number.isNaN(date.getTime())) return isoString;
+        return date.toLocaleString();
+    }
+
+    openExportDevices() {
+        const siteSelect = document.getElementById('deviceSiteFilter');
+        const selectedSite = siteSelect ? siteSelect.value : '';
+        if (!this.currentSite && selectedSite) {
+            this.currentSite = selectedSite;
+        }
+        if (!this.currentSite) {
+            this.showError('Select a site (or set default) to export devices.');
+            return;
+        }
+        this.runModule('export_devices');
     }
 
     updateSettingsTab() {
@@ -1617,6 +2428,13 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             const textarea = document.getElementById('ouiRangesText');
             if (textarea && this.ouiRangesText) {
                 textarea.value = this.ouiRangesText;
+            }
+        }
+        const moduleCredsSection = document.getElementById('moduleCredentialsSection');
+        if (moduleCredsSection) {
+            moduleCredsSection.style.display = this.currentUserRole === 'admin' ? 'block' : 'none';
+            if (this.currentUserRole === 'admin') {
+                this.renderModuleCredentials();
             }
         }
         if (this.currentUserRole === 'admin') {
@@ -1678,150 +2496,33 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         
         // Set title
         title.textContent = `Run: ${module.name}`;
-        
-        // Build form from module inputs
-        // Build form from module inputs
-let formHTML = '';
+        this.renderModuleFormInto(formContainer, module, this.currentSite, prefill, {
+            includeCredentialProfiles: true,
+            showSiteDisplay: true,
+            idPrefix: 'module_'
+        });
 
-        if (module.inputs && module.inputs.length > 0) {
-    module.inputs.forEach(input => {
-        // Skip site field - we use the selected site
-        if (input.name === 'site') {
-            return;
+        const credentialSelect = document.getElementById('module_credential_profile');
+        if (credentialSelect) {
+            credentialSelect.addEventListener('change', () => {
+                const selected = credentialSelect.value;
+                if (!selected) {
+                    return;
+                }
+                const profile = this.getModuleCredentialProfiles(module.id).find(entry => entry.name === selected);
+                if (!profile) {
+                    return;
+                }
+                const usernameInput = document.getElementById('module_username');
+                const passwordInput = document.getElementById('module_password');
+                if (usernameInput) {
+                    usernameInput.value = profile.username || '';
+                }
+                if (passwordInput) {
+                    passwordInput.value = profile.password || '';
+                }
+            });
         }
-        
-        if (input.type === 'select') {
-            formHTML += `
-                <div class="form-group">
-                    <label for="module_${input.name}">${input.label} ${input.required ? '*' : ''}</label>
-                    <select id="module_${input.name}" ${input.required ? 'required' : ''}>
-                        ${input.options.map(opt => 
-                            `<option value="${opt}" ${opt === input.default ? 'selected' : ''}>${opt}</option>`
-                        ).join('')}
-                    </select>
-                </div>
-            `;
-        } else if (input.type === 'device_select') {
-            const siteDevices = (this.devices || []).filter(d => !this.currentSite || d.site === this.currentSite);
-            const options = siteDevices.map(d => {
-                const ip = d.ip ? ` (${d.ip})` : '';
-                const dtype = d.type ? ` [${d.type}]` : '';
-                return `<option value="${d.id}">${d.name}${ip}${dtype}</option>`;
-            }).join('');
-            formHTML += `
-                <div class="form-group">
-                    <label for="module_${input.name}">${input.label} ${input.required ? '*' : ''}</label>
-                    <select id="module_${input.name}" ${input.required ? 'required' : ''}>
-                        <option value="">Select device</option>
-                        ${options}
-                    </select>
-                </div>
-            `;
-        } else if (input.type === 'device_table') {
-            const siteDevices = (this.devices || []).filter(d => !this.currentSite || d.site === this.currentSite);
-            const rows = siteDevices.map(d => {
-                const checked = module.id === 'ubiquiti_cdp_reader' && this.isUbiquitiDevice(d) ? 'checked' : '';
-                const vendor = d.vendor || d.platform || '';
-                return `
-                    <tr>
-                        <td><input type="checkbox" class="module-device-select" data-device-id="${d.id}" ${checked}></td>
-                        <td>${d.name || d.id}</td>
-                        <td>${d.ip || ''}</td>
-                        <td>${vendor}</td>
-                        <td>${d.type || ''}</td>
-                    </tr>
-                `;
-            }).join('');
-            formHTML += `
-                <div class="form-group">
-                    <label>${input.label} ${input.required ? '*' : ''}</label>
-                    <div class="table-container" style="padding: 0;">
-                        <table class="data-table" style="min-width: 520px;">
-                            <thead>
-                                <tr>
-                                    <th style="width: 36px;"></th>
-                                    <th>Name</th>
-                                    <th>IP</th>
-                                    <th>Vendor</th>
-                                    <th>Type</th>
-                                </tr>
-                            </thead>
-                            <tbody id="module_${input.name}_table">
-                                ${rows || '<tr><td colspan="5">No devices in this site.</td></tr>'}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="form-group" style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px;">
-                        <input type="text" id="module_${input.name}_manual_name" placeholder="Device name">
-                        <input type="text" id="module_${input.name}_manual_ip" placeholder="IP address">
-                        <button class="btn btn-secondary" type="button" id="module_${input.name}_manual_add">Add</button>
-                    </div>
-                </div>
-            `;
-        } else if (input.type === 'checkbox') {
-            formHTML += `
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox"
-                               id="module_${input.name}"
-                               ${input.default ? 'checked' : ''}>
-                        <span>${input.label}</span>
-                    </label>
-                </div>
-            `;
-        } else if (input.type === 'textarea') {
-            formHTML += `
-                <div class="form-group">
-                    <label for="module_${input.name}">${input.label} ${input.required ? '*' : ''}</label>
-                    <textarea id="module_${input.name}"
-                              placeholder="${input.placeholder || ''}"
-                              ${input.required ? 'required' : ''}
-                              rows="4">${input.default || ''}</textarea>
-                </div>
-            `;
-        } else {
-            const inputType = input.type === 'credential' ? 'password' : 'text';
-            formHTML += `
-                <div class="form-group">
-                    <label for="module_${input.name}">${input.label} ${input.required ? '*' : ''}</label>
-                    <input type="${inputType}" 
-                           id="module_${input.name}" 
-                           placeholder="${input.placeholder || ''}"
-                           ${input.required ? 'required' : ''}
-                           value="${input.default || ''}">
-                </div>
-            `;
-        }
-    });
-} else {
-    formHTML = '<p>This module has no configurable parameters.</p>';
-}
-
-// Add site as hidden field (auto-filled from selection)
-formHTML += `
-    <input type="hidden" id="module_site_name" value="${this.currentSite}">
-    <div class="form-group">
-        <label>Site</label>
-        <div style="padding: 10px 14px; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid var(--border-color);">
-            ${this.currentSite}
-        </div>
-    </div>
-`;
-        // Add site field (hidden, auto-filled)
-        formHTML += `<input type="hidden" id="module_site" value="${this.currentSite}">`;
-        
-          formContainer.innerHTML = formHTML;
-          Object.entries(prefill || {}).forEach(([key, value]) => {
-              const element = document.getElementById(`module_${key}`);
-              if (!element) {
-                  return;
-              }
-              if (element.type === 'checkbox') {
-                  element.checked = Boolean(value);
-              } else {
-                  element.value = value;
-              }
-          });
 
         if (module.inputs && module.inputs.length > 0) {
             module.inputs.forEach(input => {
@@ -1879,59 +2580,284 @@ formHTML += `
         startBtn.onclick = () => this.startModule(module);
     }
 
+    renderModuleFormInto(container, module, siteName, prefill = {}, options = {}) {
+        if (!container) return;
+        const includeCredentialProfiles = !!options.includeCredentialProfiles;
+        const showSiteDisplay = !!options.showSiteDisplay;
+        const idPrefix = options.idPrefix || 'module_';
+        const formHTML = this.buildModuleFormHTML(module, siteName, includeCredentialProfiles, showSiteDisplay, idPrefix);
+        container.innerHTML = formHTML;
+        this.applyPrefillValues(prefill, idPrefix);
+        this.bindManualDeviceButtons(module, idPrefix);
+    }
+
+    buildModuleFormHTML(module, siteName, includeCredentialProfiles, showSiteDisplay, idPrefix) {
+        let formHTML = '';
+        if (includeCredentialProfiles) {
+            const supportsCredentialProfiles = this.moduleCredentialTargets.some(target => target.id === module.id);
+            if (supportsCredentialProfiles) {
+                const profiles = this.getModuleCredentialProfiles(module.id);
+                const options = profiles.map(profile => (
+                    `<option value="${profile.name}">${profile.name} (${profile.username || 'user'})</option>`
+                )).join('');
+                formHTML += `
+                    <div class="form-group">
+                        <label for="${idPrefix}credential_profile">Credential Profile</label>
+                        <select id="${idPrefix}credential_profile">
+                            <option value="">Manual</option>
+                            ${options}
+                        </select>
+                    </div>
+                `;
+            }
+        }
+
+        if (module.inputs && module.inputs.length > 0) {
+            module.inputs.forEach(input => {
+                if (input.name === 'site') {
+                    return;
+                }
+                if (input.type === 'select') {
+                    formHTML += `
+                        <div class="form-group">
+                            <label for="${idPrefix}${input.name}">${input.label} ${input.required ? '*' : ''}</label>
+                            <select id="${idPrefix}${input.name}" ${input.required ? 'required' : ''}>
+                                ${(input.options || []).map(opt =>
+                                    `<option value="${opt}" ${opt === input.default ? 'selected' : ''}>${opt}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    `;
+                } else if (input.type === 'device_select') {
+                    const siteDevices = this.getDevicesForSite(siteName, input);
+                    const options = siteDevices.map(d => {
+                        const ip = d.ip ? ` (${d.ip})` : '';
+                        const dtype = d.type ? ` [${d.type}]` : '';
+                        return `<option value="${d.id}">${d.name}${ip}${dtype}</option>`;
+                    }).join('');
+                    formHTML += `
+                        <div class="form-group">
+                            <label for="${idPrefix}${input.name}">${input.label} ${input.required ? '*' : ''}</label>
+                            <select id="${idPrefix}${input.name}" ${input.required ? 'required' : ''}>
+                                <option value="">Select device</option>
+                                ${options}
+                            </select>
+                        </div>
+                    `;
+                } else if (input.type === 'device_table') {
+                    const siteDevices = this.getDevicesForSite(siteName);
+                    const rows = siteDevices.map(d => {
+                        let checked = '';
+                        if (module.id === 'ubiquiti_cdp_reader' && this.isUbiquitiDevice(d)) {
+                            checked = 'checked';
+                        }
+                        if (module.id === 'uniview_nvr_capture' && this.isNvrDevice(d)) {
+                            checked = 'checked';
+                        }
+                        const vendor = d.vendor || d.platform || '';
+                        return `
+                            <tr>
+                                <td><input type="checkbox" class="module-device-select" data-device-id="${d.id}" ${checked}></td>
+                                <td>${d.name || d.id}</td>
+                                <td>${d.ip || ''}</td>
+                                <td>${vendor}</td>
+                                <td>${d.type || ''}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                    formHTML += `
+                        <div class="form-group">
+                            <label>${input.label} ${input.required ? '*' : ''}</label>
+                            <div class="table-container" style="padding: 0;">
+                                <table class="data-table" style="min-width: 520px;">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 36px;"></th>
+                                            <th>Name</th>
+                                            <th>IP</th>
+                                            <th>Vendor</th>
+                                            <th>Type</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="${idPrefix}${input.name}_table">
+                                        ${rows || '<tr><td colspan="5">No devices in this site.</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="form-group" style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px;">
+                                <input type="text" id="${idPrefix}${input.name}_manual_name" placeholder="Device name">
+                                <input type="text" id="${idPrefix}${input.name}_manual_ip" placeholder="IP address">
+                                <button class="btn btn-secondary" type="button" id="${idPrefix}${input.name}_manual_add">Add</button>
+                            </div>
+                        </div>
+                    `;
+                } else if (input.type === 'checkbox') {
+                    const infoText = input.info || input.description || '';
+                    const infoIcon = infoText
+                        ? `<span class="info-icon" title="${this.escapeHtml(infoText)}">i</span>`
+                        : '';
+                    formHTML += `
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox"
+                                       id="${idPrefix}${input.name}"
+                                       ${input.default ? 'checked' : ''}>
+                                <span>${input.label}</span>
+                                ${infoIcon}
+                            </label>
+                        </div>
+                    `;
+                } else if (input.type === 'textarea') {
+                    formHTML += `
+                        <div class="form-group">
+                            <label for="${idPrefix}${input.name}">${input.label} ${input.required ? '*' : ''}</label>
+                            <textarea id="${idPrefix}${input.name}"
+                                      placeholder="${input.placeholder || ''}"
+                                      ${input.required ? 'required' : ''}
+                                      rows="4">${input.default || ''}</textarea>
+                        </div>
+                    `;
+                } else {
+                    const inputType = (input.type === 'credential' || input.type === 'password') ? 'password' : 'text';
+                    formHTML += `
+                        <div class="form-group">
+                            <label for="${idPrefix}${input.name}">${input.label} ${input.required ? '*' : ''}</label>
+                            <input type="${inputType}" 
+                                   id="${idPrefix}${input.name}" 
+                                   placeholder="${input.placeholder || ''}"
+                                   ${input.required ? 'required' : ''}
+                                   value="${input.default || ''}">
+                        </div>
+                    `;
+                }
+            });
+        } else {
+            formHTML = '<p>This module has no configurable parameters.</p>';
+        }
+
+        if (showSiteDisplay) {
+            const siteLabel = siteName || 'No site selected';
+            formHTML += `
+                <input type="hidden" id="${idPrefix}site_name" value="${siteName || ''}">
+                <div class="form-group">
+                    <label>Site</label>
+                    <div style="padding: 10px 14px; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid var(--border-color);">
+                        ${siteLabel}
+                    </div>
+                </div>
+            `;
+        }
+        return formHTML;
+    }
+
+    escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    bindManualDeviceButtons(module, idPrefix) {
+        if (module.inputs && module.inputs.length > 0) {
+            module.inputs.forEach(input => {
+                if (input.type !== 'device_table') {
+                    return;
+                }
+                const addBtn = document.getElementById(`${idPrefix}${input.name}_manual_add`);
+                const nameInput = document.getElementById(`${idPrefix}${input.name}_manual_name`);
+                const ipInput = document.getElementById(`${idPrefix}${input.name}_manual_ip`);
+                const tableBody = document.getElementById(`${idPrefix}${input.name}_table`);
+                if (!addBtn || !nameInput || !ipInput || !tableBody) {
+                    return;
+                }
+                addBtn.addEventListener('click', () => {
+                    const name = nameInput.value.trim();
+                    const ip = ipInput.value.trim();
+                    if (!name || !ip) {
+                        this.showError('Manual device name and IP are required');
+                        return;
+                    }
+                    const row = document.createElement('tr');
+                    row.dataset.manual = 'true';
+                    row.dataset.name = name;
+                    row.dataset.ip = ip;
+                    row.innerHTML = `
+                        <td><input type="checkbox" class="module-device-select" checked></td>
+                        <td>${name}</td>
+                        <td>${ip}</td>
+                        <td>manual</td>
+                        <td><button type="button" class="btn btn-secondary">Remove</button></td>
+                    `;
+                    row.querySelector('button')?.addEventListener('click', () => {
+                        row.remove();
+                    });
+                    tableBody.appendChild(row);
+                    nameInput.value = '';
+                    ipInput.value = '';
+                });
+            });
+        }
+    }
+
+    applyPrefillValues(prefill, idPrefix) {
+        Object.entries(prefill || {}).forEach(([key, value]) => {
+            const element = document.getElementById(`${idPrefix}${key}`);
+            if (!element) {
+                return;
+            }
+            if (element.type === 'checkbox') {
+                element.checked = Boolean(value);
+            } else {
+                element.value = value;
+            }
+        });
+    }
+
+    getDevicesForSite(siteName, input = null) {
+        if (!siteName) {
+            return [];
+        }
+        let devices = (this.devices || []).filter(d => d.site === siteName);
+        if (!input) {
+            return devices;
+        }
+        const typeFilters = Array.isArray(input.device_types) ? input.device_types.map(v => String(v).toLowerCase()) : [];
+        const nameContains = Array.isArray(input.device_name_contains) ? input.device_name_contains.map(v => String(v).toLowerCase()) : [];
+        if (!typeFilters.length && !nameContains.length) {
+            return devices;
+        }
+        return devices.filter(d => {
+            const type = String(d.type || '').toLowerCase();
+            const name = String(d.name || '').toLowerCase();
+            const vendor = String(d.vendor || '').toLowerCase();
+            if (typeFilters.length && !typeFilters.includes(type)) {
+                return false;
+            }
+            if (nameContains.length) {
+                const match = nameContains.some(token => token && (name.includes(token) || vendor.includes(token)));
+                if (!match) {
+                    return false;
+                }
+            }
+            return true;
+        });
+    }
+
     async startModule(module) {
         const formContainer = document.getElementById('moduleFormContainer');
         const statusDisplay = document.getElementById('moduleStatusDisplay');
         const startBtn = document.getElementById('startModuleBtn');
         
         // Validate form
-        const inputs = {};
-        let isValid = true;
-        
-        module.inputs.forEach(input => {
-            if (input.type === 'device_table') {
-                const tableBody = document.getElementById(`module_${input.name}_table`);
-                if (!tableBody) {
-                    return;
-                }
-                const deviceIds = [];
-                const manualDevices = [];
-                tableBody.querySelectorAll('tr').forEach(row => {
-                    const checkbox = row.querySelector('.module-device-select');
-                    if (!checkbox || !checkbox.checked) {
-                        return;
-                    }
-                    if (row.dataset.manual === 'true') {
-                        manualDevices.push({
-                            name: row.dataset.name || '',
-                            ip: row.dataset.ip || ''
-                        });
-                    } else {
-                        const id = checkbox.dataset.deviceId;
-                        if (id) {
-                            deviceIds.push(id);
-                        }
-                    }
-                });
-                if (input.required && deviceIds.length === 0 && manualDevices.length === 0) {
-                    isValid = false;
-                } else {
-                    inputs[input.name] = { device_ids: deviceIds, manual_devices: manualDevices };
-                }
-                return;
-            }
-            const element = document.getElementById(`module_${input.name}`);
-            if (element) {
-                const value = element.type === 'checkbox' ? element.checked : element.value;
-                if (input.required && !value) {
-                    isValid = false;
-                    element.style.borderColor = 'var(--error)';
-                } else {
-                    inputs[input.name] = value;
-                    element.style.borderColor = '';
-                }
-            }
-        });
+        const inputResult = this.collectModuleInputs(module, 'module_');
+        const inputs = inputResult.inputs;
+        const isValid = inputResult.isValid;
+        if (inputResult.error) {
+            this.showError(inputResult.error);
+            return;
+        }
         
         if (!isValid) {
             this.showError('Please fill all required fields');
@@ -1993,6 +2919,8 @@ formHTML += `
             if (!response.ok) return;
             
             const status = await response.json();
+            const terminalStates = ['completed', 'failed', 'error', 'timeout'];
+            const isTerminal = terminalStates.includes(status.status);
             const statusDisplay = document.getElementById('moduleStatusDisplay');
             if (statusDisplay) {
                 statusDisplay.dataset.logThread = threadId;
@@ -2003,8 +2931,11 @@ formHTML += `
                     statusDisplay.querySelector('.progress-fill').style.width = `${status.progress}%`;
                 }
                 
-                if (status.status === 'completed' || status.status === 'failed' || status.status === 'error') {
-                    this.updateModuleLog(threadId, true);
+                if (isTerminal) {
+                    this.updateModuleLog(threadId, false);
+                    setTimeout(() => {
+                        this.updateModuleLog(threadId, true);
+                    }, 500);
                     // Module finished
                     statusDisplay.querySelector('.status-message').textContent = 
                         status.status === 'completed' ? 'Module completed successfully' : 
@@ -2017,6 +2948,7 @@ formHTML += `
                     }
                     this.activeModuleThreads.delete(threadId);
                     
+                    this.renderModuleDownload(status);
                     // Enable start button
                     document.getElementById('startModuleBtn').disabled = false;
                     
@@ -2038,11 +2970,122 @@ formHTML += `
             
             // Update jobs table
             this.updateModuleJobs();
-            this.updateModuleLog(threadId, false);
+            if (!isTerminal) {
+                this.updateModuleLog(threadId, false);
+            } else {
+                setTimeout(() => {
+                    this.updateModuleLog(threadId, true);
+                }, 500);
+            }
+            this.renderModuleDownload(status);
             
         } catch (error) {
             console.error('Error updating module status:', error);
         }
+    }
+
+    renderModuleDownload(status) {
+        const statusDisplay = document.getElementById('moduleStatusDisplay');
+        if (!statusDisplay) return;
+        const details = statusDisplay.querySelector('.status-details');
+        if (!details) return;
+        const exportInfo = status?.output?.export;
+        if (!exportInfo || !exportInfo.content_base64) {
+            return;
+        }
+        const filename = exportInfo.filename || 'devices_export.csv';
+        const buttonId = 'moduleExportDownloadBtn';
+        if (document.getElementById(buttonId)) {
+            return;
+        }
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-secondary';
+        btn.id = buttonId;
+        btn.type = 'button';
+        btn.textContent = 'Download CSV';
+        btn.addEventListener('click', () => {
+            try {
+                const bytes = Uint8Array.from(atob(exportInfo.content_base64), c => c.charCodeAt(0));
+                const blob = new Blob([bytes], { type: 'text/csv;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                console.error('Download failed', err);
+                this.showError('Failed to download CSV');
+            }
+        });
+        details.appendChild(btn);
+    }
+
+    collectModuleInputs(module, idPrefix) {
+        const inputs = {};
+        let isValid = true;
+        let error = '';
+
+        (module.inputs || []).forEach(input => {
+            if (input.name === 'site') {
+                return;
+            }
+            if (input.type === 'device_table') {
+                const tableBody = document.getElementById(`${idPrefix}${input.name}_table`);
+                if (!tableBody) {
+                    return;
+                }
+                const deviceIds = [];
+                const manualDevices = [];
+                tableBody.querySelectorAll('tr').forEach(row => {
+                    const checkbox = row.querySelector('.module-device-select');
+                    if (!checkbox || !checkbox.checked) {
+                        return;
+                    }
+                    if (row.dataset.manual === 'true') {
+                        manualDevices.push({
+                            name: row.dataset.name || '',
+                            ip: row.dataset.ip || ''
+                        });
+                    } else {
+                        const id = checkbox.dataset.deviceId;
+                        if (id) {
+                            deviceIds.push(id);
+                        }
+                    }
+                });
+                if (input.required && deviceIds.length === 0 && manualDevices.length === 0) {
+                    isValid = false;
+                } else {
+                    inputs[input.name] = { device_ids: deviceIds, manual_devices: manualDevices };
+                }
+                return;
+            }
+            const element = document.getElementById(`${idPrefix}${input.name}`);
+            if (element) {
+                const value = element.type === 'checkbox' ? element.checked : element.value;
+                if (input.required && !value) {
+                    isValid = false;
+                    element.style.borderColor = 'var(--error)';
+                } else {
+                    inputs[input.name] = value;
+                    element.style.borderColor = '';
+                }
+            }
+        });
+
+        const credentialSelect = document.getElementById(`${idPrefix}credential_profile`);
+        if (credentialSelect && credentialSelect.value) {
+            inputs.credential_profile = credentialSelect.value;
+        }
+
+        if (!isValid && !error) {
+            error = 'Please fill all required fields';
+        }
+
+        return { inputs, isValid, error };
     }
 
     async updateModuleLog(threadId, deleteAfter) {
@@ -2052,7 +3095,7 @@ formHTML += `
         if (!textarea) return;
         const statusDisplay = document.getElementById('moduleStatusDisplay');
         const threadInfo = this.activeModuleThreads.get(threadId);
-        if (!threadInfo && (!statusDisplay || statusDisplay.dataset.logThread !== threadId)) {
+        if (!deleteAfter && !threadInfo && (!statusDisplay || statusDisplay.dataset.logThread !== threadId)) {
             logWrap.style.display = 'none';
             return;
         }
@@ -2066,12 +3109,21 @@ formHTML += `
             }
             const lines = data.lines || [];
             if (!lines.length) {
-                logWrap.style.display = 'none';
+                const cached = this.moduleLogCache.get(threadId);
+                if (cached && cached.length) {
+                    logWrap.style.display = 'block';
+                    textarea.value = cached.join('\n');
+                    textarea.scrollTop = textarea.scrollHeight;
+                } else {
+                    logWrap.style.display = 'block';
+                    textarea.value = 'No log output yet.';
+                }
                 return;
             }
             logWrap.style.display = 'block';
             textarea.value = lines.join('\n');
             textarea.scrollTop = textarea.scrollHeight;
+            this.moduleLogCache.set(threadId, lines);
         } catch (error) {
             logWrap.style.display = 'none';
         }
@@ -2461,6 +3513,9 @@ selectSite(siteName) {
             auto_refresh: document.getElementById('autoRefresh').checked,
             refresh_interval: parseInt(document.getElementById('refreshInterval').value) || 30
         };
+        if (this.currentUserRole === 'admin') {
+            settings.module_credentials = this.moduleCredentials || {};
+        }
         
         try {
             const authEnabled = document.getElementById('authEnabled');
@@ -2475,13 +3530,170 @@ selectSite(siteName) {
             
             if (!response.ok) throw new Error('Failed to save settings');
             
-            this.settings = settings;
+            this.settings = { ...this.settings, ...settings };
             this.applySettings();
             this.showMessage('Settings saved successfully');
             
         } catch (error) {
             console.error('Error saving settings:', error);
             this.showError('Failed to save settings');
+        }
+    }
+
+    getModuleCredentialProfiles(moduleId) {
+        if (!moduleId) {
+            return [];
+        }
+        const profiles = (this.moduleCredentials || {})[moduleId];
+        return Array.isArray(profiles) ? profiles : [];
+    }
+
+    renderModuleCredentials() {
+        const moduleSelect = document.getElementById('moduleCredModule');
+        const tableBody = document.getElementById('moduleCredsTableBody');
+        if (!moduleSelect || !tableBody) {
+            return;
+        }
+        const moduleOptions = (this.modules || []).map(module => ({
+            id: module.id,
+            label: module.name || module.id
+        }));
+        const dropdownModules = moduleOptions.length ? moduleOptions : this.moduleCredentialTargets;
+        moduleSelect.innerHTML = dropdownModules.map(target => (
+            `<option value="${target.id}">${target.label}</option>`
+        )).join('');
+        if (dropdownModules.length) {
+            moduleSelect.value = dropdownModules[0].id;
+        }
+
+        const rows = [];
+        dropdownModules.forEach(target => {
+            const profiles = this.getModuleCredentialProfiles(target.id);
+            profiles.forEach(profile => {
+                rows.push(`
+                    <tr data-module="${target.id}" data-name="${profile.name}">
+                        <td>${target.label}</td>
+                        <td>${profile.name}</td>
+                        <td>${profile.username || ''}</td>
+                        <td style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary module-cred-edit" type="button">Edit</button>
+                            <button class="btn btn-secondary module-cred-remove" type="button">Remove</button>
+                        </td>
+                    </tr>
+                `);
+            });
+        });
+        tableBody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="4">No saved credentials.</td></tr>';
+
+        tableBody.querySelectorAll('.module-cred-edit').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const row = event.currentTarget.closest('tr');
+                if (!row) {
+                    return;
+                }
+                const moduleId = row.dataset.module;
+                const profileName = row.dataset.name;
+                const profile = this.getModuleCredentialProfiles(moduleId).find(p => p.name === profileName);
+                if (profile) {
+                    this.fillModuleCredentialForm(moduleId, profile);
+                }
+            });
+        });
+        tableBody.querySelectorAll('.module-cred-remove').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const row = event.currentTarget.closest('tr');
+                if (!row) {
+                    return;
+                }
+                const moduleId = row.dataset.module;
+                const profileName = row.dataset.name;
+                if (confirm(`Remove credential profile "${profileName}"?`)) {
+                    this.removeModuleCredential(moduleId, profileName);
+                }
+            });
+        });
+    }
+
+    fillModuleCredentialForm(moduleId, profile) {
+        const moduleSelect = document.getElementById('moduleCredModule');
+        const nameInput = document.getElementById('moduleCredName');
+        const userInput = document.getElementById('moduleCredUsername');
+        const passInput = document.getElementById('moduleCredPassword');
+        if (moduleSelect) moduleSelect.value = moduleId || '';
+        if (nameInput) nameInput.value = profile.name || '';
+        if (userInput) userInput.value = profile.username || '';
+        if (passInput) passInput.value = profile.password || '';
+    }
+
+    clearModuleCredentialForm() {
+        const nameInput = document.getElementById('moduleCredName');
+        const userInput = document.getElementById('moduleCredUsername');
+        const passInput = document.getElementById('moduleCredPassword');
+        if (nameInput) nameInput.value = '';
+        if (userInput) userInput.value = '';
+        if (passInput) passInput.value = '';
+    }
+
+    saveModuleCredential() {
+        const moduleSelect = document.getElementById('moduleCredModule');
+        const nameInput = document.getElementById('moduleCredName');
+        const userInput = document.getElementById('moduleCredUsername');
+        const passInput = document.getElementById('moduleCredPassword');
+        if (!moduleSelect || !nameInput || !userInput || !passInput) {
+            return;
+        }
+        const moduleId = moduleSelect.value;
+        const name = nameInput.value.trim();
+        const username = userInput.value.trim();
+        const password = passInput.value || '';
+        if (!moduleId || !name || !username || !password) {
+            this.showError('Module, profile name, username, and password are required');
+            return;
+        }
+        const profiles = this.getModuleCredentialProfiles(moduleId);
+        const existingIndex = profiles.findIndex(profile => profile.name === name);
+        const entry = { name, username, password };
+        if (existingIndex >= 0) {
+            profiles[existingIndex] = entry;
+        } else {
+            profiles.push(entry);
+        }
+        this.moduleCredentials[moduleId] = profiles;
+        this.renderModuleCredentials();
+        this.showMessage(`Saved credential profile "${name}"`);
+        this.persistModuleCredentials();
+    }
+
+    removeModuleCredential(moduleId, profileName) {
+        if (!moduleId || !profileName) {
+            return;
+        }
+        const profiles = this.getModuleCredentialProfiles(moduleId).filter(profile => profile.name !== profileName);
+        this.moduleCredentials[moduleId] = profiles;
+        this.renderModuleCredentials();
+        this.persistModuleCredentials();
+    }
+
+    async persistModuleCredentials() {
+        if (this.currentUserRole !== 'admin') {
+            return;
+        }
+        try {
+            const response = await fetch('/api/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ module_credentials: this.moduleCredentials || {} })
+            });
+            if (!response.ok) {
+                throw new Error('Failed to save module credentials');
+            }
+            const updated = await response.json();
+            if (updated && updated.module_credentials) {
+                this.moduleCredentials = updated.module_credentials;
+            }
+        } catch (error) {
+            console.error('Error saving module credentials:', error);
+            this.showError('Failed to save module credentials');
         }
     }
 
@@ -3272,8 +4484,17 @@ selectSite(siteName) {
     const activeTab = document.getElementById(`${tabName}Tab`);
     if (activeTab) {
         activeTab.classList.add('active');
-        document.getElementById('pageTitle').textContent = 
-            tabName.charAt(0).toUpperCase() + tabName.slice(1);
+        const titleMap = {
+            topology: 'Module Scheduler',
+            dashboard: 'Dashboard',
+            sites: 'Sites',
+            devices: 'Devices',
+            map: 'Map',
+            monitoring: 'Monitoring',
+            settings: 'Settings'
+        };
+        document.getElementById('pageTitle').textContent =
+            titleMap[tabName] || (tabName.charAt(0).toUpperCase() + tabName.slice(1));
     }
     
     this.currentTab = tabName;
@@ -3293,6 +4514,7 @@ selectSite(siteName) {
         document.querySelectorAll('.modal').forEach(modal => {
             modal.classList.remove('active');
         });
+        this.scheduleModuleEditRow = null;
     }
 
     showLoading(show) {
@@ -3341,6 +4563,12 @@ selectSite(siteName) {
                 this.updateModuleJobs();
             }
         }, 2000);
+
+        setInterval(() => {
+            if (this.currentTab === 'topology') {
+                this.refreshSchedules();
+            }
+        }, 10000);
         
         // Auto-refresh if enabled
         if (this.settings.auto_refresh) {

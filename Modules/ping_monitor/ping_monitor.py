@@ -8,6 +8,7 @@ Pings each device in the selected site for ~5 seconds and updates monitoring.db.
 from __future__ import annotations
 
 import json
+import portalocker
 import os
 import subprocess
 import sys
@@ -16,14 +17,14 @@ from typing import Dict, Any, Tuple
 
 
 def _load_json(path: str) -> Dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as f:
+    with portalocker.Lock(path, "r", timeout=5, encoding="utf-8") as f:
         return json.load(f)
 
 
 def _write_json(path: str, data: Dict[str, Any]) -> None:
     data.setdefault("meta", {})
     data["meta"]["last_modified"] = datetime.now().isoformat()
-    with open(path, "w", encoding="utf-8") as f:
+    with portalocker.Lock(path, "w", timeout=5, encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
 

@@ -25,7 +25,7 @@
       "type": "select",
       "required": true,
       "default": "switch",
-      "options": ["switch", "router", "firewall", "ap", "server", "pc", "printer", "camera", "other"],
+      "options": ["switch", "router", "firewall", "ap", "server", "nvr", "pc", "printer", "camera", "other"],
       "label": "Device Type"
     },
     {

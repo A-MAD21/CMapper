@@ -1,0 +1,58 @@
+{
+  "id": "export_devices",
+  "name": "Export Devices",
+  "version": "1.0",
+  "description": "Export devices to CSV with flexible filters (type, IP range, name/vendor).",
+  "author": "System",
+  "entry_point": "export_devices.py",
+  "inputs": [
+    {
+      "name": "site_scope",
+      "type": "select",
+      "required": false,
+      "default": "current",
+      "options": ["current", "all"],
+      "label": "Site Scope",
+      "description": "Export only the selected site or all sites."
+    },
+    {
+      "name": "device_types",
+      "type": "text",
+      "required": false,
+      "label": "Device Types (comma-separated)",
+      "placeholder": "pc, server, switch"
+    },
+    {
+      "name": "ip_range",
+      "type": "text",
+      "required": false,
+      "label": "IP Range (optional)",
+      "placeholder": "10.192.86.128/25 or 10.192.86.1-10.192.86.254"
+    },
+    {
+      "name": "name_contains",
+      "type": "text",
+      "required": false,
+      "label": "Name Contains (optional)"
+    },
+    {
+      "name": "vendor_contains",
+      "type": "text",
+      "required": false,
+      "label": "Vendor Contains (optional)"
+    },
+    {
+      "name": "platform_contains",
+      "type": "text",
+      "required": false,
+      "label": "Platform Contains (optional)"
+    },
+    {
+      "name": "filename",
+      "type": "text",
+      "required": false,
+      "label": "Filename (optional)",
+      "placeholder": "devices_export.csv"
+    }
+  ]
+}

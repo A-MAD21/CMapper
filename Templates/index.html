@@ -135,7 +135,7 @@
                     </li>
                     <li class="nav-item" data-tab="topology">
                         <i data-feather="share-2"></i>
-                        <span>Topology</span>
+                        <span>Module Scheduler</span>
                     </li>
                     <li class="nav-item" data-tab="map">
                         <i data-feather="map"></i>
@@ -249,16 +249,39 @@
             <div class="tab-content" id="devicesTab">
                 <div class="card">
                     <div class="card-header">
-                        <h2>Devices</h2>
+                        <div style="display: flex; align-items: baseline; gap: 12px;">
+                            <h2>Devices</h2>
+                            <span id="deviceCountLabel" style="color: var(--text-secondary); font-size: 14px;">0 devices</span>
+                        </div>
                         <div class="header-actions">
                             <div class="site-selector">
                                 <select id="deviceSiteFilter">
                                     <option value="">All Sites</option>
                                 </select>
                             </div>
+                            <button class="btn btn-primary" id="exportDevicesBtn">
+                                <i data-feather="download"></i>
+                                Export Devices
+                            </button>
                             <button class="btn btn-secondary" id="deleteSelectedDevicesBtn" disabled>
                                 <i data-feather="trash-2"></i>
                                 Remove Selected
+                            </button>
+                            <button class="btn btn-secondary" id="deleteCatchedDevicesBtn">
+                                <i data-feather="slash"></i>
+                                Delete Catched
+                            </button>
+                            <button class="btn btn-secondary" id="enforceOuiBtn">
+                                <i data-feather="tag"></i>
+                                Enforce OUI
+                            </button>
+                            <button class="btn btn-secondary" id="mikrotikDiscoveryBtn">
+                                <i data-feather="wifi"></i>
+                                MikroTik Discovery
+                            </button>
+                            <button class="btn btn-secondary" id="addDeviceModuleBtn">
+                                <i data-feather="plus-circle"></i>
+                                Add Device
                             </button>
                         </div>
                     </div>
@@ -285,11 +308,138 @@
                             </tbody>
                         </table>
                     </div>
+                    <div class="table-footer">
+                        <div class="table-footer-left">
+                            <span id="devicesPageInfo">Page 1 of 1</span>
+                        </div>
+                        <div class="table-footer-right">
+                            <label class="table-footer-label" for="devicesPageSize">Rows</label>
+                            <select id="devicesPageSize">
+                                <option value="25">25</option>
+                                <option value="50" selected>50</option>
+                                <option value="100">100</option>
+                                <option value="250">250</option>
+                            </select>
+                            <button class="btn btn-secondary" type="button" id="devicesPagePrev">Prev</button>
+                            <button class="btn btn-secondary" type="button" id="devicesPageNext">Next</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Topology Tab -->
             <div class="tab-content" id="topologyTab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Schedule Manager</h2>
+                        <div class="header-actions">
+                            <button class="btn btn-secondary" id="clearScheduleBtn">
+                                <i data-feather="x-circle"></i>
+                                Clear
+                            </button>
+                            <button class="btn btn-primary" id="saveScheduleBtn">
+                                <i data-feather="save"></i>
+                                Save Schedule
+                            </button>
+                        </div>
+                    </div>
+                    <div class="schedule-form-grid">
+                        <div class="form-group">
+                            <label for="scheduleName">Schedule Name</label>
+                            <input type="text" id="scheduleName" placeholder="e.g., Nightly discovery">
+                        </div>
+                        <div class="form-group">
+                            <label for="scheduleEnabled">Enabled</label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="scheduleEnabled" checked>
+                                <span>Active</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="scheduleSiteScope">Site Scope</label>
+                            <select id="scheduleSiteScope">
+                                <option value="selected">Selected sites</option>
+                                <option value="all">All sites (global)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Sites</label>
+                            <div class="multi-select" id="scheduleSitesSelect">
+                                <button class="btn btn-secondary multi-select-toggle" type="button">
+                                    <span>Select sites</span>
+                                    <i data-feather="chevron-down"></i>
+                                </button>
+                                <div class="multi-select-panel"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="scheduleRunMode">Site Run Mode</label>
+                            <select id="scheduleRunMode">
+                                <option value="sequential">Sequential per site</option>
+                                <option value="concurrent">Concurrent across sites</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="scheduleDelaySeconds">Delay Between Modules (sec)</label>
+                            <input type="number" id="scheduleDelaySeconds" min="0" value="30">
+                        </div>
+                        <div class="form-group">
+                            <label for="scheduleRepeatMinutes">Repeat Interval After Finish (min)</label>
+                            <input type="number" id="scheduleRepeatMinutes" min="1" value="60">
+                        </div>
+                    </div>
+                    <div class="schedule-modules">
+                        <div class="card-header" style="padding: 0 0 12px;">
+                            <h3>Module Order</h3>
+                            <button class="btn btn-secondary" id="addScheduleModuleBtn">
+                                <i data-feather="plus"></i>
+                                Add Module
+                            </button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 60px;">Order</th>
+                                        <th>Module</th>
+                                        <th>Credential Profile</th>
+                                        <th>Configuration</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scheduleModulesBody">
+                                    <!-- Module order rows injected here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Schedules</h2>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Sites</th>
+                                    <th>Modules</th>
+                                    <th>Delay</th>
+                                    <th>Repeat</th>
+                                    <th>Status</th>
+                                    <th>Next Run</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scheduleListBody">
+                                <!-- Schedule list injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header">
                         <h2>Discovery Modules</h2>
@@ -554,6 +704,53 @@
                             </div>
                             <p style="color: var(--text-secondary); font-size: 0.9em;">
                                 Export/import includes devices, settings, and monitoring data (ZIP).
+                            </p>
+                        </div>
+                        <div id="moduleCredentialsSection" style="margin-top: 12px;">
+                            <div class="form-group">
+                                <h3>Module Credentials</h3>
+                            </div>
+                            <div class="form-group" style="display: grid; grid-template-columns: 1.1fr 1fr 1fr 1fr auto auto; gap: 10px; align-items: end;">
+                                <div>
+                                    <label for="moduleCredModule">Module</label>
+                                    <select id="moduleCredModule"></select>
+                                </div>
+                                <div>
+                                    <label for="moduleCredName">Profile Name</label>
+                                    <input type="text" id="moduleCredName" placeholder="ubiqadmin">
+                                </div>
+                                <div>
+                                    <label for="moduleCredUsername">Username</label>
+                                    <input type="text" id="moduleCredUsername" placeholder="admin">
+                                </div>
+                                <div>
+                                    <label for="moduleCredPassword">Password</label>
+                                    <input type="password" id="moduleCredPassword" placeholder="••••••••">
+                                </div>
+                                <button class="btn btn-primary" type="button" id="moduleCredSaveBtn">
+                                    Save
+                                </button>
+                                <button class="btn btn-secondary" type="button" id="moduleCredClearBtn">
+                                    Clear
+                                </button>
+                            </div>
+                            <div class="table-container" style="margin-top: 12px;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Module</th>
+                                            <th>Profile</th>
+                                            <th>Username</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="moduleCredsTableBody">
+                                        <!-- Module credentials go here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p style="color: var(--text-secondary); font-size: 0.9em;">
+                                Saved profiles appear in module dropdowns for quick selection.
                             </p>
                         </div>
                         <div id="ouiRangesSection" style="margin-top: 12px;">
@@ -821,6 +1018,27 @@
                 </div>
             </div>
 
+            <!-- Schedule Module Config Modal -->
+            <div class="modal" id="scheduleModuleModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="scheduleModuleTitle">Configure Module</h3>
+                        <button class="btn-icon close-modal">
+                            <i data-feather="x"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="scheduleModuleFormContainer">
+                            <!-- Schedule module form will be generated here -->
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary close-modal">Cancel</button>
+                        <button class="btn btn-primary" id="scheduleModuleSaveBtn">Save Module</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Edit OUI Modal -->
             <div class="modal" id="editOuiModal">
                 <div class="modal-content">
@@ -838,6 +1056,26 @@
                         <div class="form-group">
                             <label for="editDeviceOuiLabel">OUI Label</label>
                             <input type="text" id="editDeviceOuiLabel" placeholder="Ubiquiti, MikroTik">
+                        </div>
+                        <div class="form-group">
+                            <label for="editDeviceOuiType">OUI Device Type</label>
+                            <select id="editDeviceOuiType">
+                                <option value="">Select type</option>
+                                <option value="router">Router</option>
+                                <option value="switch">Switch</option>
+                                <option value="firewall">Firewall</option>
+                                <option value="ap">AP</option>
+                                <option value="server">Server</option>
+                                <option value="nvr">NVR</option>
+                                <option value="pda">PDA</option>
+                                <option value="host">Host</option>
+                                <option value="phone">Phone</option>
+                                <option value="camera">Camera</option>
+                                <option value="printer">Printer</option>
+                                <option value="pc">PC</option>
+                                <option value="unknown">Unknown</option>
+                                <option value="other">Other</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="editDeviceOuiStart">OUI Range Start</label>

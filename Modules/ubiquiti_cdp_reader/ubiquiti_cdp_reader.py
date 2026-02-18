@@ -9,6 +9,7 @@ with parent switch name/IP/port and VLAN. Overrides fields because CDP is author
 from __future__ import annotations
 
 import json
+import portalocker
 import os
 import re
 import sys
@@ -19,12 +20,12 @@ from typing import Dict, Any, Optional, Tuple
 
 
 def load_json(path: str) -> Dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as f:
+    with portalocker.Lock(path, "r", timeout=5, encoding="utf-8") as f:
         return json.load(f)
 
 
 def save_json(path: str, data: Dict[str, Any]) -> None:
-    with open(path, "w", encoding="utf-8") as f:
+    with portalocker.Lock(path, "w", timeout=5, encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
 
@@ -149,6 +150,51 @@ def parse_cdp(payload: bytes) -> Dict[str, Any]:
                         result["ip"] = ".".join(str(b) for b in addr)
                         break
         offset += l
+    return result
+
+
+def parse_cdp_text(output: str) -> Dict[str, Any]:
+    """
+    Parse CDP details from tcpdump -v text output (CDPv1/2 summary).
+    """
+    lines = output.splitlines()
+    start_idx = None
+    for idx, line in enumerate(lines):
+        if "CDPv" in line:
+            start_idx = idx
+    if start_idx is None:
+        return {}
+    details: list[str] = []
+    for line in lines[start_idx + 1:]:
+        if re.match(r"^\d{2}:\d{2}:\d{2}\.", line):
+            break
+        if line.startswith("tcpdump:") or line.startswith("START ") or line.startswith("END "):
+            break
+        if "DTPv" in line:
+            break
+        details.append(line.strip())
+    if not details:
+        return {}
+    payload = "\n".join(details)
+    result: Dict[str, Any] = {}
+    match = re.search(r"Device-ID .*?:\s*'([^']+)'", payload)
+    if match:
+        result["device_id"] = match.group(1).strip()
+    match = re.search(r"Platform .*?:\s*'([^']+)'", payload)
+    if match:
+        result["platform"] = match.group(1).strip()
+    match = re.search(r"Port-ID .*?:\s*'([^']+)'", payload)
+    if match:
+        result["port_id"] = match.group(1).strip()
+    match = re.search(r"Address .*?:\s*IPv4 \\(1\\) ([0-9.]+)", payload)
+    if match:
+        result["ip"] = match.group(1).strip()
+    match = re.search(r"Native VLAN ID .*?:\\s*([0-9]+)", payload)
+    if match:
+        try:
+            result["vlan"] = int(match.group(1))
+        except ValueError:
+            pass
     return result
 
 
@@ -440,13 +486,36 @@ def main() -> None:
         output = out + "\n" + err
         if trace_output:
             _append_log(log_file, f"RAW {host}:\n{output[:2000]}")
-        if "pid CDP" not in output:
+        if "pid CDP" not in output and "CDPv" not in output:
             if trace_output:
                 _append_log(log_file, f"PARSE FAIL {host} ({name}): no CDP packet")
             return name, host, False, "no_cdp_packet"
 
         blocks = extract_hex_blocks(output)
         if not blocks:
+            cdp = parse_cdp_text(output)
+            if cdp:
+                dev["parent_switch_name"] = cdp.get("device_id") or dev.get("parent_switch_name")
+                dev["parent_switch_ip"] = cdp.get("ip") or dev.get("parent_switch_ip")
+                port_id = cdp.get("port_id") or dev.get("parent_switch_port")
+                dev["parent_switch_port"] = port_id
+                if "vlan" in cdp:
+                    dev["vlan"] = str(cdp["vlan"])
+                if cdp.get("platform"):
+                    dev["parent_switch_platform"] = cdp.get("platform")
+                switch_device = _find_or_create_switch(data, site_name, cdp, now, override_existing)
+                if switch_device:
+                    _upsert_connection(dev, switch_device["id"], interface, port_id or "", now)
+                dev["last_modified"] = now
+                if trace_output:
+                    _append_log(log_file, f"PARSED {host}: {cdp}")
+                else:
+                    port_display = short_port(port_id)
+                    _append_log(
+                        log_file,
+                        f"FOUND {name} ({host}) -> switch={cdp.get('device_id')} port={port_display} vlan={cdp.get('vlan')}"
+                    )
+                return name, host, True, "ok"
             if trace_output:
                 _append_log(log_file, f"PARSE FAIL {host} ({name}): no hex payload")
             return name, host, False, "no_hex"
@@ -456,6 +525,8 @@ def main() -> None:
             if parsed:
                 cdp = parsed
                 break
+        if not cdp:
+            cdp = parse_cdp_text(output)
         if not cdp:
             if trace_output:
                 _append_log(log_file, f"PARSE FAIL {host} ({name}): no CDP TLVs")

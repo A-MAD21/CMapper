@@ -7,10 +7,19 @@
   "entry_point": "mikrotik_mac_discovery.py",
   "inputs": [
     {
+      "name": "router_device_id",
+      "type": "device_select",
+      "required": false,
+      "label": "Router Device (optional)",
+      "description": "Select a MikroTik/router device from this site.",
+      "device_types": ["server"],
+      "device_name_contains": ["mikrotik"]
+    },
+    {
       "name": "router_ip",
       "type": "text",
-      "required": true,
-      "label": "Router IP",
+      "required": false,
+      "label": "Router IP (optional)",
       "placeholder": "192.168.88.1",
       "description": "Reachable IP of the MikroTik RouterOS device."
     },
@@ -42,7 +51,25 @@
       "required": false,
       "label": "Address Range (optional)",
       "placeholder": "10.192.111.1-10.192.111.254",
-      "description": "IP range for ip-scan (e.g., 10.0.0.1-10.0.0.254)."
+      "description": "IP range for ip-scan (e.g., 10.0.0.1-10.0.0.254). Leave blank to use the router interface subnet."
+    },
+    {
+      "name": "use_dhcp_hostname",
+      "type": "select",
+      "required": false,
+      "default": "true",
+      "options": ["false", "true"],
+      "label": "Use DHCP Hostname",
+      "description": "If enabled, use DHCP lease hostnames when available (replaces truncated NETBIOS)."
+    },
+    {
+      "name": "catch_ip_thieves",
+      "type": "checkbox",
+      "required": false,
+      "default": false,
+      "label": "Catch IP Thieves",
+      "description": "If enabled, prefix names with Catched- when an IP appears in scan but the client is not active in DHCP leases (applies to PC/PDA/unknown).",
+      "info": "Marks PC/PDA/unknown devices seen in IP scan with no active DHCP lease. Uses scan name and prefixes with Catched-."
     },
     {
       "name": "scan_duration_s",

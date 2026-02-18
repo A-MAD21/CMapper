@@ -267,6 +267,31 @@ body {
     margin-bottom: 24px;
 }
 
+#settingsTab .card {
+    overflow: visible;
+}
+
+#moduleCredentialsSection {
+    position: relative;
+    z-index: 2;
+}
+
+#moduleCredentialsSection select {
+    position: relative;
+    z-index: 3;
+}
+
+#settingsTab {
+    position: relative;
+    z-index: 2;
+    overflow: visible;
+}
+
+#settingsTab .table-container {
+    position: relative;
+    z-index: 1;
+}
+
 .card-header {
     display: flex;
     justify-content: space-between;
@@ -333,6 +358,39 @@ body {
 .table-container {
     overflow-x: auto;
     padding: 0 24px 24px;
+}
+
+.table-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 24px 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.table-footer-left {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.table-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.table-footer-right select {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-primary);
+}
+
+.table-footer-label {
+    font-size: 12px;
+    color: var(--text-secondary);
 }
 
 .data-table {
@@ -420,6 +478,42 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 16px;
+}
+
+.schedule-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px 20px;
+    margin-top: 12px;
+}
+
+.schedule-modules {
+    margin-top: 18px;
+}
+
+.info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-left: 8px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: help;
+}
+
+.info-icon:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.multi-select.is-disabled {
+    opacity: 0.6;
+    pointer-events: none;
 }
 
 .module-card {

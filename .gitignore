@@ -1,0 +1,15 @@
+# Generated maps and logs
+generated_maps/
+logs/
+*.log
+
+# Module runtime artifacts
+module_log_*.txt
+module_config_*.json
+
+# Corrupt DB backups
+*.corrupt.*
+
+# Python caches
+__pycache__/
+*.pyc

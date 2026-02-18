@@ -5,6 +5,7 @@ This shows exactly how to write modules for the platform
 """
 
 import json
+import portalocker
 import sys
 import os
 from datetime import datetime
@@ -40,7 +41,7 @@ def main():
     db_path = config.get("database_path", "database.json")
     
     try:
-        with open(db_path, 'r') as f:
+        with portalocker.Lock(db_path, 'r', timeout=5, encoding='utf-8') as f:
             database = json.load(f)
     except Exception as e:
         print(json.dumps({
@@ -90,7 +91,7 @@ def main():
         }))
         sys.exit(1)
     
-    # 6. Check for duplicate device (same IP or name in same site)
+    # 6. Check for duplicate device (same IP or MAC in same site)
     for device in database.get("devices", []):
         if device.get("site") != site_name:
             continue
@@ -100,9 +101,11 @@ def main():
                 "status": "failed"
             }))
             sys.exit(1)
-        if device.get("name") == name:
+        existing_mac = (device.get("mac") or "").strip().lower()
+        incoming_mac = (params.get("mac") or "").strip().lower()
+        if incoming_mac and existing_mac and existing_mac == incoming_mac:
             print(json.dumps({
-                "error": f"Device named '{name}' already exists in site {site_name}",
+                "error": f"Device with MAC {params.get('mac')} already exists in site {site_name}",
                 "status": "failed"
             }))
             sys.exit(1)
@@ -118,6 +121,7 @@ def main():
         "platform": platform,
         "vendor": vendor,
         "os": os_name,
+        "mac": params.get("mac", "").strip(),
         "discovered_by": "manual",
         "discovered_at": datetime.now().isoformat(),
         "last_seen": datetime.now().isoformat(),
@@ -271,7 +275,7 @@ def main():
     
     # 9. Write back to database
     try:
-        with open(db_path, 'w') as f:
+        with portalocker.Lock(db_path, 'w', timeout=5, encoding='utf-8') as f:
             json.dump(database, f, indent=2)
     except Exception as e:
         print(json.dumps({

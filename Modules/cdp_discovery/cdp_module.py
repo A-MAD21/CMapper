@@ -5,6 +5,7 @@ Uses Netmiko (best) or paramiko for SSH, falls back to telnet
 """
 
 import json
+import portalocker
 import sys
 import os
 import re
@@ -436,7 +437,7 @@ def main():
     
     # 4. Read current database
     try:
-        with open(db_path, 'r') as f:
+        with portalocker.Lock(db_path, 'r', timeout=5, encoding='utf-8') as f:
             database = json.load(f)
         print(f"DEBUG: Database loaded, has {len(database.get('devices', []))} devices", file=sys.stderr)
     except Exception as e:
@@ -672,7 +673,7 @@ def main():
     
     # 8. Write updated database
     try:
-        with open(db_path, 'w') as f:
+        with portalocker.Lock(db_path, 'w', timeout=5, encoding='utf-8') as f:
             json.dump(database, f, indent=2)
         print(f"DEBUG: Database updated successfully", file=sys.stderr)
         

@@ -199,4 +199,26 @@ Updated config:
 
 ---
 
+## 12) OUI Table Format (changed)
+- `Modules/mikrotik_mac_discovery/oui_ranges.txt` now supports device type inline:
+  - `AA:BB:CC:00:00:00-AA:BB:CC:FF:FF:FF=Vendor,device_type=ap`
+- This replaces the old separate `oui_device_types.txt` mapping (no longer used by Enforce OUI).
+- UI "Edit OUI" now has a dropdown for device type and writes the `device_type=` into the same line.
+- Mikrotik MAC discovery and Enforce OUI both parse the label before the comma and optional device_type.
+
+---
+
+## 13) Uniview NVR Packet Capture Module
+- New module: `Modules/uniview_nvr_capture/` (uses Digest auth via `requests`).
+- UI is a device table listing NVRs (pre-selected) + NIC (1/2), packet size, IP/Port modes (all/specify/filter).
+- Captures for a fixed 30s internally, Start/Stop via:
+  - `PUT /LAPI/V1.1/Network/PacketCapture/Start`
+  - `PUT /LAPI/V1.1/Network/PacketCapture/Stop` (best-effort)
+  - Download: `GET /LAPI/V1.0/Network/PacketCapture/File/DownLoad`
+- Saves pcaps under `generated_maps/nvr_captures/`.
+- No CDP parsing yet; only capture/download.
+- Requires `requests` in `requirements.txt`.
+
+---
+
 This summary matches the current codebase in `D:\Net Automation\SW mapper\Test1\CMapper1`.
