@@ -16,6 +16,7 @@ import uuid
 import zipfile
 import io
 from datetime import datetime, timedelta
+import sqlite3
 import copy
 import portalocker 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -30,6 +31,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_FILE = os.path.join(BASE_DIR, "devices.db")
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
 MONITORING_FILE = os.path.join(BASE_DIR, "monitoring.db")
+SQLITE_DB_FILE = os.path.join(BASE_DIR, "cmapp.sqlite3")
 MONITORING_INTERVAL_SEC = 5
 MONITORING_LOCK = threading.Lock()
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
@@ -101,21 +103,126 @@ app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-change-me")
 # Ensure output directories exist
 os.makedirs(GENERATED_MAPS_DIR, exist_ok=True)
 
+def _get_sqlite_conn():
+    conn = sqlite3.connect(SQLITE_DB_FILE)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS json_store ("
+        "name TEXT PRIMARY KEY,"
+        "json TEXT NOT NULL,"
+        "updated_at TEXT NOT NULL)"
+    )
+    return conn
+
+def _read_sqlite_json(name: str):
+    try:
+        conn = _get_sqlite_conn()
+        cur = conn.execute("SELECT json FROM json_store WHERE name = ?", (name,))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return json.loads(row[0])
+    except Exception:
+        return None
+
+def _write_sqlite_json(name: str, data):
+    payload = json.dumps(data)
+    now = datetime.now().isoformat()
+    conn = _get_sqlite_conn()
+    conn.execute(
+        "INSERT INTO json_store (name, json, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(name) DO UPDATE SET json=excluded.json, updated_at=excluded.updated_at",
+        (name, payload, now)
+    )
+    conn.commit()
+    conn.close()
+
+def _read_json_file(path: str, default=None):
+    try:
+        if os.path.exists(path):
+            with portalocker.Lock(path, 'r', timeout=5, encoding='utf-8') as f:
+                return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError, portalocker.exceptions.LockException, PermissionError):
+        return default
+    return default
+
+def _write_json_file(path: str, data):
+    try:
+        with portalocker.Lock(path, 'w', timeout=5, encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass
+
+def _read_legacy_database_with_salvage():
+    def _cleanup_corrupt_backups():
+        cutoff = time.time() - (CORRUPT_RETENTION_DAYS * 86400)
+        try:
+            if not os.path.isdir(CORRUPT_DIR):
+                return
+            for name in os.listdir(CORRUPT_DIR):
+                path = os.path.join(CORRUPT_DIR, name)
+                if not os.path.isfile(path):
+                    continue
+                if os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+        except OSError:
+            pass
+
+    try:
+        if os.path.exists(DATABASE_FILE):
+            with portalocker.Lock(DATABASE_FILE, 'r', timeout=5, encoding='utf-8') as f:
+                return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        # Attempt salvage: keep the first JSON object if extra data was appended.
+        try:
+            with portalocker.Lock(DATABASE_FILE, 'r', timeout=5, encoding='utf-8') as f:
+                raw = f.read()
+            decoder = json.JSONDecoder()
+            data, _ = decoder.raw_decode(raw)
+            if isinstance(data, dict):
+                os.makedirs(CORRUPT_DIR, exist_ok=True)
+                backup = os.path.join(
+                    CORRUPT_DIR,
+                    f"devices.db.corrupt.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                )
+                try:
+                    os.replace(DATABASE_FILE, backup)
+                except OSError:
+                    pass
+                _cleanup_corrupt_backups()
+                _write_json_file(DATABASE_FILE, data)
+                return data
+        except Exception:
+            return None
+    except portalocker.exceptions.LockException:
+        return None
+    return None
+
+def _sync_sqlite_from_legacy_files():
+    legacy_db = _read_legacy_database_with_salvage()
+    if legacy_db is not None:
+        _write_sqlite_json("devices", legacy_db)
+    legacy_monitoring = _read_json_file(MONITORING_FILE, default=None)
+    if legacy_monitoring is not None:
+        _write_sqlite_json("monitoring", legacy_monitoring)
+    legacy_settings = _read_json_file(SETTINGS_FILE, default=None)
+    if legacy_settings is not None:
+        _write_sqlite_json("settings", legacy_settings)
+
 def init_database():
     """Initialize empty database if it doesn't exist"""
-    if not os.path.exists(DATABASE_FILE):
-        data = {
-            "version": "1.0",
-            "meta": {
-                "created": datetime.now().isoformat(),
-                "last_modified": datetime.now().isoformat()
-            },
-            "sites": [],
-            "devices": [],
-            "discovery_sessions": []
-        }
-        with open(DATABASE_FILE, 'w') as f:
-            json.dump(data, f, indent=2)
+    data = {
+        "version": "1.0",
+        "meta": {
+            "created": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat()
+        },
+        "sites": [],
+        "devices": [],
+        "discovery_sessions": []
+    }
+    _write_sqlite_json("devices", data)
+    _write_json_file(DATABASE_FILE, data)
 
 DEFAULT_SETTINGS = {
     "default_site": "",
@@ -132,12 +239,10 @@ DEFAULT_SETTINGS = {
 }
 
 def init_settings():
-
     """Initialize default settings"""
-    if not os.path.exists(SETTINGS_FILE):
-        settings = DEFAULT_SETTINGS.copy()
-        with open(SETTINGS_FILE, 'w') as f:
-            json.dump(settings, f, indent=2)
+    settings = DEFAULT_SETTINGS.copy()
+    _write_sqlite_json("settings", settings)
+    _write_json_file(SETTINGS_FILE, settings)
 
 DEFAULT_MONITORING_RULES_LIST = [
     {"id": "loss", "type": "loss", "threshold": 100, "enabled": True},
@@ -145,40 +250,35 @@ DEFAULT_MONITORING_RULES_LIST = [
 ]
 
 def init_monitoring():
-    if not os.path.exists(MONITORING_FILE):
-        data = {
-            "version": "1.0",
-            "meta": {
-                "created": datetime.now().isoformat(),
-                "last_modified": datetime.now().isoformat()
-            },
-            "sites": {}
-        }
-        with open(MONITORING_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2)
+    data = {
+        "version": "1.0",
+        "meta": {
+            "created": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat()
+        },
+        "sites": {}
+    }
+    _write_sqlite_json("monitoring", data)
+    _write_json_file(MONITORING_FILE, data)
     if not os.path.exists(LOGS_DIR):
         os.makedirs(LOGS_DIR, exist_ok=True)
 
 def read_monitoring():
-    try:
-        if os.path.exists(MONITORING_FILE):
-            with portalocker.Lock(MONITORING_FILE, 'r', timeout=2, encoding='utf-8') as f:
-                return json.load(f)
-        init_monitoring()
-        return read_monitoring()
-    except (json.JSONDecodeError, FileNotFoundError):
-        init_monitoring()
-        return read_monitoring()
-    except PermissionError:
-        return {"version": "1.0", "meta": {"last_modified": datetime.now().isoformat()}, "sites": {}}
-    except portalocker.exceptions.LockException:
-        return {"version": "1.0", "meta": {"last_modified": datetime.now().isoformat()}, "sites": {}}
+    data = _read_sqlite_json("monitoring")
+    if data is not None:
+        return data
+    legacy = _read_json_file(MONITORING_FILE, default=None)
+    if legacy is not None:
+        _write_sqlite_json("monitoring", legacy)
+        return legacy
+    init_monitoring()
+    return _read_sqlite_json("monitoring") or {"version": "1.0", "meta": {"last_modified": datetime.now().isoformat()}, "sites": {}}
 
 def write_monitoring(data):
     data.setdefault("meta", {})
     data["meta"]["last_modified"] = datetime.now().isoformat()
-    with portalocker.Lock(MONITORING_FILE, 'w', timeout=2, encoding='utf-8') as f:
-        json.dump(data, f, indent=2)
+    _write_sqlite_json("monitoring", data)
+    _write_json_file(MONITORING_FILE, data)
 
 def _safe_log_name(site_name):
     safe = _safe_site_name(site_name)
@@ -288,101 +388,61 @@ def _log_perf(label, start_time):
     print(f"[PERF] {label} took {duration:.2f}s")
 
 def read_database():
-    """Read database.json.
-
-    If the file is missing or invalid, an empty database will be created.
-    """
-    def _cleanup_corrupt_backups():
-        cutoff = time.time() - (CORRUPT_RETENTION_DAYS * 86400)
-        try:
-            if not os.path.isdir(CORRUPT_DIR):
-                return
-            for name in os.listdir(CORRUPT_DIR):
-                path = os.path.join(CORRUPT_DIR, name)
-                if not os.path.isfile(path):
-                    continue
-                if os.path.getmtime(path) < cutoff:
-                    os.remove(path)
-        except OSError:
-            pass
-
-    try:
-        if os.path.exists(DATABASE_FILE):
-            with portalocker.Lock(DATABASE_FILE, 'r', timeout=5, encoding='utf-8') as f:
-                return json.load(f)
-
-        init_database()
-        return read_database()
-
-    except (json.JSONDecodeError, FileNotFoundError):
-        # Attempt salvage: keep the first JSON object if extra data was appended.
-        try:
-            with portalocker.Lock(DATABASE_FILE, 'r', timeout=5, encoding='utf-8') as f:
-                raw = f.read()
-            decoder = json.JSONDecoder()
-            data, idx = decoder.raw_decode(raw)
-            if isinstance(data, dict):
-                os.makedirs(CORRUPT_DIR, exist_ok=True)
-                backup = os.path.join(
-                    CORRUPT_DIR,
-                    f"devices.db.corrupt.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                )
-                try:
-                    os.replace(DATABASE_FILE, backup)
-                except OSError:
-                    pass
-                _cleanup_corrupt_backups()
-                with portalocker.Lock(DATABASE_FILE, 'w', timeout=5, encoding='utf-8') as f:
-                    json.dump(data, f, indent=2)
-                return data
-        except Exception:
-            pass
-        init_database()
-        return read_database()
+    """Read database (SQLite-backed with JSON fallback)."""
+    data = _read_sqlite_json("devices")
+    if data is not None:
+        return data
+    legacy = _read_legacy_database_with_salvage()
+    if legacy is not None:
+        _write_sqlite_json("devices", legacy)
+        return legacy
+    init_database()
+    return _read_sqlite_json("devices") or {
+        "version": "1.0",
+        "meta": {"created": datetime.now().isoformat(), "last_modified": datetime.now().isoformat()},
+        "sites": [],
+        "devices": [],
+        "discovery_sessions": []
+    }
 
 
 def write_database(data):
     """Write database"""
     try:
-        with portalocker.Lock(DATABASE_FILE, 'w', timeout=5, encoding='utf-8') as f:
-            json.dump(data, f, indent=2)
+        _write_sqlite_json("devices", data)
+        _write_json_file(DATABASE_FILE, data)
         return True
     except Exception as e:
         print(f"Error writing database: {e}", file=sys.stderr)
         return False
 
 def read_settings():
-    """Read settings.json (merging in defaults for backwards/forwards compatibility)."""
-    try:
-        if os.path.exists(SETTINGS_FILE):
-            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                loaded = json.load(f) or {}
+    """Read settings (SQLite-backed with JSON fallback)."""
+    loaded = _read_sqlite_json("settings")
+    if loaded is None:
+        legacy = _read_json_file(SETTINGS_FILE, default=None)
+        if legacy is not None:
+            loaded = legacy
+            _write_sqlite_json("settings", legacy)
         else:
             init_settings()
-            return read_settings()
+            loaded = _read_sqlite_json("settings") or {}
 
-        merged = DEFAULT_SETTINGS.copy()
-        if isinstance(loaded, dict):
-            merged.update(loaded)
+    merged = DEFAULT_SETTINGS.copy()
+    if isinstance(loaded, dict):
+        merged.update(loaded)
 
-        if merged != loaded:
-            try:
-                with open(SETTINGS_FILE, 'w', encoding='utf-8') as wf:
-                    json.dump(merged, wf, indent=2)
-            except Exception:
-                pass
+    if merged != loaded:
+        _write_sqlite_json("settings", merged)
+        _write_json_file(SETTINGS_FILE, merged)
 
-        return merged
-
-    except (json.JSONDecodeError, FileNotFoundError):
-        init_settings()
-        return read_settings()
+    return merged
 
 
 def write_settings(settings):
     """Write settings file"""
-    with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=2)
+    _write_sqlite_json("settings", settings)
+    _write_json_file(SETTINGS_FILE, settings)
 
 def read_oui_ranges():
     if not os.path.exists(OUI_RANGES_FILE):
@@ -874,6 +934,12 @@ class ModuleRunner:
                         self.running_modules[thread_id]["status"] = "completed"
                         self.running_modules[thread_id]["progress"] = 100
                         self.running_modules[thread_id]["completed_at"] = datetime.now().isoformat()
+
+                # Sync SQLite from legacy JSON files after module writes
+                try:
+                    _sync_sqlite_from_legacy_files()
+                except Exception:
+                    pass
                 
                 # Clean up temp config file
                 try:
@@ -2178,6 +2244,7 @@ def export_data():
         "devices.db": DATABASE_FILE,
         "settings.json": SETTINGS_FILE,
         "monitoring.db": MONITORING_FILE,
+        "cmapp.sqlite3": SQLITE_DB_FILE,
     }
 
     buf = io.BytesIO()
@@ -2215,15 +2282,25 @@ def import_data():
                 'devices.db': DATABASE_FILE,
                 'settings.json': SETTINGS_FILE,
                 'monitoring.db': MONITORING_FILE,
+                'cmapp.sqlite3': SQLITE_DB_FILE,
             }
+            imported_sqlite = False
             for name in zf.namelist():
                 if name in allowed:
                     target = allowed[name]
                     with zf.open(name) as src, open(target, 'wb') as dst:
                         dst.write(src.read())
-        init_settings()
-        init_database()
-        init_monitoring()
+                    if name == 'cmapp.sqlite3':
+                        imported_sqlite = True
+        if imported_sqlite:
+            return jsonify({"success": True})
+        _sync_sqlite_from_legacy_files()
+        if _read_sqlite_json("settings") is None:
+            init_settings()
+        if _read_sqlite_json("devices") is None:
+            init_database()
+        if _read_sqlite_json("monitoring") is None:
+            init_monitoring()
         return jsonify({"success": True})
     except zipfile.BadZipFile:
         return jsonify({"error": "invalid_zip"}), 400
