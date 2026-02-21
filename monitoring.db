@@ -2,7 +2,7 @@
   "version": "1.0",
   "meta": {
     "created": "2026-01-20T14:51:58.142052",
-    "last_modified": "2026-02-18T12:53:19.117856"
+    "last_modified": "2026-02-21T10:01:22.495418"
   },
   "sites": {
     "Hamedan - Dry -TEST": {
@@ -558,8 +558,8 @@
           ],
           "ip": "172.18.16.17",
           "packet_loss": 0,
-          "avg_latency_ms": 117,
-          "last_check": "2026-02-18T12:53:18.223343"
+          "avg_latency_ms": 137,
+          "last_check": "2026-02-21T10:01:21.268868"
         },
         "dev_b36fffe8": {
           "enabled": true,
@@ -576,8 +576,8 @@
           ],
           "ip": "172.18.16.13",
           "packet_loss": 0,
-          "avg_latency_ms": 96,
-          "last_check": "2026-02-18T12:53:18.223343"
+          "avg_latency_ms": 84,
+          "last_check": "2026-02-21T10:01:21.268868"
         },
         "dev_e0af63c9": {
           "enabled": true,
@@ -594,8 +594,8 @@
           ],
           "ip": "172.18.16.101",
           "packet_loss": 0,
-          "avg_latency_ms": 25,
-          "last_check": "2026-02-18T12:53:18.223343"
+          "avg_latency_ms": 103,
+          "last_check": "2026-02-21T10:01:21.268868"
         },
         "dev_92870125": {
           "enabled": true,
@@ -612,8 +612,8 @@
           ],
           "ip": "172.18.16.1",
           "packet_loss": 0,
-          "avg_latency_ms": 75,
-          "last_check": "2026-02-18T12:53:18.223343"
+          "avg_latency_ms": 67,
+          "last_check": "2026-02-21T10:01:21.268868"
         },
         "dev_432338af": {
           "enabled": true,
@@ -630,8 +630,8 @@
           ],
           "ip": "172.18.16.102",
           "packet_loss": 0,
-          "avg_latency_ms": 87,
-          "last_check": "2026-02-18T12:53:18.223343"
+          "avg_latency_ms": 83,
+          "last_check": "2026-02-21T10:01:21.268868"
         },
         "dev_582354f5": {
           "enabled": true,
@@ -648,8 +648,8 @@
           ],
           "ip": "172.18.16.14",
           "packet_loss": 0,
-          "avg_latency_ms": 31,
-          "last_check": "2026-02-18T12:53:18.223343"
+          "avg_latency_ms": 47,
+          "last_check": "2026-02-21T10:01:21.268868"
         },
         "dev_1a86c593": {
           "enabled": true,
@@ -666,8 +666,8 @@
           ],
           "ip": "172.18.16.15",
           "packet_loss": 0,
-          "avg_latency_ms": 77,
-          "last_check": "2026-02-18T12:53:18.223343"
+          "avg_latency_ms": 47,
+          "last_check": "2026-02-21T10:01:21.268868"
         },
         "dev_95a672f7": {
           "enabled": true,
@@ -684,8 +684,8 @@
           ],
           "ip": "172.18.16.16",
           "packet_loss": 0,
-          "avg_latency_ms": 68,
-          "last_check": "2026-02-18T12:53:18.223343"
+          "avg_latency_ms": 75,
+          "last_check": "2026-02-21T10:01:21.268868"
         },
         "dev_721b4ca6": {
           "enabled": true,
@@ -702,8 +702,8 @@
           ],
           "ip": "172.18.16.103",
           "packet_loss": 0,
-          "avg_latency_ms": 75,
-          "last_check": "2026-02-18T12:53:18.223343"
+          "avg_latency_ms": 46,
+          "last_check": "2026-02-21T10:01:21.268868"
         }
       },
       "rules": [
@@ -4577,6 +4577,34 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_468cf7528ec3_002_ahvaz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c074adc2e19e_002_ahvaz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_8aad2189f414_002_ahvaz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_06a7401148b8_002_ahvaz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -5395,6 +5423,13 @@
           "rules": []
         },
         "dev_mac_64cba3f37167_003_alborz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_9efc95da4b2f_003_alborz___dry": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -6440,6 +6475,55 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_64cba3f35471_004_apadana___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f941ff_004_apadana___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f940eb_004_apadana___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f94259_004_apadana___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_aeaf3210933c_004_apadana___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d896e52_004_apadana___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6a6b2c730bf0_004_apadana___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -6761,6 +6845,13 @@
           "rules": []
         },
         "dev_mac_569801a8e37c_005_babolsar___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d80e0bd_005_babolsar___cold": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -7943,6 +8034,1000 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_e4f14c60435c_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6af75_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_48ea63e724d5_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c60436e_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_48ea63e72360_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c604370_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c604364_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_48ea63e7239e_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_48ea63e72414_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b00a_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b007_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b02b_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b025_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b014_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b0ad_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b01d_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b4d2_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b4f2_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b4ac_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6affc_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905a0b80a_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6af62_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6af28_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b6af_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b5da_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b439_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b4d4_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b3a3_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6affa_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b43b_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b6ec_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b4be_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6cf17e02cbad_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b5cc_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b505_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b011_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b486_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b455_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b488_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b473_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b4dd_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b512_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b020_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6affb_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b096_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b035_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b199_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6afff_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c4790511c731_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c4790511c537_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b07d_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b6bf_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b034_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b033_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1a8_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b255_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b05c_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b27e_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b039_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b162_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1bb_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b032_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1cb_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b037_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b05a_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b08e_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1be_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b105_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b197_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b042_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b06d_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b2b2_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b237_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b19c_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1a3_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1a7_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b024_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6afed_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b6b8_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b013_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6aff5_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b01f_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b017_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b19a_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6afef_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b19b_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b3a8_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6afee_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1b2_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6aff4_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b302_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b3a5_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b655_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b696_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b5bd_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6aff2_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6af7c_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b548_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b010_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b6c2_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6af83_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1e9_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1b6_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1a4_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1d6_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b036_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905a0b81b_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905959f98_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b22b_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b66e_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905a0b80c_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905a0b7af_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b597_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b6e6_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b57d_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c4790595a04d_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b62a_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6af42_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b39e_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b56d_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b54b_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b590_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b3a1_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b56e_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b572_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b1a5_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905959ed0_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b018_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c4790595a00e_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905959f48_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6afe3_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b00f_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b6ef_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b060_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6cf17e02cbf8_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c6b51b_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905959f4c_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e4f14c604352_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_2c36f89179c1_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_108ccff61742_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_764907c894f2_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_da73ac08ed1a_007_hormozgan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -8896,6 +9981,13 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_529fbe81cf16_009_bushehr___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -9628,6 +10720,34 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_64cba3f30041_010_esfahan_west___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_508e49dafef7_010_esfahan_west___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f30289_010_esfahan_west___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_d65773e8e64a_010_esfahan_west___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -9907,6 +11027,13 @@
           "rules": []
         },
         "dev_mac_64cba3f5ace7_011_hamedan___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d896d79_011_hamedan___cold": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -10958,6 +12085,13 @@
           "rules": []
         },
         "dev_mac_64cba3f303b5_013_esfahan___east": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f3036f_013_esfahan___east": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -12259,6 +13393,20 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_f875a42a2e5d_015_kermanshah___cold___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_925228d62a94_015_kermanshah___cold___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -12921,6 +14069,125 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_00167f4f37cf_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_1078d2844d6b_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f42914_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0c236951331e_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f42985_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_00167f4f3889_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f42989_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0c2369512d98_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f70acf_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f4298a_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d896e6e_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f97c4c_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f428f7_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0c23695136a4_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f429cb_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0c23695137ae_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2815d_016_mashhad___dry__parsian_": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -12946,6 +14213,244 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_5087898edbe0_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c2c96c72_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_f492bfc919a8_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000830d3a4c0_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64d98983b9c0_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_f492bfc6a137_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_f492bfc69c48_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_40a8f01e7e70_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29e462ce_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_f0921c0af31e_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f6e2df_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f97868_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6cf17e01882a_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_00176111270f_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0c9d92859715_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b42e99738e2b_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f6e08f_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f94d85_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f94e85_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f429cc_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_309c23a56b29_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c074ad9322dc_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f70f51_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f42913_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f92f4c_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f429c9_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f4298f_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_3c7c3fb8f0a6_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f97891_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_f6be89405d8f_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f94e72_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_d45d64236524_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d896e7e_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_509839d0e455_017_mashhad___cold_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -12966,6 +14471,608 @@
     "018 Mashhad - Dry Ghadim": {
       "devices": {
         "dev_9b0b3b54": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_d8b190bcb2f0_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_204c9e7722c0_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_28c7cec65140_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_3c5ec3ccafc0_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_28c7cec68840_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_9c4e20d7a7c0_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_3c0e23d997c0_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_5cfc669ea7c0_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c292375ea_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_40a8f032b99c_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_fc15b492def8_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c2c96bbc_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c2c96b25_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c2c96b31_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c2c96e26_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c2c96f3a_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c239b028_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_48ea637ce24d_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6cf17e3e3b26_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c2c96e35_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c239bb87_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_18e829500340_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_48ea637ce251_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_48ea637ce239_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_48ea637ce24f_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_48ea637ce249_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0018ae60c4e7_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_48ea63804664_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7483c2c96c9d_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_48ea63804891_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c074ad935b18_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c074adc2dc53_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6cf17e99006c_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f300a9_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f97c55_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29c9d820_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_88d7f67e6bf9_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_1402ec319dec_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64d154853b62_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4c1154c0ee49_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4c1154c0ee23_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_f80dac759b45_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_18c04d18829e_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_e86a64b4d9e5_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f281b5_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc0f4_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d896e8c_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc116_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f70fc4_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f978bf_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6045cb6d18dc_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_04d9f5acb2d3_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_04d4c4f37391_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6045cb6d14fb_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc10b_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2821b_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0c23695136a0_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f281c1_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f97765_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905fdf4db_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_001761109e65_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f282c3_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0c2369513604_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f92fa0_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc11a_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_1831bf07fd98_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_249ad84742a5_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_ac220b74f656_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_18c04dde9b46_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4c1154c0f7df_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f281d9_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0c2369512d7c_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f6c34d_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2817d_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f70b8c_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc11b_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc10a_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc105_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0c236951310a_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f201f1_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f28193_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f2816f_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f281b7_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc108_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f281c7_018_mashhad___dry_ghadim": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f70c3b_018_mashhad___dry_ghadim": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -13362,6 +15469,27 @@
           "rules": []
         },
         "dev_mac_002406f42a58_019_urumieh___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f42f1b_019_urumieh___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0ea518f70b6a_019_urumieh___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47905c5410e_019_urumieh___cold": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -14051,6 +16179,34 @@
           "rules": []
         },
         "dev_mac_88d7f6c61021_020_urumieh___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_fc349718d001_020_urumieh___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f4a58d_020_urumieh___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6045cba90665_020_urumieh___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f4a595_020_urumieh___dry": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -14774,6 +16930,20 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_5e2370fe36df_021_qom___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_2282ea66eff6_021_qom___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -15011,6 +17181,55 @@
           "rules": []
         },
         "dev_mac_b4293d7fc2c0_023_rasht___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d67442c_023_rasht___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f2b5e2_023_rasht___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d674430_023_rasht___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d7fc354_023_rasht___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_5efb66c31af4_023_rasht___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b4293d896f54_023_rasht___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_9a6f11409ea8_023_rasht___cold": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -15752,6 +17971,27 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_20720d39033d_025_rasht___dry_new": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_20720d390345_025_rasht___dry_new": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_20720d390332_025_rasht___dry_new": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -16073,6 +18313,76 @@
           "rules": []
         },
         "dev_mac_64cba3f572f7_026_shiraz___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_001761106327_026_shiraz___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_96e5f04b4159_026_shiraz___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ad39_026_shiraz___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f571d9_026_shiraz___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ad31_026_shiraz___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f4a587_026_shiraz___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5ad40_026_shiraz___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f5acdf_026_shiraz___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_7cc2c63e42ca_026_shiraz___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c074ad932343_026_shiraz___cold": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -16915,6 +19225,13 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_fa4e8a41433a_027_shiraz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -17418,6 +19735,48 @@
           "rules": []
         },
         "dev_mac_64cba3fa279a_028_shoorabad___dry___jonob": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0017611275c1_028_shoorabad___dry___jonob": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_001761109ede_028_shoorabad___dry___jonob": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f942b0_028_shoorabad___dry___jonob": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f942b4_028_shoorabad___dry___jonob": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f94bc6_028_shoorabad___dry___jonob": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_80a5897feba5_028_shoorabad___dry___jonob": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -17973,6 +20332,69 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_1831bf07fe6c_029_shoorabad___dry___n": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4c1154c0ec61_029_shoorabad___dry___n": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4c1154c0e545_029_shoorabad___dry___n": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4c1154c0e1fc_029_shoorabad___dry___n": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_761f9be3f05f_029_shoorabad___dry___n": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4c1154c0dda2_029_shoorabad___dry___n": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_3af5017c9c7b_029_shoorabad___dry___n": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f79a3c_029_shoorabad___dry___n": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4c1154c0eb15_029_shoorabad___dry___n": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -18280,6 +20702,13 @@
           "rules": []
         },
         "dev_mac_b4293d830adc_030_tabriz___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_1831bf092f26_030_tabriz___cold": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -19017,6 +21446,741 @@
           "dock": "center",
           "last_status": null,
           "rules": []
+        },
+        "dev_mac_ec107b34abdd_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_002406f42f0b_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688638_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684404_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cc4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688634_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843dc_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_8813bffaddac_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688d04_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cf4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cb4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b2c_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d6468860c_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b38_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646885f4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cc8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843f4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688ce4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688b44_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843e8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688648_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cd8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b44_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646885f0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688630_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646885ec_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684ab0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843a8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688604_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d6468862c_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b58_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684390_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843d4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843d0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684428_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b50_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688c90_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688b30_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843e4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688ce8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684418_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684414_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688b38_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843ec_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684aec_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688608_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688ca4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b24_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843c8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_8813bffc9258_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684adc_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688b48_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cbc_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843c4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684410_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cdc_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688614_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843b4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cd4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684af0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688ce0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684ab8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688644_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688b28_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b18_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688c9c_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b30_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843ac_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684ae4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b3c_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843a0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843b8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d6468861c_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684ac8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688600_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688618_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cb0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646885f8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688658_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688640_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b28_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684420_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688ca8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_8813bffcafb0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cec_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b0c_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646885dc_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843cc_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688b2c_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b00_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cc0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684ac4_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688624_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29d71e12_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cac_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d646843c0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684b1c_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d6468864c_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684ac0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684acc_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64688cf0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684ae0_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c49f4c49c306_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b2ab6e442367_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_441d64684ae8_031_tabriz___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
         }
       },
       "rules": [
@@ -19064,14 +22228,21 @@
           "last_status": null,
           "rules": []
         },
-        "dev_mac_6c9989817040_032_shoorabad___tajhiz": {
+        "dev_mac_d0c789d03140_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
           "dock": "center",
           "last_status": null,
           "rules": []
         },
-        "dev_mac_c8f9f901d640_032_shoorabad___tajhiz": {
+        "dev_mac_10bd188fb6c0_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6c9989817040_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -19085,14 +22256,7 @@
           "last_status": null,
           "rules": []
         },
-        "dev_mac_d0c789d03140_032_shoorabad___tajhiz": {
-          "enabled": false,
-          "placed": false,
-          "dock": "center",
-          "last_status": null,
-          "rules": []
-        },
-        "dev_mac_10bd188fb6c0_032_shoorabad___tajhiz": {
+        "dev_mac_c8f9f901d640_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -19127,6 +22291,13 @@
           "last_status": null,
           "rules": []
         },
+        "dev_mac_c4790578d6fa_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
         "dev_mac_6cf17ee016a6_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
@@ -19135,13 +22306,6 @@
           "rules": []
         },
         "dev_mac_e4f14c60437b_032_shoorabad___tajhiz": {
-          "enabled": false,
-          "placed": false,
-          "dock": "center",
-          "last_status": null,
-          "rules": []
-        },
-        "dev_mac_c4790578d6fa_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -19162,14 +22326,14 @@
           "last_status": null,
           "rules": []
         },
-        "dev_mac_d8b370a9262d_032_shoorabad___tajhiz": {
+        "dev_mac_c074adc8ff38_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
           "dock": "center",
           "last_status": null,
           "rules": []
         },
-        "dev_mac_c47764e61f39_032_shoorabad___tajhiz": {
+        "dev_mac_d8b370a9262d_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -19197,13 +22361,6 @@
           "last_status": null,
           "rules": []
         },
-        "dev_mac_cc28aa340f0d_032_shoorabad___tajhiz": {
-          "enabled": false,
-          "placed": false,
-          "dock": "center",
-          "last_status": null,
-          "rules": []
-        },
         "dev_mac_249ad841987d_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
@@ -19218,7 +22375,14 @@
           "last_status": null,
           "rules": []
         },
-        "dev_mac_b42e9975263a_032_shoorabad___tajhiz": {
+        "dev_mac_f4e2c62649e9_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_cc28aa340f0d_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -19232,7 +22396,14 @@
           "last_status": null,
           "rules": []
         },
-        "dev_mac_f4e2c62649e9_032_shoorabad___tajhiz": {
+        "dev_mac_bc32b21f4ba1_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_b42e9975263a_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -19253,7 +22424,28 @@
           "last_status": null,
           "rules": []
         },
+        "dev_mac_d8b370a926fe_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
         "dev_mac_18c04d7d9e25_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_94524486cb81_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_c47764e61f39_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -19267,13 +22459,6 @@
           "last_status": null,
           "rules": []
         },
-        "dev_mac_d8b370a926fe_032_shoorabad___tajhiz": {
-          "enabled": false,
-          "placed": false,
-          "dock": "center",
-          "last_status": null,
-          "rules": []
-        },
         "dev_mac_f80dacd82390_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
@@ -19281,7 +22466,357 @@
           "last_status": null,
           "rules": []
         },
-        "dev_mac_c074adc8ff38_032_shoorabad___tajhiz": {
+        "dev_mac_c47295f458c2_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_6c9989817041_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29f7b5c1_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_74563ca6b52c_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_74563c16f109_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_d85ed356d456_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_0021b7bb799e_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29c741d6_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_30e17151bd3c_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_94188280a178_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_30e171538ab0_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_30e171586960_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29bd6dc8_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29483b29_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c295da30b_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29a8e2c3_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_9418827e39b4_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_30e17158f990_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29166dfa_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c297031c7_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29e88443_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29812fd7_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29c9fc1b_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c2932e5b0_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29b9682f_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29629112_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29ede36f_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29ea00ef_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29a62e74_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c2941ab2d_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_9418827cfa44_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_30e171535904_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_94188280153c_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_30e17151cd50_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_94188280113c_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29f1e92b_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_941882801898_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_30e17151bd18_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c294e1f75_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_9418827ee9a0_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_9418827ef434_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_30e17158857c_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_1c98ec214184_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_30e1715869ea_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_1402ec033806_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_30e17158694c_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_9418827ef81c_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_f403434670d6_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c2983fea0_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_9418827ea4ea_032_shoorabad___tajhiz": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_000c29aa44bf_032_shoorabad___tajhiz": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -19811,6 +23346,13 @@
           "rules": []
         },
         "dev_mac_b4293d7d5d6c_033_tehran_zafar___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_826624fe7091_033_tehran_zafar___cold": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -20620,6 +24162,20 @@
           "rules": []
         },
         "dev_mac_b4293d7d5d22_034_zahedan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4cedfb6b2a1c_034_zahedan___dry___cold": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_4c1154c0df91_034_zahedan___dry___cold": {
           "enabled": false,
           "placed": false,
           "dock": "center",
@@ -21713,6 +25269,27 @@
           "rules": []
         },
         "dev_mac_64cba3f7b9f4_022_qazvin___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_64cba3f7ba48_022_qazvin___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_34dbfd12fd41_022_qazvin___dry": {
+          "enabled": false,
+          "placed": false,
+          "dock": "center",
+          "last_status": null,
+          "rules": []
+        },
+        "dev_mac_04106b51e6ad_022_qazvin___dry": {
           "enabled": false,
           "placed": false,
           "dock": "center",

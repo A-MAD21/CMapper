@@ -330,7 +330,7 @@ def main() -> None:
     router_device_id = params.get("router_device_id")
     username = params.get("username")
     password = params.get("password")
-    interface = params.get("interface")
+    interface = (params.get("interface") or "").strip() or None
     address_range = params.get("address_range")
     duration = int(params.get("scan_duration_s", 30) or 30)
     note = params.get("note") or None
@@ -350,7 +350,7 @@ def main() -> None:
             }))
             return
 
-    if not interface:
+    if address_range and not interface:
         interface = "ether1"
     if not router_ip and router_device_id and db_path:
         try:
@@ -407,19 +407,19 @@ def main() -> None:
                 return value
         return value
 
-    def build_scan_command(path: str, target_range: str, use_kv: bool = True, use_proplist: bool = True, include_interface: bool = True) -> str:
+    def build_scan_command(path: str, target_range: str, iface: Optional[str], use_kv: bool = True, use_proplist: bool = True, include_interface: bool = True) -> str:
         cmd = f"{path} duration={duration}"
         if use_kv:
             cmd += " as-value without-paging"
         if target_range:
             cmd += f" address-range={normalize_address_range(target_range)}"
-        if include_interface and interface:
-            cmd += f" interface={interface}"
+        if include_interface and iface:
+            cmd += f" interface={iface}"
         if use_proplist:
             cmd += " proplist=address,mac-address,netbios,interface"
         return cmd
 
-    def parse_ip_address_ranges() -> List[str]:
+    def parse_ip_address_ranges(iface_filter: Optional[str]) -> List[str]:
         try:
             result = run_ssh_command(router_ip, username, password, "ip address print", timeout=20)
         except Exception:
@@ -437,7 +437,7 @@ def main() -> None:
                 continue
             addr = parts[0]
             iface = parts[-1]
-            if interface and iface != interface:
+            if iface_filter and iface != iface_filter:
                 continue
             if "/" not in addr:
                 continue
@@ -463,6 +463,35 @@ def main() -> None:
             seen.add(item)
             deduped.append(item)
         return deduped
+
+    def parse_interface_subnets() -> Dict[str, List[str]]:
+        try:
+            result = run_ssh_command(router_ip, username, password, "ip address print", timeout=20)
+        except Exception:
+            return {}
+        output = (result.stdout or "") + "\n" + (result.stderr or "")
+        iface_map: Dict[str, List[str]] = {}
+        for raw_line in output.splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith(";;;"):
+                continue
+            parts = line.split()
+            if parts and parts[0].isdigit():
+                parts = parts[1:]
+            if len(parts) < 2:
+                continue
+            addr = parts[0]
+            iface = parts[-1]
+            if "/" not in addr:
+                continue
+            try:
+                network = str(ipaddress.ip_interface(addr).network)
+            except ValueError:
+                continue
+            iface_map.setdefault(iface, [])
+            if network not in iface_map[iface]:
+                iface_map[iface].append(network)
+        return iface_map
 
     def parse_ip_pool_ranges() -> List[str]:
         try:
@@ -499,6 +528,68 @@ def main() -> None:
                 cleaned.append(token)
         return cleaned
 
+    def parse_ip_pool_map() -> Dict[str, List[str]]:
+        try:
+            result = run_ssh_command(router_ip, username, password, "ip pool print detail without-paging", timeout=20)
+        except Exception:
+            return {}
+        output = (result.stdout or "") + "\n" + (result.stderr or "")
+        pools: Dict[str, List[str]] = {}
+        for rec in _parse_detail_records(output):
+            name = rec.get("name")
+            ranges = rec.get("ranges") or rec.get("range") or ""
+            if not name or not ranges:
+                continue
+            items = [r.strip() for r in ranges.split(",") if r.strip()]
+            if items:
+                pools[name] = items
+        return pools
+
+    def parse_dhcp_servers() -> List[Dict[str, str]]:
+        try:
+            result = run_ssh_command(router_ip, username, password, "ip dhcp-server print", timeout=20)
+        except Exception:
+            return []
+        output = (result.stdout or "") + "\n" + (result.stderr or "")
+        servers: List[Dict[str, str]] = []
+        header = None
+        for line in output.splitlines():
+            if "NAME" in line and "INTERFACE" in line and "ADDRESS-POOL" in line:
+                header = line
+                break
+        if header:
+            name_idx = header.find("NAME")
+            iface_idx = header.find("INTERFACE")
+            pool_idx = header.find("ADDRESS-POOL")
+            for raw_line in output.splitlines():
+                if not raw_line.strip() or raw_line.strip().startswith(";;;"):
+                    continue
+                if raw_line.lstrip().startswith(("Flags:", "#")):
+                    continue
+                line = raw_line
+                if line.lstrip()[0].isdigit():
+                    line = line.split(" ", 1)[1]
+                name = line[name_idx:iface_idx].strip() if iface_idx != -1 else line[name_idx:].strip().split()[0]
+                iface = line[iface_idx:pool_idx].strip() if pool_idx != -1 else ""
+                pool = line[pool_idx:].strip() if pool_idx != -1 else ""
+                if name and iface:
+                    servers.append({"name": name, "interface": iface, "pool": pool})
+            return servers
+
+        # Fallback: token parse
+        for raw_line in output.splitlines():
+            line = raw_line.strip()
+            if not line or line.lower().startswith("flags:") or line.startswith(";;;"):
+                continue
+            parts = line.split()
+            if not parts:
+                continue
+            if parts[0].isdigit():
+                parts = parts[1:]
+            if len(parts) < 3:
+                continue
+            servers.append({"name": parts[0], "interface": parts[1], "pool": parts[2]})
+        return servers
     def parse_dhcp_leases() -> Dict[str, Any]:
         hostnames_by_ip: Dict[str, str] = {}
         hostnames_by_mac: Dict[str, str] = {}
@@ -622,16 +713,57 @@ def main() -> None:
             "lease_pairs": lease_pairs
         }
 
-    def resolve_address_ranges() -> List[str]:
+    def resolve_scan_targets() -> List[Dict[str, str]]:
         if address_range:
-            return [address_range]
+            return [{"interface": interface, "range": address_range}]
 
-        addr_ranges = parse_ip_address_ranges()
+        targets: List[Dict[str, str]] = []
+        dhcp_servers = parse_dhcp_servers()
+        pool_map = parse_ip_pool_map()
+        iface_subnets = parse_interface_subnets()
+        if dhcp_servers:
+            for srv in dhcp_servers:
+                iface = srv.get("interface")
+                pool = srv.get("pool")
+                if not iface:
+                    continue
+                if interface and iface != interface:
+                    continue
+                # Prefer full interface subnet(s)
+                subnets = iface_subnets.get(iface, [])
+                if subnets:
+                    for net in subnets:
+                        targets.append({"interface": iface, "range": net})
+                    continue
+                # Fallback to DHCP pool ranges
+                if pool:
+                    ranges = pool_map.get(pool, [])
+                    for r in ranges:
+                        targets.append({"interface": iface, "range": r})
+            if targets:
+                return targets
+
+        # Fallback: use interface subnets directly
+        if interface:
+            for net in iface_subnets.get(interface, []):
+                targets.append({"interface": interface, "range": net})
+            if targets:
+                return targets
+        else:
+            for iface, nets in iface_subnets.items():
+                for net in nets:
+                    targets.append({"interface": iface, "range": net})
+            if targets:
+                return targets
+
+        # Last resort: ip address print filtered or pool ranges without interface mapping
+        addr_ranges = parse_ip_address_ranges(interface)
         if addr_ranges:
-            return addr_ranges
-        return parse_ip_pool_ranges()
+            return [{"interface": interface or "ether1", "range": r} for r in addr_ranges]
+        return [{"interface": interface or "ether1", "range": r} for r in parse_ip_pool_ranges()]
 
     devices: List[Dict[str, str]] = []
+    seen_devices: set[tuple[str, str, str]] = set()
     scan_paths = ["tool ip-scan"]
     dhcp_hostnames = parse_dhcp_leases() if use_dhcp_hostname else {
         "by_ip": {},
@@ -647,13 +779,17 @@ def main() -> None:
             f"pairs={len(dhcp_hostnames.get('lease_pairs', set()))} ===",
             file=sys.stderr
         )
-    address_ranges = resolve_address_ranges()
-    if not address_ranges:
+    scan_targets = resolve_scan_targets()
+    if not scan_targets:
         print(json.dumps({"status": "error", "message": "No address ranges found for scan."}))
         return
     scan_errors: List[str] = []
     for path in scan_paths:
-        for target_range in address_ranges:
+        for target in scan_targets:
+            target_range = target.get("range") or ""
+            target_iface = target.get("interface") or None
+            if not target_iface:
+                continue
             attempts = [
                 {"use_kv": True, "use_proplist": True, "include_interface": True},
                 {"use_kv": False, "use_proplist": True, "include_interface": True},
@@ -667,6 +803,7 @@ def main() -> None:
                 combined_cmd = build_scan_command(
                     path,
                     target_range,
+                    target_iface,
                     use_kv=attempt["use_kv"],
                     use_proplist=attempt["use_proplist"],
                     include_interface=attempt["include_interface"]
@@ -707,6 +844,16 @@ def main() -> None:
                     scan_errors.append(err_text[:1000])
             dhcp_hits = 0
             for item in parse_ip_scan(output):
+                ip_key = (item.get("ip") or "").strip()
+                mac_key = normalize_mac(item.get("mac") or "") if item.get("mac") else ""
+                iface_key = (item.get("interface") or target_iface or "").strip()
+                dedupe_key = (ip_key, mac_key, iface_key)
+                if ip_key or mac_key:
+                    if dedupe_key in seen_devices:
+                        continue
+                    seen_devices.add(dedupe_key)
+                if not item.get("interface") and target_iface:
+                    item["interface"] = target_iface
                 ip = item.get("ip")
                 mac = item.get("mac")
                 ip_match = dhcp_hostnames.get("by_ip", {}).get(ip) if ip else None

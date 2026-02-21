@@ -36,7 +36,8 @@ LOGS_DIR = os.path.join(BASE_DIR, "logs")
 LOG_RETENTION_DAYS = 60
 CORRUPT_DIR = os.path.join(BASE_DIR, "corrupt_backups")
 CORRUPT_RETENTION_DAYS = 7
-MODULE_LOG_RETENTION_DAYS = 7
+MODULE_LOG_RETENTION_DAYS = 0
+MODULE_CONFIG_RETENTION_DAYS = 0
 
 MODULES_DIR = os.path.join(BASE_DIR, "Modules")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "Templates")
@@ -196,7 +197,6 @@ def _cleanup_logs():
         pass
 
 def _cleanup_module_logs():
-    cutoff = time.time() - (MODULE_LOG_RETENTION_DAYS * 86400)
     try:
         for name in os.listdir(BASE_DIR):
             if not name.startswith("module_log_") or not name.endswith(".txt"):
@@ -204,8 +204,19 @@ def _cleanup_module_logs():
             path = os.path.join(BASE_DIR, name)
             if not os.path.isfile(path):
                 continue
-            if os.path.getmtime(path) < cutoff:
-                os.remove(path)
+            os.remove(path)
+    except OSError:
+        pass
+
+def _cleanup_module_configs():
+    try:
+        for name in os.listdir(BASE_DIR):
+            if not name.startswith("module_config_") or not name.endswith(".json"):
+                continue
+            path = os.path.join(BASE_DIR, name)
+            if not os.path.isfile(path):
+                continue
+            os.remove(path)
     except OSError:
         pass
 
@@ -736,6 +747,7 @@ class ModuleRunner:
         thread_id = str(uuid.uuid4())[:8]
         
         def module_thread():
+            config_file = None
             try:
                 log_file = os.path.join(BASE_DIR, f"module_log_{thread_id}.txt")
                 # Update status
@@ -865,8 +877,9 @@ class ModuleRunner:
                 
                 # Clean up temp config file
                 try:
-                    os.remove(config_file)
-                except:
+                    if config_file and os.path.exists(config_file):
+                        os.remove(config_file)
+                except Exception:
                     pass
                 
             except subprocess.TimeoutExpired:
@@ -881,6 +894,11 @@ class ModuleRunner:
                         self.running_modules[thread_id]["error"] = str(e)
                         self.running_modules[thread_id]["progress"] = 100
             finally:
+                try:
+                    if config_file and os.path.exists(config_file):
+                        os.remove(config_file)
+                except Exception:
+                    pass
                 # Cleanup after delay
                 threading.Timer(300, self.cleanup_thread, args=[thread_id]).start()
         
@@ -909,6 +927,7 @@ class ModuleRunner:
             log_file = (running or {}).get("log_file") or (result or {}).get("log_file")
         # Keep log files for troubleshooting; manual cleanup if needed.
         _cleanup_module_logs()
+        _cleanup_module_configs()
     
     def get_all_status(self):
         """Get status of all modules"""

@@ -276,3 +276,11 @@ F4:7F:35:00:00:00-F4:7F:35:FF:FF:FF=Cisco,device_type=switch
 80:CE:62:00:00:00-80:CE:62:FF:FF:FF=HP Printer,device_type=printer
 44:E4:D9:00:00:00-44:E4:D9:FF:FF:FF=Cisco,device_type=switch
 00:19:06:00:00:00-00:19:06:FF:FF:FF=Cisco,device_type=switch
+F6:BE:89:00:00:00-F6:BE:89:FF:FF:FF=Samsung,device_type=phone
+E8:6A:64:00:00:00-E8:6A:64:FF:FF:FF=PC,device_type=pc
+FC:15:B4:00:00:00-FC:15:B4:FF:FF:FF=Server,device_type=server
+9C:4E:20:00:00:00-9C:4E:20:FF:FF:FF=Cisco,device_type=switch
+94:18:82:00:00:00-94:18:82:FF:FF:FF=Server,device_type=server
+94:52:44:00:00:00-94:52:44:FF:FF:FF=Samsung,device_type=phone
+BC:32:B2:00:00:00-BC:32:B2:FF:FF:FF=Samsung,device_type=server
+1C:98:EC:00:00:00-1C:98:EC:FF:FF:FF=Server,device_type=server

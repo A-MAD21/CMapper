@@ -43,7 +43,7 @@
       "required": false,
       "label": "Interface (optional)",
       "placeholder": "bridge1",
-      "description": "Leave blank to scan all interfaces."
+      "description": "Leave blank to auto-scan per DHCP server interface."
     },
     {
       "name": "address_range",
