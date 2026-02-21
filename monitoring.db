@@ -2,7 +2,7 @@
   "version": "1.0",
   "meta": {
     "created": "2026-01-20T14:51:58.142052",
-    "last_modified": "2026-02-21T10:01:22.495418"
+    "last_modified": "2026-02-21T10:23:14.671646"
   },
   "sites": {
     "Hamedan - Dry -TEST": {
@@ -558,8 +558,8 @@
           ],
           "ip": "172.18.16.17",
           "packet_loss": 0,
-          "avg_latency_ms": 137,
-          "last_check": "2026-02-21T10:01:21.268868"
+          "avg_latency_ms": 122,
+          "last_check": "2026-02-21T10:23:13.147549"
         },
         "dev_b36fffe8": {
           "enabled": true,
@@ -576,8 +576,8 @@
           ],
           "ip": "172.18.16.13",
           "packet_loss": 0,
-          "avg_latency_ms": 84,
-          "last_check": "2026-02-21T10:01:21.268868"
+          "avg_latency_ms": 88,
+          "last_check": "2026-02-21T10:23:13.147549"
         },
         "dev_e0af63c9": {
           "enabled": true,
@@ -594,8 +594,8 @@
           ],
           "ip": "172.18.16.101",
           "packet_loss": 0,
-          "avg_latency_ms": 103,
-          "last_check": "2026-02-21T10:01:21.268868"
+          "avg_latency_ms": 74,
+          "last_check": "2026-02-21T10:23:13.147549"
         },
         "dev_92870125": {
           "enabled": true,
@@ -613,7 +613,7 @@
           "ip": "172.18.16.1",
           "packet_loss": 0,
           "avg_latency_ms": 67,
-          "last_check": "2026-02-21T10:01:21.268868"
+          "last_check": "2026-02-21T10:23:13.147549"
         },
         "dev_432338af": {
           "enabled": true,
@@ -630,8 +630,8 @@
           ],
           "ip": "172.18.16.102",
           "packet_loss": 0,
-          "avg_latency_ms": 83,
-          "last_check": "2026-02-21T10:01:21.268868"
+          "avg_latency_ms": 91,
+          "last_check": "2026-02-21T10:23:13.147549"
         },
         "dev_582354f5": {
           "enabled": true,
@@ -648,8 +648,8 @@
           ],
           "ip": "172.18.16.14",
           "packet_loss": 0,
-          "avg_latency_ms": 47,
-          "last_check": "2026-02-21T10:01:21.268868"
+          "avg_latency_ms": 76,
+          "last_check": "2026-02-21T10:23:13.147549"
         },
         "dev_1a86c593": {
           "enabled": true,
@@ -666,8 +666,8 @@
           ],
           "ip": "172.18.16.15",
           "packet_loss": 0,
-          "avg_latency_ms": 47,
-          "last_check": "2026-02-21T10:01:21.268868"
+          "avg_latency_ms": 26,
+          "last_check": "2026-02-21T10:23:13.147549"
         },
         "dev_95a672f7": {
           "enabled": true,
@@ -684,8 +684,8 @@
           ],
           "ip": "172.18.16.16",
           "packet_loss": 0,
-          "avg_latency_ms": 75,
-          "last_check": "2026-02-21T10:01:21.268868"
+          "avg_latency_ms": 162,
+          "last_check": "2026-02-21T10:23:13.147549"
         },
         "dev_721b4ca6": {
           "enabled": true,
@@ -702,8 +702,8 @@
           ],
           "ip": "172.18.16.103",
           "packet_loss": 0,
-          "avg_latency_ms": 46,
-          "last_check": "2026-02-21T10:01:21.268868"
+          "avg_latency_ms": 71,
+          "last_check": "2026-02-21T10:23:13.147549"
         }
       },
       "rules": [
