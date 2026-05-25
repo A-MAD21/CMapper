@@ -26,6 +26,19 @@ def log(path: Optional[str], message: str) -> None:
             handle.write(message.rstrip() + "\n")
 
 
+def matches_group(device: Dict[str, Any], device_type: str, name_filter: str, match_mode: str) -> bool:
+    actual_type = str(device.get("type") or "unknown").lower()
+    if device_type != "all" and actual_type != device_type:
+        return False
+    if not name_filter:
+        return True
+    name = str(device.get("name") or "").lower()
+    wanted = name_filter.lower()
+    if match_mode == "contains":
+        return wanted in name
+    return name.startswith(wanted)
+
+
 def trace_target(
     target: Dict[str, Any],
     start_ip: str,
@@ -158,7 +171,10 @@ def main() -> None:
     devices = [device for device in data.get("devices", []) if device.get("site") == site]
 
     device_type = str(params.get("device_type") or "").strip().lower()
-    prefix = str(params.get("name_prefix") or "").strip()
+    name_filter = str(params.get("name_prefix") or "").strip()
+    name_match_mode = str(params.get("name_match_mode") or "starts_with").strip().lower()
+    if name_match_mode not in ("starts_with", "contains"):
+        name_match_mode = "starts_with"
     start = mac_search.device_by_id(devices, str(params.get("start_switch_id") or ""))
     start_ip = str(params.get("start_switch_ip") or "").strip() or str((start or {}).get("ip") or "")
     username = str(params.get("username") or "").strip()
@@ -166,17 +182,13 @@ def main() -> None:
     port = int(params.get("ssh_port") or 22)
     max_hops = max(1, min(int(params.get("max_hops") or 10), 30))
 
-    if not prefix:
-        print(json.dumps({"status": "error", "message": "Name prefix is required"}))
-        return
     if not start_ip:
         print(json.dumps({"status": "error", "message": "Select a starting switch or enter its IP address"}))
         return
 
     matching = [
         device for device in devices
-        if (device_type == "all" or str(device.get("type") or "unknown").lower() == device_type)
-        and str(device.get("name") or "").lower().startswith(prefix.lower())
+        if matches_group(device, device_type, name_filter, name_match_mode)
     ]
     with_mac = [device for device in matching if mac_search.normalize_mac(str(device.get("mac") or ""))]
     without_mac = len(matching) - len(with_mac)
@@ -185,7 +197,11 @@ def main() -> None:
         with open(log_file, "w", encoding="utf-8") as handle:
             handle.write(f"MAP GROUP - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
     label = "all types" if device_type == "all" else device_type
-    log(log_file, f"Filter: {label}, name starts with \"{prefix}\"")
+    if name_filter:
+        match_label = "contains" if name_match_mode == "contains" else "starts with"
+        log(log_file, f"Filter: {label}, name {match_label} \"{name_filter}\"")
+    else:
+        log(log_file, f"Filter: {label}, all names")
     log(log_file, f"Matched: {len(matching)} device(s)")
     if without_mac:
         log(log_file, f"Skipped without MAC: {without_mac}")

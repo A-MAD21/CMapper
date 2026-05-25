@@ -15,11 +15,19 @@
       "label": "Device Type"
     },
     {
+      "name": "name_match_mode",
+      "type": "select",
+      "required": false,
+      "default": "starts_with",
+      "options": ["starts_with", "contains"],
+      "label": "Name Match"
+    },
+    {
       "name": "name_prefix",
       "type": "text",
-      "required": true,
-      "label": "Name Starts With",
-      "placeholder": "OKR"
+      "required": false,
+      "label": "Name Filter (optional)",
+      "placeholder": "Finger"
     },
     {
       "name": "start_switch_id",
