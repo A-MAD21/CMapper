@@ -8,14 +8,21 @@ Logs in via LAPI (Digest auth), starts capture, waits, then downloads pcap.
 from __future__ import annotations
 
 import json
-import portalocker
 import os
+import ipaddress
+import re
 import struct
 import sys
 import time
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DIR = os.path.abspath(os.path.join(MODULE_DIR, "..", "_shared"))
+if SHARED_DIR not in sys.path:
+    sys.path.insert(0, SHARED_DIR)
+from sqlite_store import read_json_store, write_json_store
 
 
 def _append_log(path: Optional[str], message: str) -> None:
@@ -28,14 +35,17 @@ def _append_log(path: Optional[str], message: str) -> None:
         pass
 
 
-def load_json(path: str) -> Dict[str, Any]:
-    with portalocker.Lock(path, "r", timeout=5, encoding="utf-8") as f:
+def load_config(path: str) -> Dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
+def load_db(path: str) -> Dict[str, Any]:
+    return read_json_store(path, "devices") or {}
+
+
 def save_json(path: str, data: Dict[str, Any]) -> None:
-    with portalocker.Lock(path, "w", timeout=5, encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    write_json_store(path, "devices", data)
 
 
 def normalize_mac(mac: str) -> str:
@@ -58,6 +68,11 @@ def _is_mac_like(value: str) -> bool:
 
 def parse_cdp(payload: bytes) -> Dict[str, Any]:
     result: Dict[str, Any] = {}
+    dest_pattern = b"\x01\x00\x0c\xcc\xcc\xcc"
+    idx_dest = payload.find(dest_pattern)
+    if idx_dest >= 6:
+        src = payload[idx_dest - 6:idx_dest]
+        result["switch_mac"] = ":".join(f"{b:02x}" for b in src)
     snap_prefix = b"\xaa\xaa\x03\x00\x00\x0c\x20"
     idx = payload.find(snap_prefix)
     if idx == -1:
@@ -348,10 +363,92 @@ def _collect_nic_names(payload: Any) -> List[str]:
     return names
 
 
+def _split_csv_values(value: Any) -> List[str]:
+    if isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = re.split(r"[\s,;]+", str(value or ""))
+    items: List[str] = []
+    for item in raw_items:
+        text = str(item or "").strip()
+        if text and text not in items:
+            items.append(text)
+    return items
+
+
+def _extract_ip_from_text(value: str) -> str:
+    match = re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", value or "")
+    return match.group(0) if match else ""
+
+
+def _collect_nic_ip_pairs(payload: Any) -> List[Tuple[str, str]]:
+    pairs: List[Tuple[str, str]] = []
+
+    def walk(value: Any, current_nic: str = "") -> None:
+        if isinstance(value, dict):
+            nic_info_list = value.get("astNICInfoList")
+            if isinstance(nic_info_list, list):
+                for idx, item in enumerate(nic_info_list):
+                    if not isinstance(item, dict):
+                        continue
+                    ip_addr = _extract_ip_from_text(str(item.get("stIpAddr") or ""))
+                    if ip_addr:
+                        pair = (f"eth{idx}", ip_addr)
+                        if pair not in pairs:
+                            pairs.append(pair)
+            nic = current_nic
+            for key, item in value.items():
+                key_l = str(key).lower()
+                if key_l in ("nic", "nicname", "name", "ifname", "interface", "portname") and isinstance(item, str):
+                    if item.lower().startswith("eth") or "nic" in item.lower():
+                        nic = item
+            ips: List[str] = []
+            for key, item in value.items():
+                key_l = str(key).lower()
+                if "ip" in key_l and isinstance(item, str):
+                    found = _extract_ip_from_text(item)
+                    if found:
+                        ips.append(found)
+            if nic and ips:
+                for ip_addr in ips:
+                    pair = (nic, ip_addr)
+                    if pair not in pairs:
+                        pairs.append(pair)
+            for item in value.values():
+                walk(item, nic)
+        elif isinstance(value, list):
+            for item in value:
+                walk(item, current_nic)
+
+    walk(payload)
+    return pairs
+
+
+def _same_ipv4_24(ip_a: str, ip_b: str) -> bool:
+    try:
+        addr_a = ipaddress.ip_address(ip_a)
+        addr_b = ipaddress.ip_address(ip_b)
+        if addr_a.version != 4 or addr_b.version != 4:
+            return False
+        return ipaddress.ip_network(f"{addr_a}/24", strict=False) == ipaddress.ip_network(f"{addr_b}/24", strict=False)
+    except Exception:
+        return False
+
+
+def _choose_nic_for_target(target_ip: str, pairs: List[Tuple[str, str]]) -> str:
+    for nic, nic_ip in pairs:
+        if nic_ip == target_ip:
+            return nic
+    for nic, nic_ip in pairs:
+        if _same_ipv4_24(target_ip, nic_ip):
+            return nic
+    return ""
+
+
 def _find_or_create_switch(data: Dict[str, Any], site: str, cdp: Dict[str, Any], now: str) -> Optional[Dict[str, Any]]:
     switch_ip = cdp.get("ip")
     switch_name = (cdp.get("device_id") or "").strip()
-    switch_mac = (cdp.get("dtp_neighbor_mac") or cdp.get("mac") or "").lower()
+    switch_mac = (cdp.get("dtp_neighbor_mac") or cdp.get("mac") or cdp.get("switch_mac") or "").lower()
     has_name = bool(switch_name) and not _is_mac_like(switch_name)
     has_ip = bool(switch_ip)
     has_mac = bool(switch_mac)
@@ -433,12 +530,16 @@ def _find_or_create_switch(data: Dict[str, Any], site: str, cdp: Dict[str, Any],
     return new_device
 
 
-def _upsert_connection(device: Dict[str, Any], remote_device_id: str, local_interface: str, remote_interface: str, now: str) -> None:
+def _upsert_connection(device: Dict[str, Any], remote_device_id: str, local_interface: str, remote_interface: str, now: str, remote_device: Optional[Dict[str, Any]] = None) -> None:
     connections = device.setdefault("connections", [])
     for conn in connections:
         if conn.get("remote_device") == remote_device_id and conn.get("protocol") == "cdp":
             if remote_interface and conn.get("remote_interface") == remote_interface:
                 conn["local_interface"] = local_interface or conn.get("local_interface", "")
+                if remote_device:
+                    conn["remote_name"] = remote_device.get("name") or conn.get("remote_name", "")
+                    conn["remote_ip"] = remote_device.get("ip") or conn.get("remote_ip", "")
+                    conn["remote_mac"] = remote_device.get("mac") or conn.get("remote_mac", "")
                 conn["status"] = "up"
                 conn["discovered_at"] = now
                 return
@@ -446,6 +547,9 @@ def _upsert_connection(device: Dict[str, Any], remote_device_id: str, local_inte
         "id": f"conn_{os.urandom(4).hex()}",
         "local_interface": local_interface or "",
         "remote_device": remote_device_id,
+        "remote_name": (remote_device.get("name") if remote_device else "") or "",
+        "remote_ip": (remote_device.get("ip") if remote_device else "") or "",
+        "remote_mac": (remote_device.get("mac") if remote_device else "") or "",
         "remote_interface": remote_interface or "",
         "protocol": "cdp",
         "discovered_at": now,
@@ -458,7 +562,7 @@ def main() -> None:
         print(json.dumps({"status": "error", "message": "Config file required"}))
         return
 
-    config = load_json(sys.argv[1])
+    config = load_config(sys.argv[1])
     params = config.get("parameters", {})
     log_file = config.get("log_file")
 
@@ -471,17 +575,20 @@ def main() -> None:
     nic_name = "eth1" if nic_choice == "NIC2" else "eth0"
     nic_label = (params.get("nic_label") or "").strip()
     packet_size = int(params.get("packet_size", 1500) or 1500)
-    ip_mode_raw = (params.get("ip_mode") or "all").strip().lower()
+    ip_mode_raw = (params.get("ip_mode") or "filter").strip().lower()
     port_mode_raw = (params.get("port_mode") or "all").strip().lower()
     mode_map = {"all": 0, "specify": 1, "filter": 2}
     ip_mode = mode_map.get(ip_mode_raw, 0)
     port_mode = mode_map.get(port_mode_raw, 0)
+    ip_values = _split_csv_values(params.get("ip_values") or params.get("ip_list") or "")
 
     db_path = config.get("database_path")
     site_name = (config.get("site_name") or "").strip()
     targets = params.get("targets") or {}
     device_ids = targets.get("device_ids") or []
     manual_devices = targets.get("manual_devices") or []
+    auto_targets = bool(targets.get("auto"))
+    auto_on_empty = bool(targets.get("auto_on_empty"))
 
     if not username or password is None:
         print(json.dumps({"status": "error", "message": "Missing username/password"}))
@@ -497,11 +604,13 @@ def main() -> None:
     devices = []
     data = {}
     if db_path and os.path.exists(db_path):
-        data = load_json(db_path)
+        data = load_db(db_path)
         site_devices = [d for d in data.get("devices", []) if d.get("site") == site_name and d.get("ip")]
         if device_ids:
             wanted = set(device_ids)
             devices = [d for d in site_devices if d.get("id") in wanted]
+            if not devices and (auto_targets or auto_on_empty) and not manual_devices:
+                devices = [d for d in site_devices if (d.get("type") or "").lower() == "nvr"]
         else:
             devices = [d for d in site_devices if (d.get("type") or "").lower() == "nvr"]
 
@@ -516,7 +625,10 @@ def main() -> None:
         })
 
     if not devices:
-        print(json.dumps({"status": "error", "message": "No NVR devices selected"}))
+        if auto_targets:
+            print(json.dumps({"status": "success", "message": "No NVR devices found", "site": site_name, "captures": []}))
+        else:
+            print(json.dumps({"status": "error", "message": "No NVR devices selected"}))
         return
 
     results = []
@@ -533,36 +645,149 @@ def main() -> None:
     def capture_device(ip: str, name: str) -> Tuple[str, str, Optional[Dict[str, Any]], Optional[str]]:
         base = f"http://{ip}"
         session = requests.Session()
+        session.trust_env = False
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Connection": "keep-alive"
+        })
+        _append_log(log_file, f"CONNECT {ip} direct")
         auth = HTTPDigestAuth(username, password)
 
         def _url(path: str) -> str:
             return f"{base}{path}"
 
+        def _auth_nonce() -> str:
+            thread_local = getattr(auth, "_thread_local", None)
+            chal = getattr(thread_local, "chal", {}) if thread_local else {}
+            return str(chal.get("nonce") or "")
+
+        def _request_digest(method: str, url: str, *, headers: Optional[Dict[str, str]] = None,
+                            data: Any = None, timeout: int = 10, uri_override: Optional[str] = None):
+            return session.request(method, url, headers=headers, data=data, auth=auth, timeout=timeout)
+
         login_url = _url("/LAPI/V1.0/System/Security/Login")
-        _append_log(log_file, f"LOGIN {ip} {login_url}")
-        login_resp = session.put(login_url, auth=auth, timeout=10)
-        if login_resp.status_code not in (200, 204):
-            _append_log(log_file, f"LOGIN FAIL {ip} {login_resp.status_code}")
-            _append_log(log_file, f"LOGIN BODY {ip} {login_resp.text[:300]}")
-            return ip, name, None, f"login_fail_{login_resp.status_code}"
+        session.cookies.set("langInfo_", "1", domain=ip, path="/")
+        session.cookies.set("len", "9", domain=ip, path="/")
+        login_ok = False
+
+        def _login(reason: str = "LOGIN") -> bool:
+            nonlocal login_ok
+            _append_log(log_file, f"{reason} {ip} {login_url}")
+            login_headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "X-Requested-With": "XMLHttpRequest",
+                "Origin": base,
+                "Referer": f"{base}/"
+            }
+            try:
+                login_resp = session.put(login_url, headers=login_headers, auth=auth, timeout=10)
+                login_ok = login_resp.status_code in (200, 204)
+                if not login_ok:
+                    _append_log(log_file, f"LOGIN FAIL {ip} {login_resp.status_code}")
+                    _append_log(log_file, f"LOGIN BODY {ip} {login_resp.text[:300]}")
+                else:
+                    _append_log(log_file, f"LOGIN OK {ip}")
+                return login_ok
+            except Exception as exc:
+                _append_log(log_file, f"LOGIN ERROR {ip} {exc}")
+                return False
+
+        try:
+            if not _login("LOGIN"):
+                _append_log(log_file, f"LOGIN FALLBACK {ip}: trying packet capture start directly")
+        except Exception as exc:
+            _append_log(log_file, f"LOGIN ERROR {ip} {exc}")
+            _append_log(log_file, f"LOGIN FALLBACK {ip}: trying packet capture start directly")
 
         def _keepalive() -> None:
+            if not login_ok:
+                return
             try:
                 keepalive_url = _url("/LAPI/V1.0/System/Security/KeepAlive")
-                session.put(keepalive_url, auth=auth, timeout=10)
+                _request_digest("PUT", keepalive_url, headers={
+                    "Accept": "application/json, text/javascript, */*; q=0.01",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Origin": base,
+                    "Referer": f"{base}/"
+                }, timeout=10)
             except Exception:
                 return
 
+        common_headers = {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": f"{base}/page/config.html"
+        }
+
+        existing_capture_running = False
         status_url = _url(f"/LAPI/V1.0/Network/PacketCapture/Status?_={int(time.time() * 1000)}")
         try:
-            status_resp = session.get(status_url, auth=auth, timeout=10)
+            status_resp = _request_digest("GET", status_url, headers=common_headers, timeout=10)
             _append_log(log_file, f"STATUS {ip} {status_resp.status_code}")
             if status_resp.text:
                 _append_log(log_file, f"STATUS BODY {ip} {status_resp.text[:500]}")
+            if status_resp.status_code == 200 and status_resp.text:
+                try:
+                    status_data = status_resp.json().get("Response", {}).get("Data", {})
+                    existing_capture_running = int(status_data.get("IsTcpdump") or 0) == 1
+                except Exception:
+                    existing_capture_running = False
         except Exception:
             pass
 
         nic_value = nic_label or nic_name
+        try:
+            link_url = _url(f"/LAPI/V1.0/Network/LinkInfo?_={int(time.time() * 1000)}")
+            link_resp = _request_digest("GET", link_url, headers=common_headers, timeout=10)
+            _append_log(log_file, f"LINKINFO {ip} {link_resp.status_code}")
+            if link_resp.text:
+                _append_log(log_file, f"LINKINFO BODY {ip} {link_resp.text[:500]}")
+            if link_resp.status_code == 200 and link_resp.text:
+                try:
+                    pairs = _collect_nic_ip_pairs(link_resp.json())
+                except Exception:
+                    pairs = _collect_nic_ip_pairs(json.loads(link_resp.text))
+                _append_log(log_file, f"LINKINFO PAIRS {ip} {pairs}")
+                selected_nic = _choose_nic_for_target(ip, pairs)
+                if selected_nic:
+                    nic_value = selected_nic
+                    _append_log(log_file, f"NIC AUTO {ip}: selected {nic_value} from LinkInfo")
+        except Exception as exc:
+            _append_log(log_file, f"LINKINFO ERROR {ip} {exc}")
+
+        if login_ok:
+            try:
+                cgi_url = _url("/cgi-bin/main-cgi")
+                cgi_headers = {
+                    "Accept": "application/json, text/javascript, */*; q=0.01",
+                    "Content-Type": "text/plain;charset=UTF-8",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Origin": base,
+                    "Referer": f"{base}/page/config.html"
+                }
+                nic_body = "json=" + json.dumps({
+                    "cmd": 29,
+                    "bFour": False,
+                    "szUserName": username,
+                    "u32UserLoginHandle": _auth_nonce()
+                }, separators=(",", ":"))
+                nic_resp = _request_digest("POST", cgi_url, headers=cgi_headers, data=nic_body, timeout=10)
+                _append_log(log_file, f"NICINFO {ip} {nic_resp.status_code}")
+                if nic_resp.text:
+                    _append_log(log_file, f"NICINFO BODY {ip} {nic_resp.text[:500]}")
+                if nic_resp.status_code == 200 and nic_resp.text:
+                    try:
+                        pairs = _collect_nic_ip_pairs(nic_resp.json())
+                    except Exception:
+                        pairs = _collect_nic_ip_pairs(json.loads(nic_resp.text))
+                    _append_log(log_file, f"NICINFO PAIRS {ip} {pairs}")
+                    selected_nic = _choose_nic_for_target(ip, pairs)
+                    if selected_nic:
+                        nic_value = selected_nic
+                        _append_log(log_file, f"NIC AUTO {ip}: selected {nic_value} from NICINFO")
+            except Exception as exc:
+                _append_log(log_file, f"NICINFO ERROR {ip} {exc}")
 
         start_urls = [
             _url("/LAPI/V1.1/Network/PacketCapture/Start"),
@@ -574,15 +799,36 @@ def main() -> None:
         start_headers = {
             "Content-Type": "text/plain;charset=UTF-8",
             "Accept": "application/json, text/javascript, */*; q=0.01",
-            "X-Requested-With": "XMLHttpRequest"
+            "X-Requested-With": "XMLHttpRequest",
+            "Origin": base,
+            "Referer": f"{base}/page/config.html"
         }
-
-        start_payload = {
+        if existing_capture_running:
+            try:
+                _append_log(log_file, f"STOP EXISTING {ip}")
+                stop_resp = _request_digest("PUT", stop_url, headers=start_headers, timeout=10)
+                _append_log(log_file, f"STOP EXISTING STATUS {ip} {stop_resp.status_code}")
+                if stop_resp.text:
+                    _append_log(log_file, f"STOP EXISTING BODY {ip} {stop_resp.text[:300]}")
+                time.sleep(2)
+            except Exception as exc:
+                _append_log(log_file, f"STOP EXISTING ERROR {ip} {exc}")
+        base_start_payload = {
             "PacketSize": packet_size,
             "PortMode": port_mode,
             "IPMode": ip_mode,
             "NicName": nic_value
         }
+        if ip_mode in (1, 2):
+            capture_ip_values = list(ip_values)
+            if not capture_ip_values and ip_mode == 2:
+                capture_ip_values = [_extract_ip_from_text(nic_label) or ip]
+            if capture_ip_values:
+                base_start_payload["IPList"] = {
+                    "AddressType": 0,
+                    "List": capture_ip_values,
+                    "Num": len(capture_ip_values)
+                }
 
         last_start_ts = 0.0
 
@@ -592,15 +838,25 @@ def main() -> None:
             wait_for = 10.0 - (now - last_start_ts)
             if wait_for > 0:
                 time.sleep(wait_for)
-            body = json.dumps(start_payload) + "\r\n"
-            for url in start_urls:
-                _append_log(log_file, f"START {ip} {start_payload}")
-                resp = session.put(url, data=body, headers=start_headers, auth=auth, timeout=20)
-                if resp.status_code in (200, 204):
-                    last_start_ts = time.time()
-                    return True
-                _append_log(log_file, f"START FAIL {ip} {resp.status_code}")
-                _append_log(log_file, f"START BODY {ip} {resp.text[:300]}")
+            nic_candidates = [nic_value]
+            if nic_value in ("eth0", "eth1"):
+                alt = "eth1" if nic_value == "eth0" else "eth0"
+                nic_candidates.append(alt)
+            for candidate_nic in nic_candidates:
+                start_payload = dict(base_start_payload)
+                start_payload["NicName"] = candidate_nic
+                body = json.dumps(start_payload, separators=(",", ":")) + "\r\n"
+                for url in start_urls:
+                    _append_log(log_file, f"START {ip} {start_payload}")
+                    resp = _request_digest("PUT", url, data=body, headers=start_headers, timeout=20)
+                    if resp.status_code in (200, 204):
+                        last_start_ts = time.time()
+                        _append_log(log_file, f"START OK {ip} nic={candidate_nic}")
+                        return True
+                    _append_log(log_file, f"START FAIL {ip} {resp.status_code}")
+                    _append_log(log_file, f"START URL {ip} {url}")
+                    _append_log(log_file, f"START HEADERS {ip} content-type={resp.headers.get('Content-Type','')} server={resp.headers.get('Server','')}")
+                    _append_log(log_file, f"START BODY {ip} {resp.text[:300]}")
             return False
 
         def _ensure_min_capture_window() -> None:
@@ -627,15 +883,23 @@ def main() -> None:
 
             _append_log(log_file, f"STOP {ip}")
             try:
-                session.put(stop_url, auth=auth, timeout=10)
+                stop_resp = _request_digest("PUT", stop_url, headers=start_headers, timeout=10)
+                _append_log(log_file, f"STOP STATUS {ip} {stop_resp.status_code}")
+                if stop_resp.text:
+                    _append_log(log_file, f"STOP BODY {ip} {stop_resp.text[:300]}")
             except Exception:
                 pass
 
             _append_log(log_file, f"DOWNLOAD {ip}")
-            download_resp = session.get(download_url, auth=auth, timeout=30)
+            download_resp = _request_digest("GET", download_url, headers={
+                "Accept": "*/*",
+                "Referer": f"{base}/page/config.html"
+            }, timeout=30)
             if download_resp.status_code != 200 or not download_resp.content:
                 if download_resp.status_code != 200:
                     _append_log(log_file, f"DOWNLOAD FAIL {ip} {download_resp.status_code}")
+                    if download_resp.text:
+                        _append_log(log_file, f"DOWNLOAD BODY {ip} {download_resp.text[:500]}")
                 _keepalive()
                 continue
 
@@ -762,13 +1026,14 @@ def main() -> None:
                                 dev_rec["parent_switch_ip"] = switch_device.get("ip") or dev_rec.get("parent_switch_ip")
                             if not has_name:
                                 dev_rec["parent_switch_name"] = switch_device.get("name") or dev_rec.get("parent_switch_name")
-                            _upsert_connection(dev_rec, switch_device["id"], nic_name, cdp.get("port_id") or "", now)
+                            _upsert_connection(dev_rec, switch_device["id"], nic_name, cdp.get("port_id") or "", now, remote_device=switch_device)
                             _upsert_connection(
                                 switch_device,
                                 dev_rec["id"],
                                 cdp.get("port_id") or "",
                                 nic_name,
-                                now
+                                now,
+                                remote_device=dev_rec
                             )
                         else:
                             if not has_name and not has_ip:

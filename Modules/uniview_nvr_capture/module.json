@@ -29,7 +29,7 @@
     {
       "name": "nic",
       "type": "select",
-      "required": true,
+      "required": false,
       "default": "NIC1",
       "options": ["NIC1", "NIC2"],
       "label": "Select NIC"
@@ -73,9 +73,19 @@
       "name": "ip_mode",
       "type": "select",
       "required": false,
-      "default": "all",
+      "default": "filter",
       "options": ["all", "specify", "filter"],
-      "label": "IP Mode"
+      "label": "IP Mode",
+      "description": "Default filter ignores the NVR management IP so CDP packets are easier to capture."
+    },
+    {
+      "name": "ip_values",
+      "type": "text",
+      "required": false,
+      "default": "",
+      "label": "IP List",
+      "placeholder": "10.192.18.162, 10.192.18.1",
+      "description": "Comma-separated IPs for specify/filter. Leave empty with filter mode to filter each target NVR IP automatically."
     },
     {
       "name": "port_mode",

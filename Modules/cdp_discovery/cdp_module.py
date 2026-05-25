@@ -5,7 +5,6 @@ Uses Netmiko (best) or paramiko for SSH, falls back to telnet
 """
 
 import json
-import portalocker
 import sys
 import os
 import re
@@ -13,6 +12,13 @@ import time
 import ipaddress
 from datetime import datetime
 import uuid
+
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DIR = os.path.abspath(os.path.join(MODULE_DIR, "..", "_shared"))
+if SHARED_DIR not in sys.path:
+    sys.path.insert(0, SHARED_DIR)
+from sqlite_store import read_json_store, write_json_store
+
 
 print("=== CDP DISCOVERY MODULE STARTING ===", file=sys.stderr)
 
@@ -135,9 +141,14 @@ def get_cdp_from_device(connection, is_netmiko=True):
                 expect_string=r'[#>]'
             )
         else:
+            output = ""
             # Paramiko connection
             channel = connection.invoke_shell()
             time.sleep(1)
+
+            # Drain banner/prompt.
+            if channel.recv_ready():
+                output += channel.recv(4096).decode('utf-8', errors='ignore')
             
             # Disable paging
             channel.send("terminal length 0\n")
@@ -148,10 +159,9 @@ def get_cdp_from_device(connection, is_netmiko=True):
             time.sleep(2)
             
             # Read output
-            output = ""
             start_time = time.time()
             
-            while time.time() - start_time < 10:
+            while time.time() - start_time < 12:
                 if channel.recv_ready():
                     chunk = channel.recv(4096).decode('utf-8', errors='ignore')
                     output += chunk
@@ -164,7 +174,7 @@ def get_cdp_from_device(connection, is_netmiko=True):
                 time.sleep(0.1)
                 
                 # Check for completion
-                if output.count('\n') > 10 and any(prompt in output for prompt in ['#', '>']):
+                if "show cdp neighbors detail" in output and output.count('\n') > 5 and any(prompt in output[-200:] for prompt in ['#', '>']):
                     break
             
             channel.close()
@@ -176,6 +186,45 @@ def get_cdp_from_device(connection, is_netmiko=True):
         error_msg = f"Failed to get CDP: {str(e)[:200]}"
         print(f"DEBUG: {error_msg}", file=sys.stderr)
         return False, error_msg
+
+
+def get_device_hostname(connection, is_netmiko=True):
+    """Get the connected device hostname from prompt or running config."""
+    try:
+        if is_netmiko:
+            prompt = ""
+            try:
+                prompt = connection.find_prompt() or ""
+            except Exception:
+                prompt = ""
+            hostname = prompt.strip().rstrip("#>").split("(")[0].strip()
+            if hostname:
+                return hostname
+            output = connection.send_command("show running-config | include ^hostname", delay_factor=1, expect_string=r'[#>]')
+        else:
+            # Avoid exec_command for old Cisco SSH. Some devices close the session after one exec channel.
+            return ""
+        for line in output.splitlines():
+            line = line.strip()
+            if line.lower().startswith("hostname "):
+                return line.split(None, 1)[1].strip()
+    except Exception as exc:
+        print(f"DEBUG: Failed to get hostname: {str(exc)[:120]}", file=sys.stderr)
+    return ""
+
+
+def extract_hostname_from_cli_output(output):
+    """Best-effort hostname extraction from Cisco CLI prompt in captured output."""
+    if not output:
+        return ""
+    for line in output.splitlines():
+        line = line.strip()
+        match = re.search(r'([A-Za-z0-9_.-]+)(?:\([^)]+\))?[#>]\s*$', line)
+        if match:
+            candidate = match.group(1)
+            if candidate.lower() not in ("more", "terminal", "show"):
+                return candidate
+    return ""
 
 def disconnect_device(connection, is_netmiko=True):
     """Close connection"""
@@ -228,10 +277,17 @@ def parse_cdp_output(cdp_output, source_ip):
             if ip_match:
                 current_neighbor['ip_address'] = ip_match.group(1)
         
-        # Platform
+        # Platform. Cisco usually prints capabilities on the same line:
+        # Platform: cisco WS-C2960...,  Capabilities: Switch IGMP
         elif capturing and line.startswith('Platform:'):
-            platform = line.replace('Platform:', '').split(',')[0].strip()
+            platform_part = line.replace('Platform:', '', 1)
+            platform = platform_part.split(',')[0].strip()
             current_neighbor['platform'] = platform
+            cap_match = re.search(r'Capabilities:\s*(.+)$', line, re.IGNORECASE)
+            if cap_match:
+                caps = cap_match.group(1).strip()
+                current_neighbor['capabilities'] = caps
+                current_neighbor['type'] = determine_device_type(caps, platform)
         
         # Capabilities
         elif capturing and line.startswith('Capabilities:'):
@@ -267,11 +323,7 @@ def parse_cdp_output(cdp_output, source_ip):
 
 def determine_device_type(capabilities, platform=""):
     """Determine device type from capabilities and platform"""
-    # Handle None or non-string capabilities
-    if not capabilities or not isinstance(capabilities, str):
-        return "unknown"
-    
-    caps_lower = capabilities.lower()
+    caps_lower = capabilities.lower() if isinstance(capabilities, str) else ""
     platform_lower = platform.lower() if isinstance(platform, str) else ""
     
     # Check capabilities
@@ -293,7 +345,7 @@ def determine_device_type(capabilities, platform=""):
         return "firewall"
     
     # Check platform keywords
-    if any(x in platform_lower for x in ['ws-c', 'catalyst', 'nexus', '2960', '3560', '3750', '3850']):
+    if any(x in platform_lower for x in ['ws-c', 'catalyst', 'nexus', '2960', '3560', '3750', '3850', '9200', '9300', '9500']):
         return "switch"
     elif any(x in platform_lower for x in ['isr', 'asr', 'csr', '1900', '2900', '3900', '4000']):
         return "router"
@@ -325,6 +377,8 @@ def update_or_add_device(database, site_name, device_info, credentials_used):
             # Update existing device
             for key, value in device_info.items():
                 if key not in ["id", "site", "discovered_at", "discovered_by"]:
+                    if key == "type" and (not value or value == "unknown") and device.get("type") not in ("", None, "unknown"):
+                        continue
                     devices[i][key] = value
             
             # Update discovery info
@@ -415,7 +469,7 @@ def main():
     subnet_mask = params.get("subnet_mask", "24")
     max_hops = int(params.get("max_hops", 3))
     
-    db_path = config.get("database_path", "database.json")
+    db_path = config.get("database_path")
     
     # 3. Validate inputs
     if not site_name:
@@ -436,14 +490,12 @@ def main():
     print(f"DEBUG: Starting CDP discovery from {root_ip}/{subnet_mask}", file=sys.stderr)
     
     # 4. Read current database
-    try:
-        with portalocker.Lock(db_path, 'r', timeout=5, encoding='utf-8') as f:
-            database = json.load(f)
-        print(f"DEBUG: Database loaded, has {len(database.get('devices', []))} devices", file=sys.stderr)
-    except Exception as e:
-        error_msg = {"error": f"Failed to read database: {str(e)}", "status": "failed"}
+    database = read_json_store(db_path, "devices")
+    if database is None:
+        error_msg = {"error": "Failed to read database", "status": "failed"}
         print(json.dumps(error_msg))
         sys.exit(1)
+    print(f"DEBUG: Database loaded, has {len(database.get('devices', []))} devices", file=sys.stderr)
     
     # 5. Check if site exists
     site_exists = any(s.get("name") == site_name for s in database.get("sites", []))
@@ -517,9 +569,17 @@ def main():
         
         # Check if Netmiko or paramiko
         is_netmiko = hasattr(connection, 'send_command')
+
+        device_hostname = get_device_hostname(connection, is_netmiko)
+        if device_hostname:
+            print(f"DEBUG: Hostname for {current_ip}: {device_hostname}", file=sys.stderr)
         
         # Get CDP output
         cdp_success, cdp_output = get_cdp_from_device(connection, is_netmiko)
+        if not device_hostname:
+            device_hostname = extract_hostname_from_cli_output(cdp_output if cdp_success else "")
+            if device_hostname:
+                print(f"DEBUG: Hostname from CLI output for {current_ip}: {device_hostname}", file=sys.stderr)
         
         # Disconnect
         disconnect_device(connection, is_netmiko)
@@ -532,7 +592,7 @@ def main():
             if current_ip not in discovered_ips:
                 device_info = {
                     "ip": current_ip,
-                    "name": f"Device-{current_ip}",
+                    "name": device_hostname or f"Device-{current_ip}",
                     "type": "unknown",
                     "credentials_used": username,
                     "status": "online",
@@ -563,14 +623,19 @@ def main():
                         # This might be our device info
                         pass
                     elif line.startswith('Platform:'):
-                        platform = line.replace('Platform:', '').split(',')[0].strip()
+                        platform_part = line.replace('Platform:', '', 1)
+                        platform = platform_part.split(',')[0].strip()
+                        cap_match = re.search(r'Capabilities:\s*(.+)$', line, re.IGNORECASE)
+                        if cap_match:
+                            capabilities = cap_match.group(1).strip()
+                            device_type = determine_device_type(capabilities, platform)
                     elif line.startswith('Capabilities:'):
                         capabilities = line.replace('Capabilities:', '').strip()
                         device_type = determine_device_type(capabilities, platform)
             
             device_info = {
                 "ip": current_ip,
-                "name": f"Device-{current_ip}",
+                "name": device_hostname or f"Device-{current_ip}",
                 "type": device_type,
                 "platform": platform,
                 "capabilities": capabilities,
@@ -673,12 +738,10 @@ def main():
     
     # 8. Write updated database
     try:
-        with portalocker.Lock(db_path, 'w', timeout=5, encoding='utf-8') as f:
-            json.dump(database, f, indent=2)
+        write_json_store(db_path, "devices", database)
         print(f"DEBUG: Database updated successfully", file=sys.stderr)
-        
-    except Exception as e:
-        error_msg = {"error": f"Failed to write database: {str(e)}", "status": "failed"}
+    except Exception:
+        error_msg = {"error": "Failed to write database", "status": "failed"}
         print(json.dumps(error_msg))
         sys.exit(1)
     
@@ -699,3 +762,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DIR = os.path.abspath(os.path.join(MODULE_DIR, "..", "_shared"))
+if SHARED_DIR not in sys.path:
+    sys.path.insert(0, SHARED_DIR)

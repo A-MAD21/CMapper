@@ -7,7 +7,9 @@ from flask import Flask, render_template, jsonify, request, send_file, session, 
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 import json
+import csv
 import os
+import glob
 import threading
 import time
 import subprocess
@@ -30,16 +32,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DATABASE_FILE = os.path.join(BASE_DIR, "devices.db")
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
-MONITORING_FILE = os.path.join(BASE_DIR, "monitoring.db")
 SQLITE_DB_FILE = os.path.join(BASE_DIR, "cmapp.sqlite3")
-MONITORING_INTERVAL_SEC = 5
-MONITORING_LOCK = threading.Lock()
-LOGS_DIR = os.path.join(BASE_DIR, "logs")
-LOG_RETENTION_DAYS = 60
 CORRUPT_DIR = os.path.join(BASE_DIR, "corrupt_backups")
 CORRUPT_RETENTION_DAYS = 7
 MODULE_LOG_RETENTION_DAYS = 0
 MODULE_CONFIG_RETENTION_DAYS = 0
+AGENT_SCAN_RETENTION_DAYS = 180
 
 MODULES_DIR = os.path.join(BASE_DIR, "Modules")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "Templates")
@@ -47,24 +45,14 @@ STATIC_DIR = os.path.join(BASE_DIR, "Static")
 OUI_RANGES_FILE = os.path.join(MODULES_DIR, "mikrotik_mac_discovery", "oui_ranges.txt")
 OUI_DEVICE_TYPES_FILE = os.path.join(MODULES_DIR, "enforce_oui_table", "oui_device_types.txt")
 
-DEFAULT_MONITORING_LAYOUT = {
-    "top": 90,
-    "bottom": 90,
-    "left": 120,
-    "right": 120,
-    "labels": {
-        "top": "Top",
-        "left": "Left",
-        "center": "Center",
-        "right": "Right",
-        "bottom": "Bottom"
-    }
-}
-
 GENERATED_MAPS_DIR = os.path.join(BASE_DIR, "generated_maps")
+AGENT_CONFIG_DIR = os.path.join(BASE_DIR, "share", "agent_configs")
+AGENT_SCAN_DIR = os.path.join(BASE_DIR, "share", "agent_scans")
 
 # Ensure required dirs exist
 os.makedirs(GENERATED_MAPS_DIR, exist_ok=True)
+os.makedirs(AGENT_CONFIG_DIR, exist_ok=True)
+os.makedirs(AGENT_SCAN_DIR, exist_ok=True)
 
 
 
@@ -92,6 +80,10 @@ app = Flask(
     static_url_path="/static",
 )
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-change-me")
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = os.getenv("USE_SSL", "0") == "1"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
 
 
 
@@ -110,6 +102,47 @@ def _get_sqlite_conn():
         "name TEXT PRIMARY KEY,"
         "json TEXT NOT NULL,"
         "updated_at TEXT NOT NULL)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS auth_users ("
+        "username TEXT PRIMARY KEY,"
+        "password_hash TEXT NOT NULL,"
+        "role TEXT NOT NULL,"
+        "allowed_sites_json TEXT NOT NULL DEFAULT '[]',"
+        "disabled INTEGER NOT NULL DEFAULT 0,"
+        "created_at TEXT NOT NULL,"
+        "updated_at TEXT NOT NULL,"
+        "last_login_at TEXT)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS auth_sessions ("
+        "session_id TEXT PRIMARY KEY,"
+        "username TEXT NOT NULL,"
+        "created_at TEXT NOT NULL,"
+        "expires_at TEXT NOT NULL,"
+        "revoked_at TEXT,"
+        "ip_address TEXT,"
+        "user_agent TEXT)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS auth_login_attempts ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "username TEXT,"
+        "success INTEGER NOT NULL,"
+        "ip_address TEXT,"
+        "user_agent TEXT,"
+        "created_at TEXT NOT NULL,"
+        "reason TEXT)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS audit_log ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "actor TEXT,"
+        "action TEXT NOT NULL,"
+        "target TEXT,"
+        "details_json TEXT NOT NULL DEFAULT '{}',"
+        "ip_address TEXT,"
+        "created_at TEXT NOT NULL)"
     )
     return conn
 
@@ -152,6 +185,12 @@ def _write_json_file(path: str, data):
             json.dump(data, f, indent=2)
     except Exception:
         pass
+
+def normalize_mac(value: str) -> str:
+    mac = (value or "").strip().replace("-", ":").replace(".", "")
+    if len(mac) == 12:
+        mac = ":".join(mac[i:i+2] for i in range(0, 12, 2))
+    return mac.upper()
 
 def _read_legacy_database_with_salvage():
     def _cleanup_corrupt_backups():
@@ -202,15 +241,19 @@ def _sync_sqlite_from_legacy_files():
     legacy_db = _read_legacy_database_with_salvage()
     if legacy_db is not None:
         _write_sqlite_json("devices", legacy_db)
-    legacy_monitoring = _read_json_file(MONITORING_FILE, default=None)
-    if legacy_monitoring is not None:
-        _write_sqlite_json("monitoring", legacy_monitoring)
     legacy_settings = _read_json_file(SETTINGS_FILE, default=None)
     if legacy_settings is not None:
         _write_sqlite_json("settings", legacy_settings)
 
 def init_database():
     """Initialize empty database if it doesn't exist"""
+    existing = _read_sqlite_json("devices")
+    if existing is not None:
+        return
+    legacy = _read_legacy_database_with_salvage()
+    if legacy is not None:
+        _write_sqlite_json("devices", legacy)
+        return
     data = {
         "version": "1.0",
         "meta": {
@@ -222,7 +265,6 @@ def init_database():
         "discovery_sessions": []
     }
     _write_sqlite_json("devices", data)
-    _write_json_file(DATABASE_FILE, data)
 
 DEFAULT_SETTINGS = {
     "default_site": "",
@@ -230,8 +272,15 @@ DEFAULT_SETTINGS = {
     "default_scan_depth": 3,
     "auto_refresh": False,
     "refresh_interval": 30,
+    "module_max_concurrent": 2,
     "module_credentials": {},
+    "module_last_params": {},
     "module_schedules": [],
+    "agent_server_url": "http://127.0.0.1:5000",
+    "agents": [],
+    "stale_scan_days": 7,
+    "agent_online_minutes": 5,
+    "auth_session_hours": 12,
     "auth": {
         "enabled": False,
         "users": []
@@ -240,148 +289,15 @@ DEFAULT_SETTINGS = {
 
 def init_settings():
     """Initialize default settings"""
+    existing = _read_sqlite_json("settings")
+    if existing is not None:
+        return
+    legacy = _read_json_file(SETTINGS_FILE, default=None)
+    if legacy is not None:
+        _write_sqlite_json("settings", legacy)
+        return
     settings = DEFAULT_SETTINGS.copy()
     _write_sqlite_json("settings", settings)
-    _write_json_file(SETTINGS_FILE, settings)
-
-DEFAULT_MONITORING_RULES_LIST = [
-    {"id": "loss", "type": "loss", "threshold": 100, "enabled": True},
-    {"id": "latency", "type": "latency", "threshold": 500, "enabled": True},
-]
-
-def init_monitoring():
-    data = {
-        "version": "1.0",
-        "meta": {
-            "created": datetime.now().isoformat(),
-            "last_modified": datetime.now().isoformat()
-        },
-        "sites": {}
-    }
-    _write_sqlite_json("monitoring", data)
-    _write_json_file(MONITORING_FILE, data)
-    if not os.path.exists(LOGS_DIR):
-        os.makedirs(LOGS_DIR, exist_ok=True)
-
-def read_monitoring():
-    data = _read_sqlite_json("monitoring")
-    if data is not None:
-        return data
-    legacy = _read_json_file(MONITORING_FILE, default=None)
-    if legacy is not None:
-        _write_sqlite_json("monitoring", legacy)
-        return legacy
-    init_monitoring()
-    return _read_sqlite_json("monitoring") or {"version": "1.0", "meta": {"last_modified": datetime.now().isoformat()}, "sites": {}}
-
-def write_monitoring(data):
-    data.setdefault("meta", {})
-    data["meta"]["last_modified"] = datetime.now().isoformat()
-    _write_sqlite_json("monitoring", data)
-    _write_json_file(MONITORING_FILE, data)
-
-def _safe_log_name(site_name):
-    safe = _safe_site_name(site_name)
-    return safe or "site"
-
-def _cleanup_logs():
-    cutoff = time.time() - (LOG_RETENTION_DAYS * 86400)
-    try:
-        for name in os.listdir(LOGS_DIR):
-            path = os.path.join(LOGS_DIR, name)
-            if not os.path.isfile(path):
-                continue
-            if os.path.getmtime(path) < cutoff:
-                os.remove(path)
-    except OSError:
-        pass
-
-def _cleanup_module_logs():
-    try:
-        for name in os.listdir(BASE_DIR):
-            if not name.startswith("module_log_") or not name.endswith(".txt"):
-                continue
-            path = os.path.join(BASE_DIR, name)
-            if not os.path.isfile(path):
-                continue
-            os.remove(path)
-    except OSError:
-        pass
-
-def _cleanup_module_configs():
-    try:
-        for name in os.listdir(BASE_DIR):
-            if not name.startswith("module_config_") or not name.endswith(".json"):
-                continue
-            path = os.path.join(BASE_DIR, name)
-            if not os.path.isfile(path):
-                continue
-            os.remove(path)
-    except OSError:
-        pass
-
-def log_event(site_name, message):
-    init_monitoring()
-    safe = _safe_log_name(site_name)
-    log_path = os.path.join(LOGS_DIR, f"{safe}.log")
-    timestamp = datetime.now().isoformat(timespec="seconds")
-    line = f"[{timestamp}] {message}\n"
-    try:
-        with portalocker.Lock(log_path, 'a', timeout=2, encoding='utf-8') as f:
-            f.write(line)
-    except portalocker.exceptions.LockException:
-        pass
-    _cleanup_logs()
-
-def _get_monitoring_site(data, site_name):
-    sites = data.setdefault("sites", {})
-    entry = sites.get(site_name)
-    if not isinstance(entry, dict):
-        entry = {}
-        sites[site_name] = entry
-    entry.setdefault("devices", {})
-    if "rules" not in entry:
-        entry["rules"] = [rule.copy() for rule in DEFAULT_MONITORING_RULES_LIST]
-    elif isinstance(entry.get("rules"), dict):
-        legacy = entry.get("rules", {})
-        entry["rules"] = [
-            {"id": "loss", "type": "loss", "threshold": int(legacy.get("loss_threshold", 100)), "enabled": True},
-            {"id": "latency", "type": "latency", "threshold": int(legacy.get("latency_threshold_ms", 500)), "enabled": True},
-        ]
-    return entry
-
-def _get_device_monitoring(site_entry, device_id):
-    devices = site_entry.setdefault("devices", {})
-    entry = devices.get(device_id)
-    if not isinstance(entry, dict):
-        entry = {}
-        devices[device_id] = entry
-    entry.setdefault("enabled", False)
-    entry.setdefault("placed", False)
-    entry.setdefault("dock", "center")
-    entry.setdefault("last_status", None)
-    if "rules" not in entry:
-        entry["rules"] = []
-    return entry
-
-def _get_monitoring_layout(site_entry):
-    layout = site_entry.get("layout")
-    if not isinstance(layout, dict):
-        layout = {}
-    merged = {
-        "top": int(layout.get("top", DEFAULT_MONITORING_LAYOUT["top"])),
-        "bottom": int(layout.get("bottom", DEFAULT_MONITORING_LAYOUT["bottom"])),
-        "left": int(layout.get("left", DEFAULT_MONITORING_LAYOUT["left"])),
-        "right": int(layout.get("right", DEFAULT_MONITORING_LAYOUT["right"])),
-        "labels": DEFAULT_MONITORING_LAYOUT["labels"].copy()
-    }
-    labels = layout.get("labels")
-    if isinstance(labels, dict):
-        for key in merged["labels"].keys():
-            if isinstance(labels.get(key), str) and labels.get(key).strip():
-                merged["labels"][key] = labels[key].strip()
-    site_entry["layout"] = merged
-    return merged
 
 def _log_perf(label, start_time):
     duration = time.perf_counter() - start_time
@@ -410,7 +326,6 @@ def write_database(data):
     """Write database"""
     try:
         _write_sqlite_json("devices", data)
-        _write_json_file(DATABASE_FILE, data)
         return True
     except Exception as e:
         print(f"Error writing database: {e}", file=sys.stderr)
@@ -434,7 +349,6 @@ def read_settings():
 
     if merged != loaded:
         _write_sqlite_json("settings", merged)
-        _write_json_file(SETTINGS_FILE, merged)
 
     return merged
 
@@ -442,7 +356,175 @@ def read_settings():
 def write_settings(settings):
     """Write settings file"""
     _write_sqlite_json("settings", settings)
-    _write_json_file(SETTINGS_FILE, settings)
+    try:
+        _write_json_file(SETTINGS_FILE, settings)
+    except Exception:
+        pass
+
+
+def _generate_agent_token() -> str:
+    return uuid.uuid4().hex + uuid.uuid4().hex
+
+
+def _normalize_agent_payload(payload, existing=None):
+    if not isinstance(payload, dict):
+        return None
+    name = (payload.get("name") or "").strip()
+    site = (payload.get("site") or "").strip()
+    target_range = (payload.get("target_range") or "").strip()
+    target_ranges = payload.get("target_ranges") if isinstance(payload.get("target_ranges"), list) else (existing.get("target_ranges") if existing else [])
+    target_ranges = [r.strip() for r in target_ranges if isinstance(r, str) and r.strip()]
+    if not name or not site or (not target_range and not target_ranges):
+        return None
+    enabled = bool(payload.get("enabled", True))
+    interval_min = int(payload.get("interval_min") or 0)
+    if interval_min < 0:
+        interval_min = 0
+    allow_interval = bool(payload.get("allow_interval", True))
+    allow_on_demand = bool(payload.get("allow_on_demand", True))
+    server_host = (payload.get("server_host") or "").strip()
+    agent_id = (payload.get("id") or "").strip() or (existing.get("id") if existing else "")
+    token = (payload.get("token") or "").strip() or (existing.get("token") if existing else "")
+    if not token:
+        token = _generate_agent_token()
+    if not agent_id:
+        agent_id = f"agent_{uuid.uuid4().hex[:8]}"
+    trust_mode = (payload.get("trust_mode") or (existing.get("trust_mode") if existing else "augment")).strip().lower()
+    if trust_mode not in ("augment", "replace"):
+        trust_mode = "augment"
+    ip_scan_min = int(payload.get("ip_scan_min") or (existing.get("ip_scan_min") if existing else 10) or 10)
+    ping_min = int(payload.get("ping_min") or (existing.get("ping_min") if existing else 2) or 2)
+    modules_cfg = payload.get("modules") if isinstance(payload.get("modules"), dict) else (existing.get("modules") if existing else {})
+    credentials_cfg = payload.get("credentials") if isinstance(payload.get("credentials"), dict) else (existing.get("credentials") if existing else {})
+
+    return {
+        "id": agent_id,
+        "name": name,
+        "site": site,
+        "target_range": target_range,
+        "enabled": enabled,
+        "interval_min": interval_min,
+        "allow_interval": allow_interval,
+        "allow_on_demand": allow_on_demand,
+        "target_ranges": target_ranges,
+        "server_host": server_host,
+        "token": token,
+        "trust_mode": trust_mode,
+        "ip_scan_min": ip_scan_min,
+        "ping_min": ping_min,
+        "modules": modules_cfg,
+        "credentials": credentials_cfg,
+        "device_name": (payload.get("device_name") or (existing.get("device_name") if existing else "")).strip(),
+        "device_ip": (payload.get("device_ip") or (existing.get("device_ip") if existing else "")).strip(),
+        "device_mac": normalize_mac(payload.get("device_mac") or (existing.get("device_mac") if existing else "")),
+        "last_seen": existing.get("last_seen") if existing else None,
+        "last_scan_at": existing.get("last_scan_at") if existing else None,
+        "last_result": existing.get("last_result") if existing else None,
+        "last_result_at": existing.get("last_result_at") if existing else None,
+        "last_state": existing.get("last_state") if existing else None,
+        "run_now": bool(existing.get("run_now")) if existing else False
+    }
+
+
+def _write_agent_config_files(agent, settings):
+    if not agent:
+        return
+    base_url = (settings or {}).get("agent_server_url") or "http://127.0.0.1:5000"
+    host_override = (agent.get("server_host") or "").strip()
+    if host_override:
+        base_url = host_override
+    config = {
+        "agent_id": agent.get("id"),
+        "name": agent.get("name"),
+        "site": agent.get("site"),
+        "target_range": agent.get("target_range"),
+        "target_ranges": agent.get("target_ranges") or [],
+        "enabled": agent.get("enabled", True),
+        "interval_min": agent.get("interval_min", 0),
+        "allow_interval": agent.get("allow_interval", True),
+        "allow_on_demand": agent.get("allow_on_demand", True),
+        "server_url": base_url,
+        "token": agent.get("token"),
+        "retention_days": AGENT_SCAN_RETENTION_DAYS
+    }
+    os.makedirs(AGENT_CONFIG_DIR, exist_ok=True)
+    json_path = os.path.join(AGENT_CONFIG_DIR, f"{agent.get('id')}.json")
+    txt_path = os.path.join(AGENT_CONFIG_DIR, f"{agent.get('id')}.txt")
+    try:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2)
+    except Exception:
+        pass
+    try:
+        with open(txt_path, "w", encoding="utf-8") as f:
+            for key, value in config.items():
+                f.write(f"{key}={value}\n")
+    except Exception:
+        pass
+
+
+def _cleanup_agent_scans(agent_id=None):
+    cutoff = time.time() - (AGENT_SCAN_RETENTION_DAYS * 86400)
+    base_dir = os.path.join(AGENT_SCAN_DIR, agent_id) if agent_id else AGENT_SCAN_DIR
+    if not os.path.isdir(base_dir):
+        return
+    for root, _, files in os.walk(base_dir):
+        for name in files:
+            path = os.path.join(root, name)
+            try:
+                if os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+            except OSError:
+                pass
+
+
+def _write_agent_scan_files(agent, scan_time, devices):
+    if not agent:
+        return None
+    agent_id = agent.get("id") or "agent"
+    site = agent.get("site") or ""
+    safe_site = site.replace("/", "_").replace("\\", "_").replace(":", "_")
+    ts = scan_time.replace(":", "").replace("-", "").replace("T", "_").split(".")[0]
+    out_dir = os.path.join(AGENT_SCAN_DIR, agent_id)
+    os.makedirs(out_dir, exist_ok=True)
+    json_path = os.path.join(out_dir, f"{safe_site}_{ts}.json")
+    csv_path = os.path.join(out_dir, f"{safe_site}_{ts}.csv")
+
+    try:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "agent_id": agent_id,
+                "site": site,
+                "scan_time": scan_time,
+                "devices": devices
+            }, f, indent=2)
+    except Exception:
+        pass
+
+    header = [
+        "Status", "Name", "IP", "Radmin", "Http", "Https", "Ftp", "Rdp",
+        "Shared folders", "Shared printers", "NetBIOS group", "Manufacturer",
+        "MAC address", "User", "Date", "Comments"
+    ]
+    try:
+        with open(csv_path, "w", encoding="utf-16", newline="") as f:
+            writer = csv.writer(f, delimiter="\t")
+            writer.writerow(header)
+            for dev in devices:
+                writer.writerow([
+                    "On",
+                    dev.get("name") or dev.get("hostname") or dev.get("ip") or "",
+                    dev.get("ip") or "",
+                    "", "", "", "", "", "", "", "",
+                    dev.get("manufacturer") or "",
+                    dev.get("mac") or "",
+                    "", "", ""
+                ])
+    except Exception:
+        pass
+
+    _cleanup_agent_scans(agent_id)
+    return {"json": json_path, "csv": csv_path}
 
 def read_oui_ranges():
     if not os.path.exists(OUI_RANGES_FILE):
@@ -523,9 +605,29 @@ def _normalize_schedule_payload(payload):
         if not isinstance(params, dict):
             params = {}
         mod_entry = {"module_id": module_id, "parameters": params}
-        cred = entry.get("credential_profile")
+
+        # Normalize credential profile (prefer explicit field, but accept param value)
+        cred = entry.get("credential_profile") or params.pop("credential_profile", None)
         if isinstance(cred, str) and cred.strip():
             mod_entry["credential_profile"] = cred.strip()
+
+        # For all-sites schedules, avoid persisting stale device selections
+        if mode == "all":
+            targets = params.get("targets")
+            if isinstance(targets, dict):
+                targets["auto"] = True
+                targets["auto_on_empty"] = True
+                if "device_ids" in targets:
+                    targets["device_ids"] = "__AUTO__"
+                if "manual_devices" in targets:
+                    targets["manual_devices"] = []
+            elif targets is None and module_id in ("ubiquiti_cdp_reader", "uniview_nvr_capture"):
+                params["targets"] = {
+                    "auto": True,
+                    "auto_on_empty": True,
+                    "device_ids": "__AUTO__",
+                    "manual_devices": []
+                }
         modules.append(mod_entry)
 
     return {
@@ -542,6 +644,11 @@ def _serialize_schedule(schedule, state=None):
     data = copy.deepcopy(schedule)
     if state:
         data["status"] = state.get("status", "idle")
+        data["progress"] = {
+            "completed_sites": int(state.get("completed_sites") or 0),
+            "total_sites": int(state.get("total_sites") or 0),
+            "active_sites": int(state.get("active_sites") or 0)
+        }
         next_run = state.get("next_run_at")
         last_run = state.get("last_run_at")
         if isinstance(next_run, datetime):
@@ -612,8 +719,17 @@ def _validate_schedule_config(schedule):
             name = field.get("name")
             if not name:
                 continue
+            if module_id in ("ubiquiti_cdp_reader", "uniview_nvr_capture") and name == "targets":
+                continue
+            if module_id == "uniview_nvr_capture" and name == "nic" and params.get("nic") in (None, ""):
+                params["nic"] = field.get("default") or "NIC1"
+            if module_id == "uniview_nvr_capture" and name == "ip_mode" and params.get("ip_mode") in (None, ""):
+                params["ip_mode"] = field.get("default") or "filter"
             value = params.get(name)
             if value is None:
+                if "default" in field:
+                    params[name] = field.get("default")
+                    continue
                 errors.append(f"{module_id}: missing {name}")
                 continue
             if isinstance(value, str) and not value.strip():
@@ -621,16 +737,210 @@ def _validate_schedule_config(schedule):
 
     return errors
 
+def _json_list(value):
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    if isinstance(value, str):
+        try:
+            loaded = json.loads(value)
+            if isinstance(loaded, list):
+                return [item for item in loaded if isinstance(item, str)]
+        except Exception:
+            return []
+    return []
+
+
+def _auth_user_from_row(row):
+    if not row:
+        return None
+    return {
+        "username": row[0],
+        "password_hash": row[1],
+        "role": row[2] or "guest",
+        "allowed_sites": _json_list(row[3]),
+        "disabled": bool(row[4]),
+        "created_at": row[5],
+        "updated_at": row[6],
+        "last_login_at": row[7],
+    }
+
+
+def _audit(action, target=None, details=None, actor=None):
+    try:
+        now = datetime.now().isoformat()
+        username = actor
+        if username is None:
+            user = getattr(g, "current_user", None)
+            username = user.get("username") if isinstance(user, dict) else session.get("user")
+        conn = _get_sqlite_conn()
+        conn.execute(
+            "INSERT INTO audit_log (actor, action, target, details_json, ip_address, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                username,
+                action,
+                target,
+                json.dumps(details or {}),
+                request.remote_addr if request else None,
+                now,
+            )
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def _sync_legacy_auth_users_to_settings():
+    try:
+        conn = _get_sqlite_conn()
+        rows = conn.execute(
+            "SELECT username, password_hash, role, allowed_sites_json, disabled "
+            "FROM auth_users ORDER BY username COLLATE NOCASE"
+        ).fetchall()
+        conn.close()
+        legacy_users = []
+        for row in rows:
+            legacy_users.append({
+                "username": row[0],
+                "password_hash": row[1],
+                "role": row[2] or "guest",
+                "allowed_sites": _json_list(row[3]),
+                "disabled": bool(row[4]),
+            })
+        settings = read_settings()
+        auth = settings.get("auth") if isinstance(settings.get("auth"), dict) else {}
+        auth["users"] = legacy_users
+        auth["users_migrated_to_sqlite"] = True
+        settings["auth"] = auth
+        write_settings(settings)
+    except Exception:
+        pass
+
+
+def _record_login_attempt(username, success, reason=""):
+    try:
+        conn = _get_sqlite_conn()
+        conn.execute(
+            "INSERT INTO auth_login_attempts (username, success, ip_address, user_agent, created_at, reason) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                username,
+                1 if success else 0,
+                request.remote_addr,
+                request.headers.get("User-Agent", "")[:500],
+                datetime.now().isoformat(),
+                reason,
+            )
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def _list_auth_users():
+    _migrate_auth_users_from_settings()
+    conn = _get_sqlite_conn()
+    rows = conn.execute(
+        "SELECT username, password_hash, role, allowed_sites_json, disabled, created_at, updated_at, last_login_at "
+        "FROM auth_users ORDER BY username COLLATE NOCASE"
+    ).fetchall()
+    conn.close()
+    return [_auth_user_from_row(row) for row in rows]
+
+
+def _auth_user_count():
+    _migrate_auth_users_from_settings()
+    conn = _get_sqlite_conn()
+    row = conn.execute("SELECT COUNT(*) FROM auth_users").fetchone()
+    conn.close()
+    return int(row[0] if row else 0)
+
+
+def _active_admin_count(exclude_username=None):
+    _migrate_auth_users_from_settings()
+    conn = _get_sqlite_conn()
+    if exclude_username:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM auth_users WHERE role = 'admin' AND disabled = 0 AND username != ?",
+            (exclude_username,)
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM auth_users WHERE role = 'admin' AND disabled = 0"
+        ).fetchone()
+    conn.close()
+    return int(row[0] if row else 0)
+
+
+def _migrate_auth_users_from_settings():
+    if getattr(_migrate_auth_users_from_settings, "_done", False):
+        return
+    conn = _get_sqlite_conn()
+    row = conn.execute("SELECT COUNT(*) FROM auth_users").fetchone()
+    existing = int(row[0] if row else 0)
+    if existing == 0:
+        settings_row = conn.execute("SELECT json FROM json_store WHERE name = 'settings'").fetchone()
+        settings = {}
+        if settings_row:
+            try:
+                settings = json.loads(settings_row[0])
+            except Exception:
+                settings = {}
+        auth = settings.get("auth", {}) if isinstance(settings, dict) else {}
+        users = auth.get("users", []) if isinstance(auth, dict) else []
+        now = datetime.now().isoformat()
+        for user in users:
+            if not isinstance(user, dict):
+                continue
+            username = (user.get("username") or "").strip()
+            password_hash = user.get("password_hash") or ""
+            role = user.get("role") or "guest"
+            if not username or not password_hash or role not in ("admin", "operator", "guest"):
+                continue
+            allowed_sites = user.get("allowed_sites") if isinstance(user.get("allowed_sites"), list) else []
+            conn.execute(
+                "INSERT OR IGNORE INTO auth_users "
+                "(username, password_hash, role, allowed_sites_json, disabled, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    username,
+                    password_hash,
+                    role,
+                    json.dumps(_json_list(allowed_sites)),
+                    1 if user.get("disabled") else 0,
+                    now,
+                    now,
+                )
+            )
+        if isinstance(settings, dict):
+            auth = settings.get("auth", {}) if isinstance(settings.get("auth"), dict) else {}
+            auth["users_migrated_to_sqlite"] = True
+            settings["auth"] = auth
+            conn.execute(
+                "INSERT INTO json_store (name, json, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT(name) DO UPDATE SET json=excluded.json, updated_at=excluded.updated_at",
+                ("settings", json.dumps(settings), now)
+            )
+            try:
+                _write_json_file(SETTINGS_FILE, settings)
+            except Exception:
+                pass
+    conn.commit()
+    conn.close()
+    _migrate_auth_users_from_settings._done = True
+    _sync_legacy_auth_users_to_settings()
+
+
 def _get_auth_config():
+    _migrate_auth_users_from_settings()
     settings = read_settings()
     auth = settings.get("auth") if isinstance(settings, dict) else {}
     if not isinstance(auth, dict):
         auth = {}
-    users = auth.get("users", [])
-    if not isinstance(users, list):
-        users = []
     enabled = bool(auth.get("enabled", False))
-    return {"enabled": enabled, "users": users}
+    return {"enabled": enabled, "users": _list_auth_users()}
 
 def _safe_site_name(site_name):
     if not site_name:
@@ -649,21 +959,155 @@ def _get_effective_user():
             "allowed_sites": [],
             "disabled": False,
         }
-    username = session.get("user")
-    user = _find_user(username) if username else None
+    session_id = session.get("auth_session_id")
+    user = _user_for_session(session_id) if session_id else None
     if user and user.get("disabled"):
+        _revoke_session(session_id)
+        session.pop("auth_session_id", None)
         session.pop("user", None)
         return None
+    if user:
+        g.current_user = user
     return user
 
 def _find_user(username):
     if not username:
         return None
-    auth = _get_auth_config()
-    for user in auth["users"]:
-        if isinstance(user, dict) and user.get("username") == username:
-            return user
-    return None
+    _migrate_auth_users_from_settings()
+    conn = _get_sqlite_conn()
+    row = conn.execute(
+        "SELECT username, password_hash, role, allowed_sites_json, disabled, created_at, updated_at, last_login_at "
+        "FROM auth_users WHERE username = ?",
+        (username,)
+    ).fetchone()
+    conn.close()
+    return _auth_user_from_row(row)
+
+
+def _create_auth_user(username, password, role, allowed_sites, disabled=False):
+    now = datetime.now().isoformat()
+    conn = _get_sqlite_conn()
+    conn.execute(
+        "INSERT INTO auth_users "
+        "(username, password_hash, role, allowed_sites_json, disabled, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            username,
+            generate_password_hash(password),
+            role,
+            json.dumps(_json_list(allowed_sites)),
+            1 if disabled else 0,
+            now,
+            now,
+        )
+    )
+    conn.commit()
+    conn.close()
+    _sync_legacy_auth_users_to_settings()
+
+
+def _update_auth_user(username, updates):
+    if not updates:
+        return
+    fields = []
+    values = []
+    if "role" in updates:
+        fields.append("role = ?")
+        values.append(updates["role"])
+    if "allowed_sites" in updates:
+        fields.append("allowed_sites_json = ?")
+        values.append(json.dumps(_json_list(updates["allowed_sites"])))
+    if "disabled" in updates:
+        fields.append("disabled = ?")
+        values.append(1 if updates["disabled"] else 0)
+    if "password" in updates and updates["password"]:
+        fields.append("password_hash = ?")
+        values.append(generate_password_hash(updates["password"]))
+    fields.append("updated_at = ?")
+    values.append(datetime.now().isoformat())
+    values.append(username)
+    conn = _get_sqlite_conn()
+    conn.execute(f"UPDATE auth_users SET {', '.join(fields)} WHERE username = ?", values)
+    conn.commit()
+    conn.close()
+    _sync_legacy_auth_users_to_settings()
+
+
+def _delete_auth_user(username):
+    conn = _get_sqlite_conn()
+    conn.execute("DELETE FROM auth_users WHERE username = ?", (username,))
+    conn.execute(
+        "UPDATE auth_sessions SET revoked_at = ? WHERE username = ? AND revoked_at IS NULL",
+        (datetime.now().isoformat(), username)
+    )
+    conn.commit()
+    conn.close()
+
+
+def _create_session_for_user(username):
+    settings = read_settings()
+    hours = int(settings.get("auth_session_hours") or 12)
+    hours = max(1, min(hours, 168))
+    now = datetime.now()
+    session_id = uuid.uuid4().hex + uuid.uuid4().hex
+    conn = _get_sqlite_conn()
+    conn.execute(
+        "INSERT INTO auth_sessions (session_id, username, created_at, expires_at, ip_address, user_agent) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            session_id,
+            username,
+            now.isoformat(),
+            (now + timedelta(hours=hours)).isoformat(),
+            request.remote_addr,
+            request.headers.get("User-Agent", "")[:500],
+        )
+    )
+    conn.execute("UPDATE auth_users SET last_login_at = ? WHERE username = ?", (now.isoformat(), username))
+    conn.commit()
+    conn.close()
+    session.permanent = True
+    session["auth_session_id"] = session_id
+    session["user"] = username
+    return session_id
+
+
+def _user_for_session(session_id):
+    if not session_id:
+        return None
+    now = datetime.now().isoformat()
+    conn = _get_sqlite_conn()
+    row = conn.execute(
+        "SELECT u.username, u.password_hash, u.role, u.allowed_sites_json, u.disabled, "
+        "u.created_at, u.updated_at, u.last_login_at "
+        "FROM auth_sessions s JOIN auth_users u ON u.username = s.username "
+        "WHERE s.session_id = ? AND s.revoked_at IS NULL AND s.expires_at > ?",
+        (session_id, now)
+    ).fetchone()
+    conn.close()
+    return _auth_user_from_row(row)
+
+
+def _revoke_session(session_id):
+    if not session_id:
+        return
+    conn = _get_sqlite_conn()
+    conn.execute(
+        "UPDATE auth_sessions SET revoked_at = ? WHERE session_id = ? AND revoked_at IS NULL",
+        (datetime.now().isoformat(), session_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def _revoke_user_sessions(username):
+    conn = _get_sqlite_conn()
+    conn.execute(
+        "UPDATE auth_sessions SET revoked_at = ? WHERE username = ? AND revoked_at IS NULL",
+        (datetime.now().isoformat(), username)
+    )
+    conn.commit()
+    conn.close()
 
 def _is_admin(user):
     return bool(user) and user.get("role") == "admin"
@@ -749,6 +1193,7 @@ def enforce_auth():
     if path.startswith("/api/") or path.startswith("/generated_maps/") or path.startswith("/static/maps/"):
         user = _get_effective_user()
         if not user:
+            session.pop("auth_session_id", None)
             session.pop("user", None)
             if path.startswith("/api/"):
                 return jsonify({"error": "auth_required"}), 401
@@ -801,6 +1246,26 @@ class ModuleRunner:
         self.running_modules = {}
         self.module_results = {}
         self.lock = threading.Lock()
+        # Limit concurrent module executions to avoid resource contention.
+        self.max_concurrent = int(os.environ.get("CMAPPER_MAX_MODULES", "2") or 2)
+        self.semaphore = threading.Semaphore(self.max_concurrent)
+
+    def set_max_concurrent(self, value):
+        try:
+            new_max = int(value)
+        except (TypeError, ValueError):
+            return
+        if new_max < 1:
+            new_max = 1
+        with self.lock:
+            running_count = sum(1 for item in self.running_modules.values() if item.get("status") == "running")
+            self.max_concurrent = new_max
+            self.semaphore = threading.Semaphore(new_max)
+            for _ in range(min(running_count, new_max)):
+                try:
+                    self.semaphore.acquire(False)
+                except Exception:
+                    break
     
     def run_module(self, module_id, config):
         """Run a module in background thread"""
@@ -808,17 +1273,32 @@ class ModuleRunner:
         
         def module_thread():
             config_file = None
+            acquired = False
             try:
                 log_file = os.path.join(BASE_DIR, f"module_log_{thread_id}.txt")
+                site_name = config.get("site_name") if isinstance(config, dict) else None
+                schedule_id = config.get("schedule_id") if isinstance(config, dict) else None
+                schedule_name = config.get("schedule_name") if isinstance(config, dict) else None
                 # Update status
                 with self.lock:
                     self.running_modules[thread_id] = {
                         "module_id": module_id,
-                        "status": "running",
-                        "start_time": datetime.now().isoformat(),
+                        "status": "queued",
+                        "queued_at": datetime.now().isoformat(),
                         "progress": 0,
-                        "log_file": log_file
+                        "log_file": log_file,
+                        "site_name": site_name,
+                        "schedule_id": schedule_id,
+                        "schedule_name": schedule_name
                     }
+
+                # Respect concurrency cap
+                self.semaphore.acquire()
+                acquired = True
+                with self.lock:
+                    if thread_id in self.running_modules:
+                        self.running_modules[thread_id]["status"] = "running"
+                        self.running_modules[thread_id]["start_time"] = datetime.now().isoformat()
                 
                 print(f"=== DEBUG: Starting module {module_id} ===", file=sys.stderr)
                 print(f"Config: {_mask_sensitive(config)}", file=sys.stderr)
@@ -838,8 +1318,7 @@ class ModuleRunner:
                 # Create temp config file
                 temp_config = {
                     **config,
-                    "database_path": os.path.abspath(DATABASE_FILE),
-                    "monitoring_db_path": os.path.abspath(MONITORING_FILE),
+                    "database_path": os.path.abspath(SQLITE_DB_FILE),
                     "module_id": module_id,
                     "thread_id": thread_id,
                     "log_file": log_file
@@ -879,17 +1358,23 @@ class ModuleRunner:
                 print(f"STDERR: {result.stderr}", file=sys.stderr)
                 try:
                     with open(log_file, "a", encoding="utf-8") as lf:
-                        lf.write(f"Return code: {result.returncode}\n")
-                        if result.stdout:
-                            lf.write("STDOUT:\n")
-                            lf.write(result.stdout)
-                            if not result.stdout.endswith("\n"):
-                                lf.write("\n")
-                        if result.stderr:
-                            lf.write("STDERR:\n")
-                            lf.write(result.stderr)
-                            if not result.stderr.endswith("\n"):
-                                lf.write("\n")
+                        hide_mac_success_output = (
+                            module_id in ("mac_table_search", "mac_group_map")
+                            and result.returncode == 0
+                            and '"status": "error"' not in result.stdout
+                        )
+                        if not hide_mac_success_output:
+                            lf.write(f"Return code: {result.returncode}\n")
+                            if result.stdout:
+                                lf.write("STDOUT:\n")
+                                lf.write(result.stdout)
+                                if not result.stdout.endswith("\n"):
+                                    lf.write("\n")
+                            if result.stderr:
+                                lf.write("STDERR:\n")
+                                lf.write(result.stderr)
+                                if not result.stderr.endswith("\n"):
+                                    lf.write("\n")
                 except Exception:
                     pass
                 
@@ -897,12 +1382,15 @@ class ModuleRunner:
                     self.running_modules[thread_id]["progress"] = 75
                 
                 # Parse module output
+                final_status = "completed"
                 if result.returncode == 0:
                     try:
                         module_output = json.loads(result.stdout.strip())
+                        if isinstance(module_output, dict) and str(module_output.get("status", "")).lower() == "error":
+                            final_status = "failed"
                         with self.lock:
                             self.module_results[thread_id] = {
-                                "status": "completed",
+                                "status": final_status,
                                 "output": module_output,
                                 "completed_at": datetime.now().isoformat(),
                                 "log_file": log_file
@@ -920,6 +1408,7 @@ class ModuleRunner:
                             if thread_id in self.running_modules:
                                 self.running_modules[thread_id]["output"] = {"message": result.stdout.strip()}
                 else:
+                    final_status = "failed"
                     with self.lock:
                         self.module_results[thread_id] = {
                             "status": "failed",
@@ -927,19 +1416,14 @@ class ModuleRunner:
                             "completed_at": datetime.now().isoformat(),
                             "log_file": log_file
                         }
-                
+
                 # Update final status
                 with self.lock:
                     if thread_id in self.running_modules:
-                        self.running_modules[thread_id]["status"] = "completed"
+                        self.running_modules[thread_id]["status"] = final_status
                         self.running_modules[thread_id]["progress"] = 100
                         self.running_modules[thread_id]["completed_at"] = datetime.now().isoformat()
 
-                # Sync SQLite from legacy JSON files after module writes
-                try:
-                    _sync_sqlite_from_legacy_files()
-                except Exception:
-                    pass
                 
                 # Clean up temp config file
                 try:
@@ -965,6 +1449,11 @@ class ModuleRunner:
                         os.remove(config_file)
                 except Exception:
                     pass
+                if acquired:
+                    try:
+                        self.semaphore.release()
+                    except ValueError:
+                        pass
                 # Cleanup after delay
                 threading.Timer(300, self.cleanup_thread, args=[thread_id]).start()
         
@@ -991,17 +1480,31 @@ class ModuleRunner:
             running = self.running_modules.pop(thread_id, None)
             result = self.module_results.pop(thread_id, None)
             log_file = (running or {}).get("log_file") or (result or {}).get("log_file")
-        # Keep log files for troubleshooting; manual cleanup if needed.
         _cleanup_module_logs()
         _cleanup_module_configs()
     
     def get_all_status(self):
         """Get status of all modules"""
         with self.lock:
+            running_jobs = []
+            for thread_id, info in self.running_modules.items():
+                entry = copy.deepcopy(info)
+                entry["thread_id"] = thread_id
+                running_jobs.append(entry)
             return {
                 "running": list(self.running_modules.keys()),
-                "completed": list(self.module_results.keys())
+                "completed": list(self.module_results.keys()),
+                "running_jobs": running_jobs
             }
+
+    def get_running_jobs(self):
+        with self.lock:
+            jobs = []
+            for thread_id, info in self.running_modules.items():
+                entry = copy.deepcopy(info)
+                entry["thread_id"] = thread_id
+                jobs.append(entry)
+            return jobs
 
 # ==================== SCHEDULED MODULE RUNNER ====================
 
@@ -1010,8 +1513,67 @@ class ScheduleRunner:
         self.poll_interval = poll_interval
         self.state = {}
         self.lock = threading.Lock()
+        self.dirty = False
+        self._load_state()
         self.thread = threading.Thread(target=self._loop, daemon=True)
         self.thread.start()
+
+    def _load_state(self):
+        settings = read_settings() or {}
+        saved = settings.get("schedule_state", {})
+        if not isinstance(saved, dict):
+            return
+        with self.lock:
+            for schedule_id, entry in saved.items():
+                if not isinstance(entry, dict):
+                    continue
+                next_run_at = entry.get("next_run_at")
+                last_run_at = entry.get("last_run_at")
+                if isinstance(next_run_at, str):
+                    try:
+                        next_run_at = datetime.fromisoformat(next_run_at)
+                    except Exception:
+                        next_run_at = None
+                if isinstance(last_run_at, str):
+                    try:
+                        last_run_at = datetime.fromisoformat(last_run_at)
+                    except Exception:
+                        last_run_at = None
+                status = entry.get("status") or "idle"
+                if status == "running":
+                    status = "idle"
+                self.state[schedule_id] = {
+                    "status": status,
+                    "next_run_at": next_run_at,
+                    "last_run_at": last_run_at,
+                    "last_result": entry.get("last_result"),
+                    "running": False,
+                    "active_sites": entry.get("active_sites", 0),
+                    "completed_sites": entry.get("completed_sites", 0),
+                    "total_sites": entry.get("total_sites", 0),
+                    "started_at": None
+                }
+
+    def _persist_state(self):
+        payload = {}
+        with self.lock:
+            for schedule_id, entry in self.state.items():
+                if not isinstance(entry, dict):
+                    continue
+                next_run_at = entry.get("next_run_at")
+                last_run_at = entry.get("last_run_at")
+                payload[schedule_id] = {
+                    "status": entry.get("status", "idle"),
+                    "next_run_at": next_run_at.isoformat() if isinstance(next_run_at, datetime) else next_run_at,
+                    "last_run_at": last_run_at.isoformat() if isinstance(last_run_at, datetime) else last_run_at,
+                    "last_result": entry.get("last_result"),
+                    "active_sites": entry.get("active_sites", 0),
+                    "completed_sites": entry.get("completed_sites", 0),
+                    "total_sites": entry.get("total_sites", 0)
+                }
+        settings = read_settings() or {}
+        settings["schedule_state"] = payload
+        write_settings(settings)
 
     def _loop(self):
         while True:
@@ -1050,6 +1612,7 @@ class ScheduleRunner:
                     state["status"] = "disabled"
                     state["next_run_at"] = None
                     state["running"] = False
+                    self.dirty = True
                 continue
 
             with self.lock:
@@ -1067,6 +1630,11 @@ class ScheduleRunner:
             for schedule_id in list(self.state.keys()):
                 if schedule_id not in schedule_ids:
                     self.state.pop(schedule_id, None)
+                    self.dirty = True
+
+        if self.dirty:
+            self.dirty = False
+            self._persist_state()
 
     def _resolve_sites(self, schedule):
         scope = schedule.get("site_scope", {}) if isinstance(schedule.get("site_scope"), dict) else {}
@@ -1077,7 +1645,7 @@ class ScheduleRunner:
             return [s.get("name") for s in data.get("sites", []) if s.get("name")]
         return [name for name in selected if isinstance(name, str) and name.strip()]
 
-    def _run_site_pipeline(self, site_name, schedule, available_modules):
+    def _run_site_pipeline(self, site_name, schedule, available_modules, schedule_id=None):
         delay = int(schedule.get("delay_between_modules_sec") or 0)
         modules = schedule.get("modules") or []
         results = []
@@ -1093,6 +1661,23 @@ class ScheduleRunner:
                 results.append({"module_id": module_id, "status": "missing"})
                 continue
             params = copy.deepcopy(entry.get("parameters") or {})
+            scope_mode = ((schedule.get("site_scope") or {}).get("mode") or "").lower()
+            if module_id in ("ubiquiti_cdp_reader", "uniview_nvr_capture"):
+                targets = params.get("targets")
+                if isinstance(targets, dict) and targets.get("device_ids") == "__AUTO__":
+                    params["targets"] = {"auto": True}
+                elif targets is None:
+                    params["targets"] = {"auto": True}
+                if scope_mode == "all":
+                    if isinstance(params.get("targets"), dict):
+                        params["targets"]["auto_on_empty"] = True
+                        params["targets"]["auto"] = True
+                        if "device_ids" in params["targets"]:
+                            params["targets"]["device_ids"] = []
+            if module_id == "uniview_nvr_capture" and not params.get("nic"):
+                params["nic"] = "NIC1"
+            if module_id == "uniview_nvr_capture" and not params.get("ip_mode"):
+                params["ip_mode"] = "filter"
             credential_profile = entry.get("credential_profile")
             if credential_profile:
                 profiles = module_creds.get(module_id, []) if isinstance(module_creds, dict) else []
@@ -1101,7 +1686,14 @@ class ScheduleRunner:
                         params["username"] = profile.get("username", "")
                         params["password"] = profile.get("password", "")
                         break
-            config = {"site_name": site_name, "parameters": params}
+            # Avoid leaking/using credential_profile inside module params
+            params.pop("credential_profile", None)
+            config = {
+                "site_name": site_name,
+                "parameters": params,
+                "schedule_id": schedule_id,
+                "schedule_name": schedule.get("name") if isinstance(schedule, dict) else None
+            }
             thread_id = module_runner.run_module(module_id, config)
             while True:
                 status = module_runner.get_module_status(thread_id) or {}
@@ -1122,6 +1714,11 @@ class ScheduleRunner:
             state = self.state.setdefault(schedule_id, {})
             state["status"] = "running"
             state["running"] = True
+            state["active_sites"] = 0
+            state["completed_sites"] = 0
+            state["total_sites"] = 0
+            state["started_at"] = datetime.now()
+            self.dirty = True
 
         errors = _validate_schedule_config(schedule)
         if errors:
@@ -1131,9 +1728,13 @@ class ScheduleRunner:
                 state["status"] = "idle"
                 state["running"] = False
                 state["next_run_at"] = None
+                self.dirty = True
+            self._persist_state()
             return
 
         sites = self._resolve_sites(schedule)
+        with self.lock:
+            state["total_sites"] = len(sites)
         run_mode = (schedule.get("site_run_mode") or "sequential").lower()
         schedule_result = {"sites": len(sites), "results": {}}
 
@@ -1141,9 +1742,19 @@ class ScheduleRunner:
         if not sites:
             schedule_result["error"] = "no_sites"
         else:
+            def run_site(site):
+                with self.lock:
+                    state["active_sites"] = int(state.get("active_sites", 0)) + 1
+                try:
+                    return self._run_site_pipeline(site, schedule, available_modules, schedule_id)
+                finally:
+                    with self.lock:
+                        state["completed_sites"] = int(state.get("completed_sites", 0)) + 1
+                        state["active_sites"] = max(0, int(state.get("active_sites", 0)) - 1)
+
             if run_mode == "concurrent":
                 with ThreadPoolExecutor(max_workers=len(sites)) as pool:
-                    future_map = {pool.submit(self._run_site_pipeline, site, schedule, available_modules): site for site in sites}
+                    future_map = {pool.submit(run_site, site): site for site in sites}
                     for future in as_completed(future_map):
                         site = future_map.get(future)
                         try:
@@ -1153,7 +1764,7 @@ class ScheduleRunner:
             else:
                 for site in sites:
                     try:
-                        schedule_result["results"][site] = self._run_site_pipeline(site, schedule, available_modules)
+                        schedule_result["results"][site] = run_site(site)
                     except Exception as exc:
                         schedule_result["results"][site] = [{"error": str(exc)}]
 
@@ -1167,6 +1778,8 @@ class ScheduleRunner:
                 state["next_run_at"] = datetime.now() + timedelta(minutes=repeat_minutes)
             else:
                 state["next_run_at"] = None
+            self.dirty = True
+        self._persist_state()
 
     def trigger_run(self, schedule_id):
         with self.lock:
@@ -1185,6 +1798,8 @@ class ScheduleRunner:
             if state.get("running"):
                 return False
             state["next_run_at"] = datetime.now()
+            self.dirty = True
+        self._persist_state()
         runner = threading.Thread(target=self._run_schedule, args=(copy.deepcopy(schedule),), daemon=True)
         runner.start()
         return True
@@ -1201,6 +1816,24 @@ class ScheduleRunner:
 module_runner = ModuleRunner()
 # Global scheduler
 schedule_runner = ScheduleRunner()
+
+def _cleanup_module_logs() -> None:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    pattern = os.path.join(base_dir, "module_log_*.txt")
+    for path in glob.glob(pattern):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+def _cleanup_module_configs() -> None:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    pattern = os.path.join(base_dir, "module_config_*.json")
+    for path in glob.glob(pattern):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
 
 # ==================== API ENDPOINTS ====================
 
@@ -1300,6 +1933,7 @@ def api_generate_visual_map():
     try:
         data = request.get_json() or {}
         site_name = data.get('site_name')
+        spacing = data.get('spacing')
         user = _get_effective_user()
         if not user:
             return jsonify({"error": "auth_required"}), 401
@@ -1308,7 +1942,7 @@ def api_generate_visual_map():
 
         from generale_visual_map import generate_visual_map
 
-        result = generate_visual_map(site_name)
+        result = generate_visual_map(site_name, spacing)
 
         if result.get('status') == 'success':
             return jsonify({
@@ -1415,23 +2049,6 @@ def handle_site(site_id):
                     scope["sites"] = [new_name if s == old_name else s for s in sites]
                 write_settings(settings)
 
-            try:
-                monitoring = read_monitoring()
-                sites_entry = monitoring.get("sites", {})
-                if isinstance(sites_entry, dict) and old_name in sites_entry:
-                    sites_entry[new_name] = sites_entry.pop(old_name)
-                    write_monitoring(monitoring)
-            except Exception:
-                pass
-
-            old_log = os.path.join(LOGS_DIR, f"{_safe_log_name(old_name)}.log")
-            new_log = os.path.join(LOGS_DIR, f"{_safe_log_name(new_name)}.log")
-            if os.path.exists(old_log) and not os.path.exists(new_log):
-                try:
-                    os.replace(old_log, new_log)
-                except OSError:
-                    pass
-        
         write_database(data)
         return jsonify(current_site)
     
@@ -1457,7 +2074,6 @@ def get_devices():
         if not _can_read_site(user, site_filter):
             return jsonify({"error": "forbidden"}), 403
         devices = [d for d in devices if d.get("site") == site_filter]
-    
     return jsonify(devices)
 
 @app.route('/api/devices/<device_id>', methods=['PUT', 'DELETE'])
@@ -1623,6 +2239,48 @@ def handle_device(device_id):
         write_database(data)
         return jsonify({"success": True})
 
+@app.route('/api/devices/bulk_delete', methods=['POST'])
+def bulk_delete_devices():
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if user.get("role") == "guest":
+        return jsonify({"error": "forbidden"}), 403
+    payload = request.get_json() or {}
+    ids = payload.get("ids") or []
+    if not isinstance(ids, list) or not ids:
+        return jsonify({"error": "ids_required"}), 400
+    ids = [i for i in ids if isinstance(i, str) and i.strip()]
+    if not ids:
+        return jsonify({"error": "ids_required"}), 400
+
+    data = read_database()
+    devices = data.get("devices", [])
+    id_set = set(ids)
+    deleted = []
+    forbidden = []
+    remaining = []
+    for device in devices:
+        device_id = device.get("id")
+        if device_id in id_set:
+            if not _can_write_site(user, device.get("site")):
+                forbidden.append(device_id)
+                remaining.append(device)
+            else:
+                deleted.append(device_id)
+        else:
+            remaining.append(device)
+
+    data["devices"] = remaining
+    write_database(data)
+    missing = [i for i in ids if i not in deleted and i not in forbidden]
+    return jsonify({
+        "success": True,
+        "deleted": deleted,
+        "forbidden": forbidden,
+        "missing": missing
+    })
+
 @app.route('/api/modules')
 def get_modules():
     """Get all available modules"""
@@ -1647,10 +2305,27 @@ def run_module(module_id):
     config = request.json
     if isinstance(config, dict):
         params = config.get("parameters")
+        if isinstance(params, dict):
+            if isinstance(params.get("targets"), dict) and params["targets"].get("device_ids") == "__AUTO__":
+                params["targets"] = {"auto": True}
+            if params.get("nic") is None and module_id == "uniview_nvr_capture":
+                params["nic"] = "NIC1"
+            if params.get("targets") is None and module_id in ("ubiquiti_cdp_reader", "uniview_nvr_capture"):
+                params["targets"] = {"auto": True}
+            if module_id == "ubiquiti_cdp_reader" and isinstance(params.get("targets"), dict) and params["targets"].get("auto") is True:
+                params["targets"]["device_types"] = ["ap"]
+            if module_id == "uniview_nvr_capture" and isinstance(params.get("targets"), dict) and params["targets"].get("auto") is True:
+                params["targets"]["device_types"] = ["nvr"]
         if isinstance(params, dict) and params.get("credential_profile"):
             settings = read_settings()
             module_creds = settings.get("module_credentials", {}) if isinstance(settings, dict) else {}
             profiles = module_creds.get(module_id, []) if isinstance(module_creds, dict) else []
+            if module_id in ("mac_table_search", "mac_group_map") and isinstance(module_creds, dict):
+                known_names = {profile.get("name") for profile in profiles if isinstance(profile, dict)}
+                profiles = list(profiles) + [
+                    profile for profile in module_creds.get("cdp_discovery", [])
+                    if isinstance(profile, dict) and profile.get("name") not in known_names
+                ]
             profile_name = str(params.get("credential_profile")).strip()
             for profile in profiles:
                 if isinstance(profile, dict) and profile.get("name") == profile_name:
@@ -1658,6 +2333,26 @@ def run_module(module_id):
                     params["password"] = profile.get("password", "")
                     break
             params.pop("credential_profile", None)
+        # Persist last-used parameters (excluding passwords)
+        try:
+            settings = read_settings()
+            module_last = settings.get("module_last_params", {})
+            if not isinstance(module_last, dict):
+                module_last = {}
+            site_name = _site_from_module_config(config) or "*"
+            safe_params = {}
+            if isinstance(params, dict):
+                for key, value in params.items():
+                    if str(key).lower() in ("password", "pass", "secret", "token", "api_key"):
+                        continue
+                    safe_params[key] = value
+            module_last.setdefault(module_id, {})
+            if isinstance(module_last[module_id], dict):
+                module_last[module_id][site_name] = safe_params
+            settings["module_last_params"] = module_last
+            write_settings(settings)
+        except Exception:
+            pass
     safe_config = json.loads(json.dumps(config or {}))
     if isinstance(safe_config, dict):
         params = safe_config.get("parameters")
@@ -1722,7 +2417,7 @@ def get_module_log(thread_id):
         return jsonify({"lines": []})
     try:
         with open(log_file, "r", encoding="utf-8") as f:
-            lines = f.read().splitlines()[-200:]
+            lines = f.read().splitlines()
         if delete_after:
             try:
                 os.remove(log_file)
@@ -1751,12 +2446,21 @@ def handle_schedules():
         settings = read_settings()
         schedules = settings.get("module_schedules", []) if isinstance(settings, dict) else []
         states = schedule_runner.get_all_states()
+        running_jobs = module_runner.get_running_jobs()
         output = []
         for sched in schedules:
             if not isinstance(sched, dict):
                 continue
             state = states.get(sched.get("id")) if sched.get("id") else None
-            output.append(_serialize_schedule(sched, state))
+            serialized = _serialize_schedule(sched, state)
+            if isinstance(serialized, dict):
+                schedule_id = serialized.get("id") or sched.get("id")
+                if schedule_id:
+                    serialized["active_jobs"] = [
+                        job for job in running_jobs
+                        if job.get("schedule_id") == schedule_id
+                    ]
+            output.append(serialized)
         return jsonify(output)
 
     if user.get("role") not in ("admin", "operator"):
@@ -1836,11 +2540,8 @@ def handle_users():
     user, err = _require_role("admin")
     if err:
         return err
-    settings = read_settings()
-    auth = settings.get("auth", {})
-    users = auth.get("users", [])
     if request.method == 'GET':
-        return jsonify([_sanitize_user(u) for u in users if isinstance(u, dict)])
+        return jsonify([_sanitize_user(u) for u in _list_auth_users() if isinstance(u, dict)])
 
     data = request.get_json() or {}
     username = (data.get("username") or "").strip()
@@ -1856,19 +2557,11 @@ def handle_users():
     if not isinstance(allowed_sites, list):
         allowed_sites = []
 
-    if any(isinstance(u, dict) and u.get("username") == username for u in users):
+    if _find_user(username):
         return jsonify({"error": "user_exists"}), 400
 
-    users.append({
-        "username": username,
-        "password_hash": generate_password_hash(password),
-        "role": role,
-        "allowed_sites": allowed_sites,
-        "disabled": disabled
-    })
-    auth["users"] = users
-    settings["auth"] = auth
-    write_settings(settings)
+    _create_auth_user(username, password, role, allowed_sites, disabled)
+    _audit("user.create", target=username, details={"role": role, "disabled": disabled})
     return jsonify({"success": True, "user": username})
 
 @app.route('/api/users/<username>', methods=['PUT', 'DELETE'])
@@ -1876,23 +2569,18 @@ def handle_user(username):
     current_user, err = _require_role("admin")
     if err:
         return err
-    settings = read_settings()
-    auth = settings.get("auth", {})
-    users = auth.get("users", [])
-
-    target = None
-    for entry in users:
-        if isinstance(entry, dict) and entry.get("username") == username:
-            target = entry
-            break
+    target = _find_user(username)
     if not target:
         return jsonify({"error": "user_not_found"}), 404
 
     if request.method == 'DELETE':
-        auth["users"] = [u for u in users if not (isinstance(u, dict) and u.get("username") == username)]
-        settings["auth"] = auth
-        write_settings(settings)
+        if target.get("role") == "admin" and not target.get("disabled") and _active_admin_count(exclude_username=username) < 1:
+            return jsonify({"error": "last_admin_required"}), 400
+        _delete_auth_user(username)
+        _audit("user.delete", target=username)
         if current_user.get("username") == username:
+            _revoke_session(session.get("auth_session_id"))
+            session.pop("auth_session_id", None)
             session.pop("user", None)
         return jsonify({"success": True})
 
@@ -1905,19 +2593,33 @@ def handle_user(username):
     if role:
         if role not in ("admin", "operator", "guest"):
             return jsonify({"error": "invalid_role"}), 400
-        target["role"] = role
+    effective_role = role or target.get("role")
+    effective_disabled = bool(disabled) if disabled is not None else bool(target.get("disabled"))
+    if target.get("role") == "admin" and not target.get("disabled"):
+        losing_admin = effective_role != "admin" or effective_disabled
+        if losing_admin and _active_admin_count(exclude_username=username) < 1:
+            return jsonify({"error": "last_admin_required"}), 400
+
+    updates = {}
+    if role:
+        updates["role"] = role
     if allowed_sites is not None:
         if not isinstance(allowed_sites, list):
             return jsonify({"error": "invalid_allowed_sites"}), 400
-        target["allowed_sites"] = allowed_sites
+        updates["allowed_sites"] = allowed_sites
     if disabled is not None:
-        target["disabled"] = bool(disabled)
+        updates["disabled"] = bool(disabled)
     if password:
-        target["password_hash"] = generate_password_hash(password)
+        updates["password"] = password
 
-    auth["users"] = users
-    settings["auth"] = auth
-    write_settings(settings)
+    _update_auth_user(username, updates)
+    if updates.get("disabled") or updates.get("password"):
+        _revoke_user_sessions(username)
+    _audit(
+        "user.update",
+        target=username,
+        details={k: ("set" if k == "password" else v) for k, v in updates.items()}
+    )
     return jsonify({"success": True})
 
 @app.route('/api/auth/me')
@@ -1942,8 +2644,13 @@ def auth_login():
     password = data.get("password") or ""
     user = _find_user(username)
     if not user or user.get("disabled") or not check_password_hash(user.get("password_hash", ""), password):
+        _record_login_attempt(username, False, "invalid_credentials")
+        _audit("auth.login_failed", target=username, details={"reason": "invalid_credentials"}, actor=username or None)
         return jsonify({"error": "invalid_credentials"}), 401
-    session["user"] = username
+    session.clear()
+    _create_session_for_user(username)
+    _record_login_attempt(username, True)
+    _audit("auth.login", target=username, actor=username)
     return jsonify({
         "authenticated": True,
         "user": username,
@@ -1953,7 +2660,9 @@ def auth_login():
 
 @app.route('/api/auth/logout', methods=['POST'])
 def auth_logout():
-    session.pop("user", None)
+    _revoke_session(session.get("auth_session_id"))
+    _audit("auth.logout")
+    session.clear()
     return jsonify({"authenticated": False})
 
 @app.route('/api/auth/setup', methods=['POST'])
@@ -1969,41 +2678,43 @@ def auth_setup():
     auth = settings.get("auth")
     if not isinstance(auth, dict):
         auth = {}
-    users = auth.get("users", [])
-    if not isinstance(users, list):
-        users = []
+    users = _list_auth_users()
 
     if users:
         current_user = _get_effective_user()
         if not _is_admin(current_user):
             return jsonify({"error": "auth_required"}), 403
 
-    users = [
-        user for user in users
-        if not (isinstance(user, dict) and user.get("username") == username)
-    ]
     existing = _find_user(username)
-    if not users:
-        role = "admin"
+    if not users or not existing:
+        role = "admin" if not users else (data.get("role") or "guest")
     else:
         role = data.get("role") or (existing.get("role") if existing else "guest")
+    if role not in ("admin", "operator", "guest"):
+        return jsonify({"error": "invalid_role"}), 400
     allowed_sites = data.get("allowed_sites", []) if data.get("allowed_sites") is not None else (existing.get("allowed_sites") if existing else [])
     if not isinstance(allowed_sites, list):
         allowed_sites = []
     disabled = bool(data.get("disabled", False))
 
-    users.append({
-        "username": username,
-        "password_hash": generate_password_hash(password),
-        "role": role,
-        "allowed_sites": allowed_sites,
-        "disabled": disabled
-    })
-    auth["users"] = users
+    if existing:
+        if existing.get("role") == "admin" and role != "admin" and _active_admin_count(exclude_username=username) < 1:
+            return jsonify({"error": "last_admin_required"}), 400
+        _update_auth_user(username, {
+            "role": role,
+            "allowed_sites": allowed_sites,
+            "disabled": disabled,
+            "password": password,
+        })
+        _revoke_user_sessions(username)
+    else:
+        _create_auth_user(username, password, role, allowed_sites, disabled)
     auth["enabled"] = enabled
     settings["auth"] = auth
     write_settings(settings)
-    session["user"] = username
+    session.clear()
+    _create_session_for_user(username)
+    _audit("auth.setup", target=username, details={"enabled": enabled, "role": role}, actor=username)
 
     return jsonify({
         "success": True,
@@ -2024,17 +2735,18 @@ def auth_change_password():
     if not current or not new_password:
         return jsonify({"error": "passwords_required"}), 400
     if not check_password_hash(user.get("password_hash", ""), current):
+        _record_login_attempt(user.get("username"), False, "bad_current_password")
         return jsonify({"error": "invalid_credentials"}), 401
-    settings = read_settings()
-    auth = settings.get("auth", {})
-    users = auth.get("users", [])
-    for entry in users:
-        if isinstance(entry, dict) and entry.get("username") == user.get("username"):
-            entry["password_hash"] = generate_password_hash(new_password)
-            break
-    auth["users"] = users
-    settings["auth"] = auth
-    write_settings(settings)
+    _update_auth_user(user.get("username"), {"password": new_password})
+    current_session_id = session.get("auth_session_id")
+    conn = _get_sqlite_conn()
+    conn.execute(
+        "UPDATE auth_sessions SET revoked_at = ? WHERE username = ? AND session_id != ? AND revoked_at IS NULL",
+        (datetime.now().isoformat(), user.get("username"), current_session_id)
+    )
+    conn.commit()
+    conn.close()
+    _audit("auth.change_password", target=user.get("username"))
     return jsonify({"success": True})
 
 @app.route('/api/auth/config', methods=['PUT'])
@@ -2049,10 +2761,10 @@ def auth_config():
     if not isinstance(auth, dict):
         auth = {}
     auth["enabled"] = enabled
-    if "users" not in auth:
-        auth["users"] = []
+    auth["users_migrated_to_sqlite"] = True
     settings["auth"] = auth
     write_settings(settings)
+    _audit("auth.config", details={"enabled": enabled})
     return jsonify({"success": True, "enabled": enabled})
 
 
@@ -2240,18 +2952,16 @@ def export_data():
     if err:
         return err
 
-    file_map = {
-        "devices.db": DATABASE_FILE,
-        "settings.json": SETTINGS_FILE,
-        "monitoring.db": MONITORING_FILE,
-        "cmapp.sqlite3": SQLITE_DB_FILE,
-    }
-
+    devices = _read_sqlite_json("devices")
+    settings = _read_sqlite_json("settings")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
-        for name, path in file_map.items():
-            if os.path.exists(path):
-                zf.write(path, arcname=name)
+        if os.path.exists(SQLITE_DB_FILE):
+            zf.write(SQLITE_DB_FILE, arcname="cmapp.sqlite3")
+        if devices is not None:
+            zf.writestr("devices.db", json.dumps(devices, indent=2))
+        if settings is not None:
+            zf.writestr("settings.json", json.dumps(settings, indent=2))
     buf.seek(0)
 
     return send_file(
@@ -2278,29 +2988,35 @@ def import_data():
         data = upload.read()
         buf = io.BytesIO(data)
         with zipfile.ZipFile(buf, 'r') as zf:
-            allowed = {
-                'devices.db': DATABASE_FILE,
-                'settings.json': SETTINGS_FILE,
-                'monitoring.db': MONITORING_FILE,
-                'cmapp.sqlite3': SQLITE_DB_FILE,
-            }
             imported_sqlite = False
+            devices_payload = None
+            settings_payload = None
             for name in zf.namelist():
-                if name in allowed:
-                    target = allowed[name]
-                    with zf.open(name) as src, open(target, 'wb') as dst:
+                if name == 'cmapp.sqlite3':
+                    with zf.open(name) as src, open(SQLITE_DB_FILE, 'wb') as dst:
                         dst.write(src.read())
-                    if name == 'cmapp.sqlite3':
-                        imported_sqlite = True
+                    imported_sqlite = True
+                    break
+                if name == 'devices.db':
+                    with zf.open(name) as src:
+                        devices_payload = json.load(src)
+                if name == 'settings.json':
+                    with zf.open(name) as src:
+                        settings_payload = json.load(src)
         if imported_sqlite:
+            _migrate_auth_users_from_settings._done = False
+            _migrate_auth_users_from_settings()
             return jsonify({"success": True})
-        _sync_sqlite_from_legacy_files()
+        if devices_payload is not None:
+            _write_sqlite_json("devices", devices_payload)
+        if settings_payload is not None:
+            _write_sqlite_json("settings", settings_payload)
         if _read_sqlite_json("settings") is None:
             init_settings()
         if _read_sqlite_json("devices") is None:
             init_database()
-        if _read_sqlite_json("monitoring") is None:
-            init_monitoring()
+        _migrate_auth_users_from_settings._done = False
+        _migrate_auth_users_from_settings()
         return jsonify({"success": True})
     except zipfile.BadZipFile:
         return jsonify({"error": "invalid_zip"}), 400
@@ -2321,7 +3037,7 @@ def handle_settings():
             "enabled": bool(auth.get("enabled", False))
         }
         if not _is_admin(user):
-            settings = {k: v for k, v in settings.items() if k not in ("auth", "module_credentials")}
+            settings = {k: v for k, v in settings.items() if k not in ("auth", "module_credentials", "agents")}
         return jsonify(settings)
     
     elif request.method == 'PUT':
@@ -2342,9 +3058,652 @@ def handle_settings():
                 new_settings = {k: v for k, v in new_settings.items() if k != "auth"}
             current_settings.update(new_settings)
         write_settings(current_settings)
+        module_runner.set_max_concurrent(current_settings.get("module_max_concurrent", 2))
         auth = current_settings.get("auth", {})
         current_settings["auth"] = {"enabled": bool(auth.get("enabled", False))}
         return jsonify(current_settings)
+
+@app.route('/api/agents', methods=['GET', 'POST'])
+def handle_agents():
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if request.method == 'GET':
+        if not _is_admin(user):
+            return jsonify({"error": "forbidden"}), 403
+        settings = read_settings()
+        agents = settings.get("agents", []) if isinstance(settings, dict) else []
+        online_minutes = int(settings.get("agent_online_minutes") or 5)
+        cutoff = datetime.now() - timedelta(minutes=online_minutes)
+        enriched = []
+        for agent in agents:
+            if not isinstance(agent, dict):
+                continue
+            last_seen = agent.get("last_seen")
+            status = "offline"
+            if last_seen:
+                try:
+                    dt = datetime.fromisoformat(last_seen)
+                    if dt >= cutoff:
+                        status = "online"
+                except Exception:
+                    status = "offline"
+            entry = copy.deepcopy(agent)
+            entry["agent_status"] = status
+            enriched.append(entry)
+        return jsonify(enriched)
+
+    # POST create
+    user, err = _require_role("admin")
+    if err:
+        return err
+    payload = request.get_json() or {}
+    settings = read_settings()
+    agents = settings.get("agents", []) if isinstance(settings, dict) else []
+    normalized = _normalize_agent_payload(payload)
+    if not normalized:
+        return jsonify({"error": "invalid_agent"}), 400
+    agents.append(normalized)
+    settings["agents"] = agents
+    write_settings(settings)
+    _write_agent_config_files(normalized, settings)
+    return jsonify(normalized)
+
+
+@app.route('/api/agents/<agent_id>', methods=['PUT', 'DELETE'])
+def handle_agent(agent_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    user, err = _require_role("admin")
+    if err:
+        return err
+    settings = read_settings()
+    agents = settings.get("agents", []) if isinstance(settings, dict) else []
+    target = None
+    for agent in agents:
+        if isinstance(agent, dict) and agent.get("id") == agent_id:
+            target = agent
+            break
+    if not target:
+        return jsonify({"error": "agent_not_found"}), 404
+
+    if request.method == 'DELETE':
+        settings["agents"] = [a for a in agents if not (isinstance(a, dict) and a.get("id") == agent_id)]
+        write_settings(settings)
+        try:
+            os.remove(os.path.join(AGENT_CONFIG_DIR, f"{agent_id}.json"))
+        except OSError:
+            pass
+        try:
+            os.remove(os.path.join(AGENT_CONFIG_DIR, f"{agent_id}.txt"))
+        except OSError:
+            pass
+        return jsonify({"success": True})
+
+    payload = request.get_json() or {}
+    normalized = _normalize_agent_payload(payload, existing=target)
+    if not normalized:
+        return jsonify({"error": "invalid_agent"}), 400
+    settings["agents"] = [normalized if (isinstance(a, dict) and a.get("id") == agent_id) else a for a in agents]
+    write_settings(settings)
+    _write_agent_config_files(normalized, settings)
+    return jsonify(normalized)
+
+
+@app.route('/api/agents/<agent_id>/trigger', methods=['POST'])
+def trigger_agent(agent_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    user, err = _require_role("admin")
+    if err:
+        return err
+    settings = read_settings()
+    agents = settings.get("agents", []) if isinstance(settings, dict) else []
+    updated = False
+    payload = request.get_json(silent=True) or {}
+    module_id = payload.get("module_id") if isinstance(payload, dict) else None
+    targets = payload.get("targets") if isinstance(payload, dict) else None
+    params = payload.get("params") if isinstance(payload, dict) else None
+    run_scan = bool(payload.get("run_scan")) if isinstance(payload, dict) else False
+    for agent in agents:
+        if isinstance(agent, dict) and agent.get("id") == agent_id:
+            if not module_id:
+                agent["run_now"] = True
+            elif run_scan:
+                agent["run_now"] = True
+            if module_id:
+                queued = agent.get("queued_modules") if isinstance(agent.get("queued_modules"), list) else []
+                job = {"id": module_id}
+                if isinstance(targets, list):
+                    job["targets"] = targets
+                if isinstance(params, dict):
+                    job["params"] = params
+                queued.append(job)
+                agent["queued_modules"] = queued
+            updated = True
+            break
+    if not updated:
+        return jsonify({"error": "agent_not_found"}), 404
+    settings["agents"] = agents
+    write_settings(settings)
+    if updated:
+        _write_agent_config_files(agent, settings)
+    return jsonify({"success": True})
+
+
+@app.route('/api/agents/<agent_id>/reset_identity', methods=['POST'])
+def reset_agent_identity(agent_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    user, err = _require_role("admin")
+    if err:
+        return err
+    settings = read_settings()
+    agents = settings.get("agents", []) if isinstance(settings, dict) else []
+    updated = False
+    for agent in agents:
+        if isinstance(agent, dict) and agent.get("id") == agent_id:
+            agent["device_name"] = ""
+            agent["device_ip"] = ""
+            agent["device_mac"] = ""
+            updated = True
+            break
+    if not updated:
+        return jsonify({"error": "agent_not_found"}), 404
+    settings["agents"] = agents
+    write_settings(settings)
+    return jsonify({"success": True})
+
+
+@app.route('/api/agents/<agent_id>/clear_queue', methods=['POST'])
+def clear_agent_queue(agent_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    user, err = _require_role("admin")
+    if err:
+        return err
+    settings = read_settings()
+    agents = settings.get("agents", []) if isinstance(settings, dict) else []
+    updated = False
+    for agent in agents:
+        if isinstance(agent, dict) and agent.get("id") == agent_id:
+            agent["queued_modules"] = []
+            agent["run_now"] = False
+            updated = True
+            break
+    if not updated:
+        return jsonify({"error": "agent_not_found"}), 404
+    settings["agents"] = agents
+    write_settings(settings)
+    return jsonify({"success": True})
+
+
+@app.route('/api/agents/<agent_id>/identity', methods=['GET'])
+def get_agent_identity(agent_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if not _is_admin(user):
+        return jsonify({"error": "forbidden"}), 403
+    settings = read_settings()
+    agents = settings.get("agents", []) if isinstance(settings, dict) else []
+    agent = next((a for a in agents if isinstance(a, dict) and a.get("id") == agent_id), None)
+    if not agent:
+        return jsonify({"error": "agent_not_found"}), 404
+    return jsonify({
+        "device_name": agent.get("device_name") or "",
+        "device_ip": agent.get("device_ip") or "",
+        "device_mac": agent.get("device_mac") or "",
+        "last_seen": agent.get("last_seen"),
+        "last_scan_at": agent.get("last_scan_at")
+    })
+
+
+@app.route('/api/agents/<agent_id>/config', methods=['GET'])
+def download_agent_config(agent_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if not _is_admin(user):
+        return jsonify({"error": "forbidden"}), 403
+    fmt = (request.args.get("format") or "json").lower()
+    path = os.path.join(AGENT_CONFIG_DIR, f"{agent_id}.json" if fmt != "txt" else f"{agent_id}.txt")
+    if not os.path.exists(path):
+        return jsonify({"error": "config_not_found"}), 404
+    return send_file(path, as_attachment=True)
+
+@app.route('/api/agents/<agent_id>/package', methods=['GET'])
+def download_agent_package(agent_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if not _is_admin(user):
+        return jsonify({"error": "forbidden"}), 403
+    settings = read_settings()
+    agents = settings.get("agents", []) if isinstance(settings, dict) else []
+    agent = next((a for a in agents if isinstance(a, dict) and a.get("id") == agent_id), None)
+    if not agent:
+        return jsonify({"error": "agent_not_found"}), 404
+
+    exe_candidates = [
+        os.path.join(BASE_DIR, "agent", "dist", "cmapp-agent.exe"),
+        os.path.join(BASE_DIR, "agent", "cmapp-agent.exe"),
+    ]
+    exe_path = next((p for p in exe_candidates if os.path.exists(p)), None)
+    if not exe_path:
+        return jsonify({"error": "agent_exe_not_found"}), 404
+
+    _write_agent_config_files(agent, settings)
+    config_path = os.path.join(AGENT_CONFIG_DIR, f"{agent_id}.json")
+    if not os.path.exists(config_path):
+        return jsonify({"error": "config_not_found"}), 404
+
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.write(exe_path, arcname="cmapp-agent.exe")
+        zf.write(config_path, arcname="agent_config.json")
+    mem.seek(0)
+    safe_site = (agent.get("site") or "agent").replace("/", "_").replace("\\", "_").replace(":", "_")
+    return send_file(mem, mimetype="application/zip", as_attachment=True,
+                     download_name=f"{safe_site}_agent_package.zip")
+
+
+@app.route('/api/agents/agent_exe', methods=['GET'])
+def download_agent_exe():
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if not _is_admin(user):
+        return jsonify({"error": "forbidden"}), 403
+    candidates = [
+        os.path.join(BASE_DIR, "agent", "dist", "cmapp-agent.exe"),
+        os.path.join(BASE_DIR, "agent", "cmapp-agent.exe"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return send_file(path, as_attachment=True)
+    return jsonify({"error": "agent_exe_not_found"}), 404
+
+
+@app.route('/api/agent/config/<agent_id>', methods=['GET'])
+def agent_poll_config(agent_id):
+    token = request.headers.get("X-Agent-Token") or request.args.get("token") or ""
+    settings = read_settings()
+    agents = settings.get("agents", []) if isinstance(settings, dict) else []
+    agent = next((a for a in agents if isinstance(a, dict) and a.get("id") == agent_id), None)
+    if not agent:
+        return jsonify({"error": "agent_not_found"}), 404
+    if token != (agent.get("token") or ""):
+        return jsonify({"error": "invalid_token"}), 401
+    base_url = (settings.get("agent_server_url") or "http://127.0.0.1:5000")
+    if agent.get("server_host"):
+        base_url = agent.get("server_host")
+    response = {
+        "agent_id": agent.get("id"),
+        "name": agent.get("name"),
+        "site": agent.get("site"),
+        "target_range": agent.get("target_range"),
+        "target_ranges": agent.get("target_ranges") or [],
+        "enabled": agent.get("enabled", True),
+        "interval_min": agent.get("interval_min", 0),
+        "allow_interval": agent.get("allow_interval", True),
+        "allow_on_demand": agent.get("allow_on_demand", True),
+        "trust_mode": agent.get("trust_mode", "augment"),
+        "ip_scan_min": agent.get("ip_scan_min", 10),
+        "ping_min": agent.get("ping_min", 2),
+        "modules": agent.get("modules", {}),
+        "credentials": agent.get("credentials", {}),
+        "server_url": base_url,
+        "run_now": bool(agent.get("run_now")),
+        "queued_modules": agent.get("queued_modules", []),
+        "retention_days": AGENT_SCAN_RETENTION_DAYS
+    }
+    return jsonify(response)
+
+
+@app.route('/api/agent/report', methods=['POST'])
+def agent_report():
+    payload = request.get_json() or {}
+    agent_id = (payload.get("agent_id") or "").strip()
+    token = request.headers.get("X-Agent-Token") or payload.get("token") or ""
+    if not agent_id:
+        return jsonify({"error": "missing_agent_id"}), 400
+    settings = read_settings()
+    agents = settings.get("agents", []) if isinstance(settings, dict) else []
+    agent = next((a for a in agents if isinstance(a, dict) and a.get("id") == agent_id), None)
+    if not agent:
+        return jsonify({"error": "agent_not_found"}), 404
+    if token != (agent.get("token") or ""):
+        return jsonify({"error": "invalid_token"}), 401
+    if not agent.get("enabled", True):
+        return jsonify({"error": "agent_disabled"}), 403
+
+    site = (payload.get("site") or agent.get("site") or "").strip()
+    scan_time = (payload.get("scan_time") or datetime.now().isoformat())
+    devices = payload.get("devices") or []
+    agent_device = payload.get("agent_device") or {}
+    agent_state = (payload.get("agent_state") or "").strip()
+    network_ranges = payload.get("network_ranges") or []
+    mode = (payload.get("mode") or "full_sync").strip().lower()
+    trust_mode = (payload.get("trust_mode") or agent.get("trust_mode") or "augment").strip().lower()
+    module_results = payload.get("module_results") or {}
+    if not isinstance(devices, list):
+        return jsonify({"error": "invalid_devices"}), 400
+
+    data = read_database() or {}
+    device_list = data.get("devices", []) if isinstance(data, dict) else []
+    now = datetime.now().isoformat()
+
+    def normalize_mac_value(value):
+        if not value:
+            return ""
+        return normalize_mac(str(value))
+
+    # Build lookup by site
+    by_ip = {}
+    by_mac = {}
+    by_switch_name = {}
+    for dev in device_list:
+        if dev.get("site") != site:
+            continue
+        ip = (dev.get("ip") or "").strip()
+        if ip:
+            by_ip[ip] = dev
+        mac = normalize_mac_value(dev.get("mac"))
+        if mac:
+            by_mac[mac] = dev
+        if (dev.get("type") or "").lower() == "switch":
+            name = (dev.get("name") or "").strip()
+            if name:
+                by_switch_name[name] = dev
+
+    created = 0
+    updated = 0
+    def _create_switch_stub(name: str, ip: str | None = None, mac: str | None = None):
+        nonlocal created
+        if not name:
+            return None
+        dev = {
+            "id": f"dev_{uuid.uuid4().hex[:8]}",
+            "site": site,
+            "name": name,
+            "ip": ip or "",
+            "mac": mac or "",
+            "type": "switch",
+            "discovered_by": f"agent:{agent_id}",
+            "discovered_at": now,
+            "last_seen": now,
+            "last_modified": now,
+            "status": "unknown",
+            "connections": []
+        }
+        device_list.append(dev)
+        if dev["ip"]:
+            by_ip[dev["ip"]] = dev
+        if dev["mac"]:
+            by_mac[dev["mac"]] = dev
+        by_switch_name[dev["name"]] = dev
+        created += 1
+        return dev
+
+    def is_mac_like(value: str) -> bool:
+        if not value:
+            return False
+        v = value.replace("-", ":").replace(".", "").upper()
+        if len(v) == 12:
+            return True
+        return v.count(":") == 5
+
+    def can_update_name(dev, name):
+        if not name:
+            return False
+        dev_type = (dev.get("type") or "").lower()
+        if dev_type and dev_type not in ("unknown", "pc", "pda"):
+            return False
+        current = (dev.get("name") or "").strip()
+        ip_val = (dev.get("ip") or "").strip()
+        if not current:
+            return True
+        if ip_val and current == ip_val:
+            return True
+        if is_mac_like(current):
+            return True
+        return False
+
+    def apply_device(dev, ip, mac, name, matched_by_mac=False, scan_name=""):
+        nonlocal updated
+        if matched_by_mac:
+            if scan_name:
+                dev["name"] = scan_name
+            elif name:
+                dev["name"] = name
+            elif mac:
+                dev["name"] = mac
+        elif can_update_name(dev, name):
+            dev["name"] = name
+        src_type = (item.get("type") or "").strip()
+        if src_type == "switch" and name and (dev.get("name") or "") != name:
+            dev["name"] = name
+        if src_type and (not dev.get("type") or dev.get("type") == "unknown"):
+            dev["type"] = src_type
+        for field in ("parent_switch_name", "parent_switch_ip", "parent_switch_port", "parent_switch_platform", "vlan"):
+            if item.get(field):
+                dev[field] = item.get(field)
+        if isinstance(item.get("connections"), list) and item.get("connections"):
+            resolved = []
+            for conn in item.get("connections"):
+                if not isinstance(conn, dict):
+                    continue
+                remote_id = conn.get("remote_device")
+                remote_ip = (conn.get("remote_ip") or "").strip()
+                remote_mac = normalize_mac_value(conn.get("remote_mac"))
+                remote_name = (conn.get("remote_name") or "").strip()
+                remote_dev = None
+                if remote_ip and remote_ip in by_ip:
+                    remote_dev = by_ip.get(remote_ip)
+                if remote_dev is None and remote_mac:
+                    remote_dev = by_mac.get(remote_mac)
+                if remote_dev is None and remote_name and (conn.get("protocol") or "").lower() == "cdp":
+                    remote_dev = by_switch_name.get(remote_name)
+                    if remote_dev is None:
+                        remote_dev = _create_switch_stub(remote_name, remote_ip or None, remote_mac or None)
+                if remote_dev:
+                    remote_id = remote_dev.get("id")
+                    conn["remote_device"] = remote_id
+                    conn["remote_name"] = remote_dev.get("name") or remote_name
+                    conn["remote_ip"] = remote_dev.get("ip") or remote_ip
+                    if remote_dev.get("mac"):
+                        conn["remote_mac"] = remote_dev.get("mac")
+                resolved.append(conn)
+            dev["connections"] = resolved
+        if item.get("platform"):
+            dev["platform"] = item.get("platform")
+        if item.get("vendor"):
+            dev["vendor"] = item.get("vendor")
+        if ip:
+            dev["ip"] = ip
+            by_ip[ip] = dev
+        if mac:
+            dev["mac"] = mac
+            by_mac[mac] = dev
+        dev["last_seen"] = now
+        dev["last_modified"] = now
+        updated += 1
+
+    if mode == "full_sync" and trust_mode == "replace":
+        # Replace site inventory, but keep IDs where possible
+        existing_for_site = [d for d in device_list if d.get("site") == site]
+        existing_lookup = {}
+        for d in existing_for_site:
+            key_ip = (d.get("ip") or "").strip()
+            key_mac = normalize_mac_value(d.get("mac"))
+            if key_ip:
+                existing_lookup[f"ip:{key_ip}"] = d
+            if key_mac:
+                existing_lookup[f"mac:{key_mac}"] = d
+            if (d.get("type") or "").lower() == "switch":
+                key_name = (d.get("name") or "").strip()
+                if key_name:
+                    existing_lookup[f"switch:{key_name}"] = d
+
+        kept = [d for d in device_list if d.get("site") != site]
+        for item in devices:
+            if not isinstance(item, dict):
+                continue
+            ip = (item.get("ip") or "").strip()
+            mac = normalize_mac_value(item.get("mac"))
+            scan_name = (item.get("hostname") or "").strip()
+            name = (scan_name or item.get("name") or ip or mac or "").strip()
+            if not ip and not mac:
+                if (item.get("type") or "").lower() != "switch" or not name:
+                    continue
+            dev = existing_lookup.get(f"ip:{ip}") or existing_lookup.get(f"mac:{mac}")
+            if dev is None and (item.get("type") or "").lower() == "switch" and name:
+                dev = existing_lookup.get(f"switch:{name}")
+            if dev is None:
+                dev = {
+                    "id": f"dev_{uuid.uuid4().hex[:8]}",
+                    "site": site,
+                    "name": name or ip or mac,
+                    "ip": ip,
+                    "mac": mac,
+                    "type": (item.get("type") or "unknown"),
+                    "discovered_by": f"agent:{agent_id}",
+                    "discovered_at": now,
+                    "last_seen": now,
+                    "last_modified": now,
+                    "status": "unknown",
+                    "parent_switch_name": item.get("parent_switch_name"),
+                    "parent_switch_ip": item.get("parent_switch_ip"),
+                    "parent_switch_port": item.get("parent_switch_port"),
+                    "parent_switch_platform": item.get("parent_switch_platform"),
+                    "vlan": item.get("vlan"),
+                    "connections": item.get("connections") if isinstance(item.get("connections"), list) else []
+                }
+                if item.get("platform"):
+                    dev["platform"] = item.get("platform")
+                if item.get("vendor"):
+                    dev["vendor"] = item.get("vendor")
+                created += 1
+            else:
+                apply_device(dev, ip, mac, name, matched_by_mac=bool(existing_lookup.get(f"mac:{mac}")), scan_name=scan_name)
+            kept.append(dev)
+        device_list = kept
+    else:
+        for item in devices:
+            if not isinstance(item, dict):
+                continue
+            ip = (item.get("ip") or "").strip()
+            mac = normalize_mac_value(item.get("mac"))
+            scan_name = (item.get("hostname") or "").strip()
+            name = (scan_name or item.get("name") or ip or mac or "").strip()
+            if not ip and not mac:
+                if (item.get("type") or "").lower() != "switch" or not name:
+                    continue
+            matched_by_mac = False
+            dev = by_ip.get(ip)
+            if not dev and mac:
+                dev = by_mac.get(mac)
+                matched_by_mac = dev is not None
+            if dev is None and (item.get("type") or "").lower() == "switch" and name:
+                dev = by_switch_name.get(name)
+            if dev is None:
+                dev = {
+                    "id": f"dev_{uuid.uuid4().hex[:8]}",
+                    "site": site,
+                    "name": name or ip or mac,
+                    "ip": ip,
+                    "mac": mac,
+                    "type": (item.get("type") or "unknown"),
+                    "discovered_by": f"agent:{agent_id}",
+                    "discovered_at": now,
+                    "last_seen": now,
+                    "last_modified": now,
+                    "status": "unknown",
+                    "parent_switch_name": item.get("parent_switch_name"),
+                    "parent_switch_ip": item.get("parent_switch_ip"),
+                    "parent_switch_port": item.get("parent_switch_port"),
+                    "parent_switch_platform": item.get("parent_switch_platform"),
+                    "vlan": item.get("vlan"),
+                    "connections": item.get("connections") if isinstance(item.get("connections"), list) else []
+                }
+                if item.get("platform"):
+                    dev["platform"] = item.get("platform")
+                if item.get("vendor"):
+                    dev["vendor"] = item.get("vendor")
+                device_list.append(dev)
+                if ip:
+                    by_ip[ip] = dev
+                if mac:
+                    by_mac[mac] = dev
+                created += 1
+            else:
+                apply_device(dev, ip, mac, name, matched_by_mac=matched_by_mac, scan_name=scan_name)
+
+    if isinstance(data, dict):
+        data["devices"] = device_list
+        data.setdefault("meta", {})["last_modified"] = now
+        write_database(data)
+
+    # Server only keeps latest in DB; agent stores local scan history
+    scan_paths = {}
+
+    # update agent status
+    for a in agents:
+        if isinstance(a, dict) and a.get("id") == agent_id:
+            # bind / validate agent identity
+            reported_name = (agent_device.get("name") or "").strip()
+            reported_ip = (agent_device.get("ip") or "").strip()
+            reported_mac = normalize_mac_value(agent_device.get("mac") or "")
+            if a.get("device_name") or a.get("device_ip") or a.get("device_mac"):
+                if a.get("device_name") and reported_name and a.get("device_name") != reported_name:
+                    a["run_now"] = False
+                    a["last_result"] = "identity_mismatch"
+                    a["last_result_at"] = datetime.now().isoformat()
+                    write_settings(settings)
+                    return jsonify({"error": "agent_identity_mismatch", "field": "name"}), 403
+                if a.get("device_ip") and reported_ip and a.get("device_ip") != reported_ip:
+                    a["run_now"] = False
+                    a["last_result"] = "identity_mismatch"
+                    a["last_result_at"] = datetime.now().isoformat()
+                    write_settings(settings)
+                    return jsonify({"error": "agent_identity_mismatch", "field": "ip"}), 403
+                if a.get("device_mac") and reported_mac and a.get("device_mac") != reported_mac:
+                    a["run_now"] = False
+                    a["last_result"] = "identity_mismatch"
+                    a["last_result_at"] = datetime.now().isoformat()
+                    write_settings(settings)
+                    return jsonify({"error": "agent_identity_mismatch", "field": "mac"}), 403
+            else:
+                a["device_name"] = reported_name
+                a["device_ip"] = reported_ip
+                a["device_mac"] = reported_mac
+            a["last_seen"] = datetime.now().isoformat()
+            a["last_scan_at"] = scan_time
+            a["run_now"] = False
+            a["last_result"] = "success"
+            a["last_result_at"] = datetime.now().isoformat()
+            if agent_state:
+                a["last_state"] = agent_state
+            if module_results:
+                a["last_state"] = f"module:{','.join(module_results.keys())}"
+                a["queued_modules"] = []
+            if isinstance(network_ranges, list):
+                a["network_ranges"] = [r for r in network_ranges if isinstance(r, str)]
+    settings["agents"] = agents
+    write_settings(settings)
+    _write_agent_config_files(agent, settings)
+
+    return jsonify({
+        "status": "success",
+        "created": created,
+        "updated": updated,
+        "scan_files": scan_paths
+    })
 
 @app.route('/api/oui_ranges', methods=['GET', 'PUT'])
 def handle_oui_ranges():
@@ -2378,385 +3737,135 @@ def get_stats():
     if not user:
         return jsonify({"error": "auth_required"}), 401
     data = read_database()
-    
+
     devices = _filter_devices_for_user(data.get("devices", []), user)
-    online_devices = len([d for d in devices if d.get("status") == "online"])
-    offline_devices = len([d for d in devices if d.get("status") == "offline"])
-    
     sites = _filter_sites_for_user(data.get("sites", []), user)
+    settings = read_settings() or {}
+    stale_days = int(settings.get("stale_scan_days") or 7)
+    online_minutes = int(settings.get("agent_online_minutes") or 5)
+
     unknown_devices = len([d for d in devices if (d.get("type") or "").lower() in ("", "unknown")])
+
+    # Per-site device grouping
+    devices_by_site = {}
+    for d in devices:
+        site = d.get("site") or ""
+        devices_by_site.setdefault(site, []).append(d)
+
+    # Sites with no router identified
+    sites_no_router = []
+    for site in sites:
+        name = site.get("name") or ""
+        devs = devices_by_site.get(name, [])
+        has_router = any((d.get("type") or "").lower() == "router" for d in devs)
+        if not has_router:
+            sites_no_router.append(name)
+
+    # Sites with stale scans
+    stale_sites = []
+    cutoff = datetime.now() - timedelta(days=stale_days)
+    for site in sites:
+        last_scan = site.get("last_scan")
+        if not last_scan:
+            stale_sites.append(site.get("name") or "")
+            continue
+        try:
+            dt = datetime.fromisoformat(last_scan)
+        except Exception:
+            stale_sites.append(site.get("name") or "")
+            continue
+        if dt < cutoff:
+            stale_sites.append(site.get("name") or "")
+
+    # Sites with highest unknown rate
+    unknown_rate = []
+    for site in sites:
+        name = site.get("name") or ""
+        devs = devices_by_site.get(name, [])
+        total = len(devs)
+        if total == 0:
+            continue
+        unk = len([d for d in devs if (d.get("type") or "").lower() in ("", "unknown")])
+        rate = (unk / total) * 100
+        unknown_rate.append({"site": name, "rate": round(rate, 1), "unknown": unk, "total": total})
+    unknown_rate.sort(key=lambda x: x["rate"], reverse=True)
+
+    # Uncompleted maps (no generated visual map)
+    def _site_has_visual_map(site_name: str) -> bool:
+        if not site_name:
+            return False
+        safe_site = site_name.replace("/", "_").replace("\\", "_").replace(":", "_")
+        patterns = [
+            os.path.join(GENERATED_MAPS_DIR, f"{site_name}_visual_map*.html"),
+            os.path.join(GENERATED_MAPS_DIR, f"{safe_site}_visual_map*.html"),
+            os.path.join("maps", f"{site_name}_visual_map*.html"),
+            os.path.join("maps", f"{safe_site}_visual_map*.html"),
+            f"{site_name}_visual_map*.html",
+            f"{safe_site}_visual_map*.html"
+        ]
+        for pattern in patterns:
+            if glob.glob(pattern):
+                return True
+        return False
+
+    uncompleted_maps = []
+    for site in sites:
+        name = site.get("name") or ""
+        if not _site_has_visual_map(name):
+            uncompleted_maps.append(name)
+
+    # Catched IPs
+    catched_by_site = {}
+    for d in devices:
+        name = (d.get("name") or "")
+        if name.lower().startswith("catched-"):
+            site = d.get("site") or ""
+            catched_by_site[site] = catched_by_site.get(site, 0) + 1
+    catched_sites = [{"site": k, "count": v} for k, v in catched_by_site.items()]
+    catched_sites.sort(key=lambda x: x["count"], reverse=True)
+
+    # Agent coverage + online status
+    agents = settings.get("agents", []) if isinstance(settings, dict) else []
+    sites_with_agents = set()
+    for agent in agents:
+        if isinstance(agent, dict) and agent.get("site"):
+            sites_with_agents.add(agent.get("site"))
+    total_sites = len(sites) or 1
+    coverage_pct = round((len(sites_with_agents) / total_sites) * 100, 1)
+    cutoff_online = datetime.now() - timedelta(minutes=online_minutes)
+    agents_online = 0
+    for agent in agents:
+        if not isinstance(agent, dict):
+            continue
+        last_seen = agent.get("last_seen")
+        if last_seen:
+            try:
+                dt = datetime.fromisoformat(last_seen)
+                if dt >= cutoff_online:
+                    agents_online += 1
+            except Exception:
+                pass
+
     stats = {
         "total_sites": len(sites),
         "total_devices": len(devices),
-        "online_devices": online_devices,
-        "offline_devices": offline_devices,
-        "unknown_status": len(devices) - online_devices - offline_devices,
         "unknown_devices": unknown_devices,
-        "last_modified": data.get("meta", {}).get("last_modified", "Never")
+        "last_modified": data.get("meta", {}).get("last_modified", "Never"),
+        "stale_scan_days": stale_days,
+        "sites_no_router": sites_no_router,
+        "stale_sites": stale_sites,
+        "unknown_rate_sites": unknown_rate[:5],
+        "uncompleted_maps": uncompleted_maps,
+        "catched_sites": catched_sites[:5],
+        "catched_total": sum(catched_by_site.values()),
+        "agent_online_minutes": online_minutes,
+        "sites_with_agents": len(sites_with_agents),
+        "agent_coverage_pct": coverage_pct,
+        "agents_total": len(agents),
+        "agents_online": agents_online
     }
-    
+
     return jsonify(stats)
-
-@app.route('/api/monitoring/site/<site_name>')
-def get_monitoring_site(site_name):
-    user = _get_effective_user()
-    if not user:
-        return jsonify({"error": "auth_required"}), 401
-    if not _can_read_site(user, site_name):
-        return jsonify({"error": "forbidden"}), 403
-
-    monitoring = read_monitoring()
-    site_entry = _get_monitoring_site(monitoring, site_name)
-    layout = _get_monitoring_layout(site_entry)
-    site_rules = site_entry.get("rules", [rule.copy() for rule in DEFAULT_MONITORING_RULES_LIST])
-
-    data = read_database()
-    devices = [d for d in data.get("devices", []) if d.get("site") == site_name]
-    now = datetime.now()
-
-    results = []
-    for device in devices:
-        device_id = device.get("id")
-        m = site_entry.get("devices", {}).get(device_id, {}) if device_id else {}
-        enabled = bool(m.get("enabled", False))
-        last_check = m.get("last_check")
-        last_check_dt = None
-        if last_check:
-            try:
-                last_check_dt = datetime.fromisoformat(last_check)
-            except ValueError:
-                last_check_dt = None
-
-        status = "unknown"
-        if not enabled:
-            status = "unknown"
-        elif last_check_dt:
-            age = (now - last_check_dt).total_seconds()
-            loss = m.get("packet_loss")
-            latency = m.get("avg_latency_ms")
-            status = "ok"
-            rules = m.get("rules") or site_rules
-            for rule in rules:
-                if not isinstance(rule, dict) or not rule.get("enabled", True):
-                    continue
-                rtype = rule.get("type")
-                threshold = rule.get("threshold")
-                if rtype == "stale" and threshold is not None and age > float(threshold):
-                    status = "not_ok"
-                    break
-                if rtype == "loss" and loss is not None and threshold is not None and loss >= float(threshold):
-                    status = "not_ok"
-                    break
-                if rtype == "latency" and latency is not None and threshold is not None and latency >= float(threshold):
-                    status = "not_ok"
-                    break
-
-        results.append({
-            "id": device_id,
-            "name": device.get("name"),
-            "ip": device.get("ip"),
-            "status": status,
-            "packet_loss": m.get("packet_loss"),
-            "avg_latency_ms": m.get("avg_latency_ms"),
-            "last_check": last_check,
-            "enabled": enabled,
-            "rules": m.get("rules") or [],
-            "placed": bool(m.get("placed", False)),
-            "dock": m.get("dock", "center")
-        })
-
-    return jsonify({
-        "site": site_name,
-        "rules": site_rules,
-        "devices": results,
-        "layout": layout
-    })
-
-
-@app.route('/api/monitoring/logs/<site_name>')
-def get_monitoring_logs(site_name):
-    user = _get_effective_user()
-    if not user:
-        return jsonify({"error": "auth_required"}), 401
-    if not _can_read_site(user, site_name):
-        return jsonify({"error": "forbidden"}), 403
-    init_monitoring()
-    safe = _safe_log_name(site_name)
-    log_path = os.path.join(LOGS_DIR, f"{safe}.log")
-    if not os.path.exists(log_path):
-        return jsonify({"site": site_name, "lines": []})
-    try:
-        with portalocker.Lock(log_path, 'r', timeout=2, encoding='utf-8') as f:
-            lines = f.read().splitlines()[-100:]
-        return jsonify({"site": site_name, "lines": lines})
-    except (portalocker.exceptions.LockException, OSError):
-        return jsonify({"site": site_name, "lines": []})
-
-@app.route('/api/monitoring/rules/<site_name>', methods=['PUT'])
-def update_monitoring_rules(site_name):
-    user = _get_effective_user()
-    if not user:
-        return jsonify({"error": "auth_required"}), 401
-    if not _can_write_site(user, site_name):
-        return jsonify({"error": "forbidden"}), 403
-
-    data = request.get_json() or {}
-    init_monitoring()
-    with MONITORING_LOCK:
-        monitoring = read_monitoring()
-    site_entry = _get_monitoring_site(monitoring, site_name)
-    device_id = data.get("device_id")
-    rules = data.get("rules")
-    enabled = data.get("enabled")
-
-    if rules is None:
-        # Backwards-compatible payload (site rules)
-        rules = [
-            {"id": "loss", "type": "loss", "threshold": int(data.get("loss_threshold", 100)), "enabled": True},
-            {"id": "latency", "type": "latency", "threshold": int(data.get("latency_threshold_ms", 500)), "enabled": True},
-        ]
-    if not isinstance(rules, list):
-        return jsonify({"error": "invalid_rules"}), 400
-    sanitized = []
-    for rule in rules:
-        if not isinstance(rule, dict):
-            continue
-        rtype = rule.get("type")
-        if rtype not in ("loss", "latency"):
-            continue
-        threshold = rule.get("threshold")
-        try:
-            threshold_val = float(threshold)
-        except (TypeError, ValueError):
-            return jsonify({"error": "invalid_threshold"}), 400
-        sanitized.append({
-            "id": rule.get("id") or rtype,
-            "type": rtype,
-            "threshold": threshold_val,
-            "enabled": bool(rule.get("enabled", True)),
-        })
-
-    if device_id:
-        device_entry = _get_device_monitoring(site_entry, device_id)
-        device_entry["rules"] = sanitized
-        if enabled is not None:
-            device_entry["enabled"] = bool(enabled)
-        with MONITORING_LOCK:
-            write_monitoring(monitoring)
-        log_event(site_name, f"rules updated for device {device_id}")
-        return jsonify({"success": True, "device_id": device_id, "rules": device_entry["rules"], "enabled": device_entry["enabled"]})
-
-    site_entry["rules"] = sanitized or [
-        {"id": "loss", "type": "loss", "threshold": 100, "enabled": True},
-        {"id": "latency", "type": "latency", "threshold": 500, "enabled": True},
-    ]
-    with MONITORING_LOCK:
-        write_monitoring(monitoring)
-    log_event(site_name, "site rules updated")
-    return jsonify({"success": True, "rules": site_entry["rules"]})
-
-@app.route('/api/monitoring/layout/<site_name>', methods=['PUT'])
-def update_monitoring_layout(site_name):
-    user = _get_effective_user()
-    if not user:
-        return jsonify({"error": "auth_required"}), 401
-    if not _can_write_site(user, site_name):
-        return jsonify({"error": "forbidden"}), 403
-    payload = request.get_json() or {}
-    layout = payload.get("layout")
-    if not isinstance(layout, dict):
-        return jsonify({"error": "invalid_layout"}), 400
-
-    init_monitoring()
-    with MONITORING_LOCK:
-        monitoring = read_monitoring()
-    site_entry = _get_monitoring_site(monitoring, site_name)
-    merged = _get_monitoring_layout(site_entry)
-    for key in ("top", "bottom", "left", "right"):
-        if key in layout:
-            try:
-                merged[key] = int(layout[key])
-            except (TypeError, ValueError):
-                pass
-    labels = layout.get("labels")
-    if isinstance(labels, dict):
-        merged_labels = merged.get("labels", {})
-        for key in merged_labels.keys():
-            if isinstance(labels.get(key), str):
-                merged_labels[key] = labels[key].strip() or merged_labels[key]
-        merged["labels"] = merged_labels
-    site_entry["layout"] = merged
-    with MONITORING_LOCK:
-        write_monitoring(monitoring)
-    return jsonify({"success": True, "layout": merged})
-
-
-@app.route('/api/monitoring/device/<site_name>/<device_id>', methods=['PUT'])
-def update_monitoring_device(site_name, device_id):
-    user = _get_effective_user()
-    if not user:
-        return jsonify({"error": "auth_required"}), 401
-    if not _can_write_site(user, site_name):
-        return jsonify({"error": "forbidden"}), 403
-
-    data = request.get_json() or {}
-    init_monitoring()
-    with MONITORING_LOCK:
-        monitoring = read_monitoring()
-    site_entry = _get_monitoring_site(monitoring, site_name)
-    device_entry = _get_device_monitoring(site_entry, device_id)
-
-    if "placed" in data:
-        device_entry["placed"] = bool(data.get("placed"))
-
-    if "dock" in data:
-        dock = data.get("dock")
-        if dock not in ("top", "right", "bottom", "left", "center"):
-            return jsonify({"error": "invalid_dock"}), 400
-        device_entry["dock"] = dock
-
-    if "enabled" in data:
-        device_entry["enabled"] = bool(data.get("enabled"))
-
-    if "rules" in data and isinstance(data.get("rules"), list):
-        device_entry["rules"] = data.get("rules")
-
-    with MONITORING_LOCK:
-        write_monitoring(monitoring)
-    if "dock" in data or "placed" in data:
-        log_event(site_name, f"layout updated for device {device_id}")
-    if "enabled" in data:
-        state = "enabled" if device_entry.get("enabled") else "disabled"
-        log_event(site_name, f"monitoring {state} for device {device_id}")
-
-    return jsonify({
-        "success": True,
-        "device_id": device_id,
-        "dock": device_entry.get("dock", "center"),
-        "enabled": device_entry.get("enabled", False),
-        "rules": device_entry.get("rules", []),
-        "placed": device_entry.get("placed", False)
-    })
-
-
-def _ping_host_once(ip: str) -> tuple[int | None, int | None]:
-    if os.name == "nt":
-        cmd = ["ping", "-n", "1", "-w", "1000", ip]
-    else:
-        cmd = ["ping", "-c", "1", "-W", "1", ip]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
-    except subprocess.TimeoutExpired:
-        return 100, None
-    output = result.stdout + "\n" + result.stderr
-    loss = None
-    avg = None
-    for line in output.splitlines():
-        if "Packets:" in line and "% loss" in line:
-            try:
-                loss_part = line.split("% loss")[0]
-                loss = int(loss_part.split("(")[-1].strip())
-            except ValueError:
-                pass
-        if "packet loss" in line:
-            try:
-                loss = int(line.split("%")[0].split()[-1])
-            except ValueError:
-                pass
-        if "Average =" in line:
-            try:
-                avg_text = line.split("Average =")[-1].strip().replace("ms", "")
-                avg = int(avg_text)
-            except ValueError:
-                pass
-        if "min/avg/max" in line:
-            try:
-                avg_text = line.split("=")[-1].strip().split("/")[1]
-                avg = int(float(avg_text))
-            except (ValueError, IndexError):
-                pass
-    if loss is None:
-        loss = 100 if result.returncode != 0 else 0
-    return loss, avg
-
-
-def _monitoring_cycle():
-    data = read_database()
-    monitoring = read_monitoring()
-    now = datetime.now().isoformat()
-    for site in data.get("sites", []):
-        site_name = site.get("name")
-        if not site_name:
-            continue
-        site_known_ids = set()
-        site_entry = _get_monitoring_site(monitoring, site_name)
-        site_rules = site_entry.get("rules", DEFAULT_MONITORING_RULES_LIST)
-        devices = [d for d in data.get("devices", []) if d.get("site") == site_name]
-        for device in devices:
-            device_id = device.get("id")
-            ip = device.get("ip")
-            if not device_id:
-                continue
-            site_known_ids.add(device_id)
-            device_entry = _get_device_monitoring(site_entry, device_id)
-            if not device_entry.get("enabled", False):
-                continue
-            if not ip:
-                device_entry.update({
-                    "ip": ip,
-                    "packet_loss": 100,
-                    "avg_latency_ms": None,
-                    "last_check": now
-                })
-            else:
-                loss, avg = _ping_host_once(ip)
-                device_entry.update({
-                    "ip": ip,
-                    "packet_loss": loss,
-                    "avg_latency_ms": avg,
-                    "last_check": now
-                })
-                if loss is not None and loss >= 100:
-                    log_event(site_name, f"ping failed for device {device_id}")
-
-            # Update last_status for lean logging
-            status = "unknown"
-            if device_entry.get("enabled"):
-                status = "ok"
-                rules = device_entry.get("rules") or site_rules
-                for rule in rules:
-                    if not isinstance(rule, dict) or not rule.get("enabled", True):
-                        continue
-                    threshold = rule.get("threshold")
-                    if rule.get("type") == "loss" and threshold is not None:
-                        if device_entry.get("packet_loss") is not None and device_entry["packet_loss"] >= float(threshold):
-                            status = "not_ok"
-                            break
-            if device_entry.get("last_status") != status:
-                device_entry["last_status"] = status
-                log_event(site_name, f"status {status} for device {device_id}")
-
-        # Prune removed devices for this site
-        site_entry["devices"] = {
-            did: entry for did, entry in site_entry.get("devices", {}).items()
-            if did in site_known_ids
-        }
-
-    write_monitoring(monitoring)
-
-
-def start_monitoring_loop():
-    def loop():
-        while True:
-            try:
-                with MONITORING_LOCK:
-                    _monitoring_cycle()
-            except Exception as exc:
-                print(f"[MONITOR] Error: {exc}", file=sys.stderr)
-            time.sleep(MONITORING_INTERVAL_SEC)
-
-    thread = threading.Thread(target=loop, daemon=True)
-    thread.start()
 
 # ==================== MAIN ====================
 
@@ -2777,17 +3886,14 @@ if __name__ == '__main__':
     # Initialize files
     init_database()
     init_settings()
-    init_monitoring()
-
-    # Start background monitoring loop
-    start_monitoring_loop()
+    module_runner.set_max_concurrent(read_settings().get("module_max_concurrent", 2))
     
     # Create modules directory if it doesn't exist
     if not os.path.exists(MODULES_DIR):
         os.makedirs(MODULES_DIR)
     
     # Create example modules if they don't exist
-    example_modules = ['add_device_manual', 'cdp_discovery', 'view_map', 'ping_monitor', 'enforce_oui_table', 'ubiquiti_cdp_reader']
+    example_modules = ['add_device_manual', 'cdp_discovery', 'view_map', 'enforce_oui_table', 'ubiquiti_cdp_reader']
     
     for module_name in example_modules:
         module_dir = os.path.join(MODULES_DIR, module_name)

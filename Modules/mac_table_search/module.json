@@ -1,0 +1,80 @@
+{
+  "id": "mac_table_search",
+  "name": "MAC Search",
+  "version": "1.0",
+  "description": "Trace a device MAC through Cisco switch trunks, map the path, and save its last-seen location.",
+  "author": "System",
+  "entry_point": "mac_table_search.py",
+  "inputs": [
+    {
+      "name": "target_device_id",
+      "type": "device_select",
+      "required": false,
+      "label": "Device from Inventory (optional)",
+      "show_mac": true,
+      "description": "Select a device whose stored MAC should be traced."
+    },
+    {
+      "name": "manual_mac",
+      "type": "text",
+      "required": false,
+      "label": "MAC Address (optional)",
+      "placeholder": "30:E1:71:6A:98:CE",
+      "description": "Overrides the selected device MAC when provided."
+    },
+    {
+      "name": "start_switch_id",
+      "type": "device_select",
+      "required": false,
+      "label": "Starting Switch",
+      "device_types": ["switch"],
+      "description": "Cisco switch where the trace should begin."
+    },
+    {
+      "name": "start_switch_ip",
+      "type": "text",
+      "required": false,
+      "label": "Starting Switch IP (optional)",
+      "placeholder": "10.192.92.60",
+      "description": "Use when the starting switch is not in the inventory."
+    },
+    {
+      "name": "username",
+      "type": "text",
+      "required": true,
+      "label": "SSH Username",
+      "placeholder": "admin"
+    },
+    {
+      "name": "password",
+      "type": "password",
+      "required": true,
+      "label": "SSH Password"
+    },
+    {
+      "name": "ssh_port",
+      "type": "number",
+      "required": false,
+      "default": 22,
+      "label": "SSH Port",
+      "min": 1,
+      "max": 65535
+    },
+    {
+      "name": "max_hops",
+      "type": "number",
+      "required": false,
+      "default": 10,
+      "label": "Maximum Trunk Hops",
+      "min": 1,
+      "max": 30
+    }
+  ],
+  "outputs": [
+    {
+      "name": "location",
+      "type": "text",
+      "description": "Final switch and access port where the MAC was learned."
+    }
+  ]
+}

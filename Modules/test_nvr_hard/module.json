@@ -1,0 +1,63 @@
+{
+  "id": "test_nvr_hard",
+  "name": "Test NVR HARD",
+  "version": "1.0",
+  "description": "Login to NVR and fetch HDD status from LAPI Storage Containers DetailInfos.",
+  "author": "System",
+  "entry_point": "test_nvr_hard.py",
+  "inputs": [
+    {
+      "name": "targets",
+      "type": "device_table",
+      "required": true,
+      "label": "Target NVRs",
+      "description": "Select NVR devices (preselected) or add manual IPs.",
+      "device_types": ["nvr"]
+    },
+    {
+      "name": "username",
+      "type": "text",
+      "required": true,
+      "label": "Username",
+      "placeholder": "admin"
+    },
+    {
+      "name": "password",
+      "type": "password",
+      "required": true,
+      "label": "Password"
+    },
+    {
+      "name": "timeout_seconds",
+      "type": "number",
+      "required": false,
+      "default": 10,
+      "label": "HTTP Timeout (seconds)",
+      "min": 3,
+      "max": 60
+    },
+    {
+      "name": "verify_ssl",
+      "type": "select",
+      "required": false,
+      "default": "false",
+      "options": ["false", "true"],
+      "label": "Verify TLS Certificate"
+    },
+    {
+      "name": "trace_output",
+      "type": "select",
+      "required": false,
+      "default": "false",
+      "options": ["false", "true"],
+      "label": "Trace HTTP Output"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "devices",
+      "type": "list",
+      "description": "Per-device HDD status details."
+    }
+  ]
+}

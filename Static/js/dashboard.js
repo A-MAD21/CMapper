@@ -23,39 +23,44 @@ class NetworkPlatform {
         this.currentUserRole = '';
         this.allowedSites = [];
         this.users = [];
-        this.monitoringData = null;
-        this.monitoringInterval = null;
-        this.monitoringSiteName = '';
-        this.monitoringSelectedDeviceId = '';
-        this.monitoringResizeBound = false;
-        this.monitoringLayout = null;
-        this.monitoringLayoutSaveTimer = null;
         this.selectedDeviceIds = new Set();
         this.devicesPage = 1;
         this.devicesPageSize = 50;
         this.devicesPageFilter = '';
+        this.devicesNetworkFilter = '';
+        this.deviceColumnFilters = {};
         this.moduleLogCache = new Map();
+        this.serverModuleJobs = [];
         this.sortState = {
             dashboardSites: { key: 'name', dir: 'asc' },
             sites: { key: 'name', dir: 'asc' },
-            devices: { key: 'name', dir: 'asc' }
+            devices: { key: 'name', dir: 'asc' },
+            ouiRanges: { key: 'oui', dir: 'asc' }
         };
         this.ouiRangesText = '';
+        this.ouiRangesEntries = [];
         this.moduleCredentials = {};
+        this.moduleLastParams = {};
         this.moduleCredentialTargets = [
             { id: 'cdp_discovery', label: 'CDP Discovery' },
             { id: 'mikrotik_mac_discovery', label: 'MikroTik MAC Discovery' },
             { id: 'ubiquiti_cdp_reader', label: 'Read CDP (Ubiquiti)' },
-            { id: 'uniview_nvr_capture', label: 'Uniview NVR Packet Capture' }
+            { id: 'uniview_nvr_capture', label: 'Uniview NVR Packet Capture' },
+            { id: 'mac_table_search', label: 'MAC Search' },
+            { id: 'mac_group_map', label: 'Map Group' }
         ];
         this.schedules = [];
         this.scheduleEditId = null;
         this.scheduleModuleEditRow = null;
+        this.showCompletedJobs = false;
+        this.agents = [];
         
         // ADD MAP-SPECIFIC PROPERTIES
         this.mapLoaded = false;
         this.currentMapSite = '';
         this.mapSelectedDeviceId = '';
+        this.editingSiteId = null;
+        this.currentTextMapUrl = '';
         
         // Initialize
         this.initEventListeners();
@@ -259,62 +264,9 @@ class NetworkPlatform {
         // Update Show Map button
         this.updateShowMapButton();
         this.updateMapControls();
-    }
-
-    updateMonitoringSelection() {
-        const label = document.getElementById('monitoringSelectedLabel');
-        const toggleBtn = document.getElementById('monitoringToggleBtn');
-        const rulesBtn = document.getElementById('monitoringRulesBtn');
-        const device = (this.monitoringData?.devices || []).find(d => d.id === this.monitoringSelectedDeviceId);
-        if (device && label) {
-            const ip = device.ip ? ` (${device.ip})` : '';
-            label.textContent = `${device.name || device.id}${ip}`;
-            if (toggleBtn) {
-                toggleBtn.disabled = this.currentUserRole === 'guest';
-                toggleBtn.classList.toggle('state-on', !!device.enabled);
-                toggleBtn.classList.toggle('state-off', !device.enabled);
-            }
-            if (rulesBtn) rulesBtn.disabled = this.currentUserRole === 'guest';
-        } else {
-            this.monitoringSelectedDeviceId = '';
-            if (label) label.textContent = 'None';
-            if (toggleBtn) {
-                toggleBtn.disabled = true;
-                toggleBtn.classList.remove('state-on', 'state-off');
-            }
-            if (rulesBtn) rulesBtn.disabled = true;
-        }
-    }
-
-    updateMonitoringTab() {
-        const siteSelect = document.getElementById('monitoringSiteSelect');
-        const showBtn = document.getElementById('showMonitoringBtn');
-        const rulesBtn = document.getElementById('monitoringRulesBtn');
-        if (!siteSelect || !showBtn) return;
-        const currentValue = siteSelect.value;
-        siteSelect.innerHTML = '<option value="">Select Site</option>';
-        if (this.sites && this.sites.length > 0) {
-            this.sites.forEach(site => {
-                const option = document.createElement('option');
-                option.value = site.name;
-                option.textContent = site.name;
-                if (site.name === this.currentSite) {
-                    option.selected = true;
-                }
-                siteSelect.appendChild(option);
-            });
-        }
-        if (currentValue) {
-            const exists = Array.from(siteSelect.options).some(opt => opt.value === currentValue);
-            if (exists) {
-                siteSelect.value = currentValue;
-            }
-        }
-        showBtn.disabled = !siteSelect.value;
-        if (rulesBtn) {
-            rulesBtn.disabled = this.currentUserRole === 'guest';
-        }
-        this.updateMonitoringSelection();
+        this.currentTextMapUrl = '';
+        const downloadBtn = document.getElementById('downloadTextMapBtn');
+        if (downloadBtn) downloadBtn.disabled = true;
     }
 
     updateMapControls() {
@@ -322,9 +274,13 @@ class NetworkPlatform {
         const textBtn = document.getElementById('showTextMapBtn');
         const visualBtn = document.getElementById('showVisualMapBtn');
         const genBtn = document.getElementById('generateMapBtn');
+        const macSearchBtn = document.getElementById('mapMacSearchBtn');
+        const mapGroupBtn = document.getElementById('mapGroupBtn');
         if (textBtn) textBtn.disabled = isGuest;
         if (visualBtn) visualBtn.disabled = isGuest;
         if (genBtn) genBtn.disabled = isGuest;
+        if (macSearchBtn) macSearchBtn.disabled = isGuest;
+        if (mapGroupBtn) mapGroupBtn.disabled = isGuest;
     }
 
     updateShowMapButton() {
@@ -336,11 +292,19 @@ class NetworkPlatform {
         showMapBtn.disabled = !siteSelect.value;
     }
 
+    getMapSpacing() {
+        const range = document.getElementById('mapSpacingRange');
+        const raw = range ? parseFloat(range.value || '1') : 1;
+        if (!Number.isFinite(raw)) return 1;
+        return Math.min(1.4, Math.max(0.3, raw));
+    }
+
     setMapSelection(deviceId) {
         this.mapSelectedDeviceId = deviceId || '';
         const label = document.getElementById('mapSelectedLabel');
         const editBtn = document.getElementById('mapEditBtn');
         const removeBtn = document.getElementById('mapRemoveBtn');
+        const rootBtn = document.getElementById('mapRootBtn');
 
         const device = (this.devices || []).find(d => d.id === this.mapSelectedDeviceId);
         if (!device) {
@@ -352,6 +316,7 @@ class NetworkPlatform {
             label.textContent = `${device.name}${ip}`;
             editBtn.disabled = false;
             removeBtn.disabled = false;
+            rootBtn.disabled = !device.ip || this.currentUserRole === 'guest';
             if (device.site && device.site !== this.currentSite) {
                 this.currentSite = device.site;
                 this.updateCurrentSiteDisplay();
@@ -361,6 +326,7 @@ class NetworkPlatform {
             label.textContent = 'None';
             editBtn.disabled = true;
             removeBtn.disabled = true;
+            rootBtn.disabled = true;
         }
     }
 
@@ -372,6 +338,39 @@ class NetworkPlatform {
         const exists = (this.devices || []).some(d => d.id === this.mapSelectedDeviceId);
         if (!exists) {
             this.setMapSelection('');
+        }
+    }
+
+    async setMapRootFromSelection() {
+        if (!this.mapSelectedDeviceId) {
+            this.showError('Select a node first');
+            return;
+        }
+        const device = (this.devices || []).find(d => d.id === this.mapSelectedDeviceId);
+        if (!device || !device.ip) {
+            this.showError('Selected device has no IP address');
+            return;
+        }
+        const siteName = device.site || this.currentSite;
+        const site = (this.sites || []).find(s => s.name === siteName);
+        if (!site) {
+            this.showError('Site not found');
+            return;
+        }
+        try {
+            const response = await fetch(`/api/sites/${site.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ root_ip: device.ip })
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to update root IP');
+            }
+            this.showMessage(`L2 root set to ${device.ip} for ${site.name}`);
+            this.loadData();
+        } catch (error) {
+            this.showError(error.message || 'Failed to update root IP');
         }
     }
 
@@ -493,27 +492,54 @@ class NetworkPlatform {
         });
 
         // Refresh button
-        document.getElementById('refreshBtn').addEventListener('click', () => {
+        document.getElementById('refreshBtn')?.addEventListener('click', () => {
             this.loadData();
         });
 
         // Add Site buttons
-        document.getElementById('addSiteBtn').addEventListener('click', () => {
+        document.getElementById('addSiteBtn')?.addEventListener('click', () => {
             this.showAddSiteModal();
         });
-        document.getElementById('addSiteBtn2').addEventListener('click', () => {
+        document.getElementById('addSiteBtn2')?.addEventListener('click', () => {
             this.showAddSiteModal();
         });
-        document.getElementById('saveSiteBtn').addEventListener('click', () => {
+        document.getElementById('saveSiteBtn')?.addEventListener('click', () => {
             this.saveSite();
+        });
+        document.getElementById('siteRootDevice')?.addEventListener('change', (event) => {
+            const rootIpInput = document.getElementById('siteRootIP');
+            if (!rootIpInput) return;
+            const value = event.target.value || '';
+            if (value) {
+                rootIpInput.value = value;
+            }
+        });
+        document.getElementById('siteRootIP')?.addEventListener('input', (event) => {
+            const select = document.getElementById('siteRootDevice');
+            if (!select) return;
+            const value = event.target.value.trim();
+            if (!value) {
+                select.value = '';
+                return;
+            }
+            const optionExists = Array.from(select.options).some(opt => opt.value === value);
+            if (!optionExists) {
+                select.value = '';
+            }
         });
 
         // Site selection
-        document.getElementById('deviceSiteFilter').addEventListener('change', (e) => {
+        document.getElementById('deviceSiteFilter')?.addEventListener('change', (e) => {
             this.devicesPage = 1;
+            this.devicesNetworkFilter = '';
             this.updateDevicesTab();
         });
-        document.getElementById('moduleSiteSelect').addEventListener('change', (e) => {
+        document.getElementById('deviceNetworkFilter')?.addEventListener('change', (e) => {
+            this.devicesPage = 1;
+            this.devicesNetworkFilter = e.target.value || '';
+            this.updateDevicesTab();
+        });
+        document.getElementById('moduleSiteSelect')?.addEventListener('change', (e) => {
             this.currentSite = e.target.value;
             this.updateCurrentSiteDisplay();
         });
@@ -544,6 +570,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', function() 
             platform.showMessage(`Text map generated for ${siteName} with ${data.device_count} devices!`);
             // Auto-load the new map
             platform.loadMapForSite(siteName);
+            platform.currentTextMapUrl = data.map_url || '';
+            const downloadBtn = document.getElementById('downloadTextMapBtn');
+            if (downloadBtn) downloadBtn.disabled = !platform.currentTextMapUrl;
         } else {
             platform.showError(data.error || 'Failed to generate map');
         }
@@ -592,6 +621,9 @@ document.getElementById('showTextMapBtn')?.addEventListener('click', async () =>
                 document.getElementById('mapFrame').style.display = 'block';
                 platform.currentSite = siteName;
                 platform.updateCurrentSiteDisplay();
+                platform.currentTextMapUrl = result.map_url || '';
+                const downloadBtn = document.getElementById('downloadTextMapBtn');
+                if (downloadBtn) downloadBtn.disabled = !platform.currentTextMapUrl;
             } else {
                 const error = await response.json();
                 platform.showError(error.error || 'Failed to generate text map');
@@ -632,7 +664,7 @@ document.getElementById('showVisualMapBtn')?.addEventListener('click', async () 
             const response = await fetch('/api/generate_visual_map', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ site_name: siteName })
+                body: JSON.stringify({ site_name: siteName, spacing: platform.getMapSpacing() })
             });
             
             if (response.ok) {
@@ -685,7 +717,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         const visualResponse = await fetch('/api/generate_visual_map', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ site_name: siteName })
+            body: JSON.stringify({ site_name: siteName, spacing: platform.getMapSpacing() })
         });
         
         if (textResponse.ok && visualResponse.ok) {
@@ -709,13 +741,17 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
     }
 });
         // Edit Device
-        document.getElementById('updateDeviceBtn').addEventListener('click', () => {
+        document.getElementById('updateDeviceBtn')?.addEventListener('click', () => {
             this.updateDevice();
         });
 
         // Settings
-        document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+        document.getElementById('saveSettingsBtn')?.addEventListener('click', () => {
             this.saveSettings();
+        });
+        document.getElementById('showCompletedJobs')?.addEventListener('change', (event) => {
+            this.showCompletedJobs = !!event.target.checked;
+            this.updateModuleJobs();
         });
         document.getElementById('moduleCredSaveBtn')?.addEventListener('click', () => {
             this.saveModuleCredential();
@@ -734,12 +770,6 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         document.getElementById('mapSiteSelect')?.addEventListener('change', (e) => {
             this.updateShowMapButton();
         });
-        document.getElementById('monitoringSiteSelect')?.addEventListener('change', (e) => {
-            const showBtn = document.getElementById('showMonitoringBtn');
-            if (showBtn) {
-                showBtn.disabled = !e.target.value;
-            }
-        });
 
         document.getElementById('mapAddBtn')?.addEventListener('click', () => {
             if (!this.currentSite) {
@@ -749,12 +779,40 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             this.openModuleById('add_device_manual');
         });
 
+        document.getElementById('mapMacSearchBtn')?.addEventListener('click', () => {
+            const siteName = document.getElementById('mapSiteSelect')?.value || this.currentSite || '';
+            if (!siteName) {
+                this.showError('Select a site first');
+                return;
+            }
+            this.currentSite = siteName;
+            this.updateCurrentSiteDisplay();
+            const selected = (this.devices || []).find(device => device.id === this.mapSelectedDeviceId);
+            const prefill = selected && selected.mac ? { target_device_id: selected.id } : {};
+            this.openModuleById('mac_table_search', prefill);
+        });
+
+        document.getElementById('mapGroupBtn')?.addEventListener('click', () => {
+            const siteName = document.getElementById('mapSiteSelect')?.value || this.currentSite || '';
+            if (!siteName) {
+                this.showError('Select a site first');
+                return;
+            }
+            this.currentSite = siteName;
+            this.updateCurrentSiteDisplay();
+            this.openModuleById('mac_group_map');
+        });
+
         document.getElementById('mapEditBtn')?.addEventListener('click', () => {
             if (!this.mapSelectedDeviceId) {
                 this.showError('Select a node first');
                 return;
             }
             this.showEditDeviceModal(this.mapSelectedDeviceId);
+        });
+
+        document.getElementById('mapRootBtn')?.addEventListener('click', () => {
+            this.setMapRootFromSelection();
         });
 
         document.getElementById('mapRemoveBtn')?.addEventListener('click', () => {
@@ -805,7 +863,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                     const genResponse = await fetch('/api/generate_visual_map', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ site_name: siteName })
+                        body: JSON.stringify({ site_name: siteName, spacing: platform.getMapSpacing() })
                     });
                     
                     if (genResponse.ok) {
@@ -840,6 +898,11 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 this.loadMapForSite(siteName);
             }
         });
+        document.getElementById('downloadTextMapBtn')?.addEventListener('click', () => {
+            if (this.currentTextMapUrl) {
+                window.open(this.currentTextMapUrl, '_blank');
+            }
+        });
         
         // Fullscreen button
         document.getElementById('fullscreenBtn')?.addEventListener('click', () => {
@@ -848,34 +911,16 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 window.open(mapFrame.src, '_blank');
             }
         });
-
-        // Monitoring actions
-        document.getElementById('showMonitoringBtn')?.addEventListener('click', () => {
-            const siteName = document.getElementById('monitoringSiteSelect').value;
-            if (siteName) {
-                this.loadMonitoringForSite(siteName);
-            }
-        });
-        document.getElementById('monitoringRulesBtn')?.addEventListener('click', () => {
-            const siteName = document.getElementById('monitoringSiteSelect').value;
-            if (!siteName) {
-                this.showError('Select a site first');
-                return;
-            }
-            if (!this.monitoringSelectedDeviceId) {
-                this.showError('Select a node first');
-                return;
-            }
-            this.openMonitoringRules(siteName, this.monitoringSelectedDeviceId);
-        });
-        document.getElementById('monitoringToggleBtn')?.addEventListener('click', () => {
-            const siteName = document.getElementById('monitoringSiteSelect').value;
-            if (!siteName || !this.monitoringSelectedDeviceId) {
-                return;
-            }
-            this.toggleMonitoringDevice(siteName, this.monitoringSelectedDeviceId);
-        });
-        
+        const mapSpacingRange = document.getElementById('mapSpacingRange');
+        const mapSpacingValue = document.getElementById('mapSpacingValue');
+        if (mapSpacingRange && mapSpacingValue) {
+            const updateLabel = () => {
+                const val = parseFloat(mapSpacingRange.value || '1') || 1;
+                mapSpacingValue.textContent = `${val.toFixed(2)}x`;
+            };
+            mapSpacingRange.addEventListener('input', updateLabel);
+            updateLabel();
+        }
         document.getElementById('exportDataBtn')?.addEventListener('click', () => {
             this.exportData();
         });
@@ -893,6 +938,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         });
         document.getElementById('mikrotikDiscoveryBtn')?.addEventListener('click', () => {
             this.runMikrotikDiscovery();
+        });
+        document.getElementById('agentDiscoveryBtn')?.addEventListener('click', () => {
+            this.runAgentDiscoveryForSite();
         });
         document.getElementById('addDeviceModuleBtn')?.addEventListener('click', () => {
             this.runAddDeviceModule();
@@ -912,8 +960,26 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 this.setDevicesPageSize(value);
             }
         });
+        document.querySelectorAll('.device-column-search').forEach(input => {
+            input.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                this.applyDeviceColumnSearch();
+            });
+            input.addEventListener('input', () => {
+                if (input.value) return;
+                const key = input.dataset.deviceFilterKey;
+                if (!key || !this.deviceColumnFilters[key]) return;
+                delete this.deviceColumnFilters[key];
+                this.devicesPage = 1;
+                this.updateDevicesTab();
+            });
+        });
         document.getElementById('saveOuiRangesBtn')?.addEventListener('click', () => {
             this.saveOuiRanges();
+        });
+        document.getElementById('addOuiRangeRowBtn')?.addEventListener('click', () => {
+            this.addOuiRangeTableRow();
         });
         document.getElementById('reloadOuiRangesBtn')?.addEventListener('click', () => {
             this.loadOuiRanges();
@@ -923,12 +989,6 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         });
         document.getElementById('addOuiRangeBtn')?.addEventListener('click', () => {
             this.addOuiRangeFromModal();
-        });
-        document.getElementById('saveMonitoringRulesBtn')?.addEventListener('click', () => {
-            const siteName = document.getElementById('monitoringSiteSelect').value;
-            if (siteName) {
-                this.saveMonitoringRules(siteName);
-            }
         });
         document.getElementById('saveOuiBtn')?.addEventListener('click', () => {
             this.saveDeviceOui();
@@ -950,6 +1010,20 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         });
         document.getElementById('scheduleModuleSaveBtn')?.addEventListener('click', () => {
             this.saveScheduleModuleConfig();
+        });
+
+        // Agent Manager
+        document.getElementById('addAgentBtn')?.addEventListener('click', () => {
+            this.openAgentModal();
+        });
+        document.getElementById('saveAgentBtn')?.addEventListener('click', () => {
+            this.saveAgent();
+        });
+        document.getElementById('pullAgentIdentityBtn')?.addEventListener('click', () => {
+            this.pullAgentIdentity();
+        });
+        document.getElementById('downloadAgentExeBtn')?.addEventListener('click', () => {
+            this.downloadAgentExe();
         });
 
         this.bindSortHeaders();
@@ -975,7 +1049,6 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                     this.updateSitesTab();
                     this.updateSettingsTab();
                     this.updateMapTab();
-                    this.updateMonitoringTab();
                 }
             })
             .finally(finishOne);
@@ -1019,10 +1092,20 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                     this.renderScheduleList();
                     this.updateScheduleFormSites();
                 }
+                return this.refreshModuleJobs();
             })
             .finally(finishOne);
 
-        Promise.allSettled([siteTask, deviceTask, statsTask, modulesTask, schedulesTask])
+        const agentsTask = this.fetchData('/api/agents', { timeoutMs: 8000 })
+            .then(agents => {
+                if (agents) {
+                    this.agents = agents;
+                    this.renderAgents();
+                }
+            })
+            .finally(finishOne);
+
+        Promise.allSettled([siteTask, deviceTask, statsTask, modulesTask, schedulesTask, agentsTask])
             .then(() => {
                 this.updateCurrentSiteDisplay();
                 if (this.currentUserRole === 'admin') {
@@ -1063,6 +1146,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             if (settings) {
                 this.settings = settings;
                 this.moduleCredentials = settings.module_credentials || {};
+                this.moduleLastParams = settings.module_last_params || {};
                 this.applySettings();
                 if (this.currentUserRole === 'admin') {
                     this.renderModuleCredentials();
@@ -1083,10 +1167,12 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 return;
             }
             this.ouiRangesText = response.content || '';
+            this.ouiRangesEntries = this.parseOuiRanges(this.ouiRangesText);
             const textarea = document.getElementById('ouiRangesText');
             if (textarea) {
                 textarea.value = this.ouiRangesText;
             }
+            this.renderOuiRangesTable();
         } catch (error) {
             console.error('Error loading OUI ranges:', error);
         }
@@ -1129,12 +1215,149 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         }).join('\n');
     }
 
+    getDeviceTypeOptions(selected = '') {
+        const types = ['', 'router', 'switch', 'firewall', 'ap', 'server', 'nvr', 'pda', 'host', 'phone', 'printer', 'pc', 'finger', 'unknown', 'other'];
+        return types.map(type => {
+            const label = type ? type : 'Select type';
+            return `<option value="${this.escapeHtml(type)}" ${type === selected ? 'selected' : ''}>${this.escapeHtml(label)}</option>`;
+        }).join('');
+    }
+
+    normalizeOuiEntry(entry = {}) {
+        const dtype = (entry.dtype || '').trim().toLowerCase();
+        return {
+            start: (entry.start || '').trim().toUpperCase(),
+            end: (entry.end || '').trim().toUpperCase(),
+            label: (entry.label || '').trim(),
+            dtype: dtype === 'camera' ? 'nvr' : dtype
+        };
+    }
+
+    ouiSortValue(entry, key) {
+        if (key === 'oui') {
+            return `${entry.start || ''}-${entry.end || ''}`;
+        }
+        if (key === 'device_type') {
+            return entry.dtype || '';
+        }
+        return entry.label || '';
+    }
+
+    renderOuiRangesTable() {
+        const body = document.getElementById('ouiRangesTableBody');
+        if (!body) return;
+        const state = this.sortState.ouiRanges || { key: 'oui', dir: 'asc' };
+        const dir = state.dir === 'desc' ? -1 : 1;
+        const entries = (this.ouiRangesEntries || [])
+            .map((entry, index) => ({ ...this.normalizeOuiEntry(entry), index }))
+            .sort((a, b) => this.compareValues(this.ouiSortValue(a, state.key), this.ouiSortValue(b, state.key)) * dir);
+
+        if (!entries.length) {
+            body.innerHTML = `
+                <tr>
+                    <td colspan="4" class="empty-state">
+                        <div style="padding: 24px; text-align: center;">No OUI ranges yet.</div>
+                    </td>
+                </tr>
+            `;
+            this.applySortIndicators('ouiRanges');
+            return;
+        }
+
+        body.innerHTML = entries.map(entry => `
+            <tr data-index="${entry.index}">
+                <td>
+                    <div style="display: grid; grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr); gap: 8px; align-items: center;">
+                        <input type="text" class="oui-start" value="${this.escapeHtml(entry.start)}" placeholder="AA:BB:CC:00:00:00">
+                        <span style="color: var(--text-secondary);">to</span>
+                        <input type="text" class="oui-end" value="${this.escapeHtml(entry.end)}" placeholder="AA:BB:CC:FF:FF:FF">
+                    </div>
+                </td>
+                <td>
+                    <input type="text" class="oui-label" value="${this.escapeHtml(entry.label)}" placeholder="Vendor / Name">
+                </td>
+                <td>
+                    <select class="oui-device-type">
+                        ${this.getDeviceTypeOptions(entry.dtype)}
+                    </select>
+                </td>
+                <td>
+                    <button class="btn btn-secondary btn-sm oui-remove-row" type="button">Remove</button>
+                </td>
+            </tr>
+        `).join('');
+
+        body.querySelectorAll('input, select').forEach(input => {
+            input.addEventListener('input', () => this.captureOuiTableRows());
+            input.addEventListener('change', () => this.captureOuiTableRows());
+        });
+        body.querySelectorAll('.oui-remove-row').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const row = event.target.closest('tr');
+                const index = Number(row?.dataset.index);
+                if (Number.isInteger(index)) {
+                    this.captureOuiTableRows();
+                    this.ouiRangesEntries.splice(index, 1);
+                    this.syncOuiTextareaFromEntries();
+                    this.renderOuiRangesTable();
+                }
+            });
+        });
+        this.applySortIndicators('ouiRanges');
+    }
+
+    captureOuiTableRows() {
+        const body = document.getElementById('ouiRangesTableBody');
+        if (!body) return this.ouiRangesEntries || [];
+        const byIndex = new Map();
+        body.querySelectorAll('tr[data-index]').forEach(row => {
+            const index = Number(row.dataset.index);
+            byIndex.set(index, this.normalizeOuiEntry({
+                start: row.querySelector('.oui-start')?.value || '',
+                end: row.querySelector('.oui-end')?.value || '',
+                label: row.querySelector('.oui-label')?.value || '',
+                dtype: row.querySelector('.oui-device-type')?.value || ''
+            }));
+        });
+        this.ouiRangesEntries = (this.ouiRangesEntries || []).map((entry, index) => byIndex.get(index) || this.normalizeOuiEntry(entry));
+        this.syncOuiTextareaFromEntries();
+        return this.ouiRangesEntries;
+    }
+
+    syncOuiTextareaFromEntries() {
+        const content = this.buildOuiRangesText((this.ouiRangesEntries || []).map(entry => this.normalizeOuiEntry(entry)).filter(entry =>
+            entry.start || entry.end || entry.label || entry.dtype
+        ));
+        this.ouiRangesText = content;
+        const textarea = document.getElementById('ouiRangesText');
+        if (textarea) {
+            textarea.value = content;
+        }
+        return content;
+    }
+
+    addOuiRangeTableRow() {
+        if (this.currentUserRole !== 'admin') return;
+        this.captureOuiTableRows();
+        this.ouiRangesEntries.push({ start: '', end: '', label: '', dtype: '' });
+        this.renderOuiRangesTable();
+    }
+
     async saveOuiRanges() {
         if (this.currentUserRole !== 'admin') {
             return;
         }
-        const textarea = document.getElementById('ouiRangesText');
-        const content = textarea ? textarea.value : '';
+        this.captureOuiTableRows();
+        const invalid = (this.ouiRangesEntries || []).find(entry => {
+            const normalized = this.normalizeOuiEntry(entry);
+            const hasAny = normalized.start || normalized.end || normalized.label || normalized.dtype;
+            return hasAny && (!normalized.start || !normalized.end || !normalized.label);
+        });
+        if (invalid) {
+            this.showError('Each OUI row needs start, end, and name');
+            return;
+        }
+        const content = this.syncOuiTextareaFromEntries();
         try {
             const response = await fetch('/api/oui_ranges', {
                 method: 'PUT',
@@ -1147,6 +1370,8 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 return;
             }
             this.ouiRangesText = content;
+            this.ouiRangesEntries = this.parseOuiRanges(content);
+            this.renderOuiRangesTable();
             this.showMessage('OUI ranges saved');
         } catch (error) {
             console.error('Error saving OUI ranges:', error);
@@ -1159,29 +1384,145 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
     updateDashboard() {
         // Update stats
         const statsGrid = document.getElementById('statsGrid');
+        const chartsGrid = document.getElementById('dashboardCharts');
         if (this.stats) {
             statsGrid.innerHTML = `
-                <div class="stat-card">
+                <div class="stat-card kpi" style="--stat-accent:#38BDF8;">
+                    <div class="kpi-icon"><i data-feather="map-pin"></i></div>
                     <div class="stat-label">Total Sites</div>
                     <div class="stat-value">${this.stats.total_sites || 0}</div>
-                    <div class="stat-trend"></div>
+                    <div class="stat-chip">All locations</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card kpi" style="--stat-accent:#10B981;">
+                    <div class="kpi-icon"><i data-feather="server"></i></div>
                     <div class="stat-label">Total Devices</div>
                     <div class="stat-value">${this.stats.total_devices || 0}</div>
-                    <div class="stat-trend"></div>
+                    <div class="stat-chip">Inventory size</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-label">Online Devices</div>
-                    <div class="stat-value">${this.stats.online_devices || 0}</div>
-                    <div class="stat-trend positive">${this.stats.online_devices || 0} online</div>
-                </div>
-                <div class="stat-card">
+                <div class="stat-card kpi" style="--stat-accent:#F59E0B;">
+                    <div class="kpi-icon"><i data-feather="help-circle"></i></div>
                     <div class="stat-label">Unknown Devices</div>
                     <div class="stat-value">${this.stats.unknown_devices || 0}</div>
-                    <div class="stat-trend"></div>
+                    <div class="stat-chip">Needs classification</div>
                 </div>
             `;
+            if (chartsGrid) {
+                const staleDays = this.stats.stale_scan_days || 7;
+                const onlineMinutes = this.stats.agent_online_minutes || 5;
+                const sitesNoRouter = this.stats.sites_no_router || [];
+                const staleSites = this.stats.stale_sites || [];
+                const unknownRates = this.stats.unknown_rate_sites || [];
+                const uncompletedMaps = this.stats.uncompleted_maps || [];
+                const catchedSites = this.stats.catched_sites || [];
+                const catchedTotal = this.stats.catched_total || 0;
+                const coveragePct = this.stats.agent_coverage_pct || 0;
+                const sitesWithAgents = this.stats.sites_with_agents || 0;
+                const agentsTotal = this.stats.agents_total || 0;
+                const agentsOnline = this.stats.agents_online || 0;
+
+                const listItems = (items, emptyText) => {
+                    if (!items.length) {
+                        return `<div style="color: var(--text-secondary); font-size: 12px;">${emptyText}</div>`;
+                    }
+                    return items.map(item => `<div>${item}</div>`).join('');
+                };
+
+                const barList = (items, key, valueKey, emptyText, color) => {
+                    if (!items.length) {
+                        return `<div style="color: var(--text-secondary); font-size: 12px;">${emptyText}</div>`;
+                    }
+                    return `
+                        <div class="chart-list">
+                            ${items.map(item => {
+                                const label = item[key] || '';
+                                const value = Number(item[valueKey] || 0);
+                                const pct = Math.min(100, Math.max(0, value));
+                                return `
+                                    <div class="chart-row">
+                                        <div>${label}</div>
+                                        <div class="chart-bar">
+                                            <span style="width:${pct}%; background:${color};"></span>
+                                        </div>
+                                        <div class="chart-badge">${value}${valueKey === 'rate' ? '%' : ''}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                };
+
+                chartsGrid.innerHTML = `
+                    <div class="chart-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div class="chart-title">Sites With Unknown Router</div>
+                                <div class="chart-subtitle">Sites missing a router type</div>
+                            </div>
+                            <strong>${sitesNoRouter.length}</strong>
+                        </div>
+                        <div style="margin-top: 12px; font-size: 12px;">
+                            ${listItems(sitesNoRouter.slice(0, 6), 'All sites have a router.')}
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div class="chart-title">No Recent Scans</div>
+                                <div class="chart-subtitle">Older than ${staleDays} days</div>
+                            </div>
+                            <strong>${staleSites.length}</strong>
+                        </div>
+                        <div style="margin-top: 12px; font-size: 12px;">
+                            ${listItems(staleSites.slice(0, 6), 'All sites scanned recently.')}
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div class="chart-title">Highest Unknown Rate</div>
+                                <div class="chart-subtitle">Top 5 by unknown devices</div>
+                            </div>
+                            <strong>${unknownRates.length}</strong>
+                        </div>
+                        ${barList(unknownRates, 'site', 'rate', 'No data.', 'linear-gradient(90deg, #F59E0B, #EF4444)')}
+                    </div>
+                    <div class="chart-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div class="chart-title">Uncompleted Maps</div>
+                                <div class="chart-subtitle">Sites missing visual maps</div>
+                            </div>
+                            <strong>${uncompletedMaps.length}</strong>
+                        </div>
+                        <div style="margin-top: 12px; font-size: 12px;">
+                            ${listItems(uncompletedMaps.slice(0, 6), 'All maps completed.')}
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div class="chart-title">Catched IPs</div>
+                                <div class="chart-subtitle">By site (top 5)</div>
+                            </div>
+                            <strong>${catchedTotal}</strong>
+                        </div>
+                        ${barList(catchedSites.map(item => ({ site: item.site, rate: item.count })), 'site', 'rate', 'No catched IPs.', 'linear-gradient(90deg, #38BDF8, #10B981)')}
+                    </div>
+                    <div class="chart-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div class="chart-title">Agent Coverage</div>
+                                <div class="chart-subtitle">${sitesWithAgents}/${this.stats.total_sites || 0} sites</div>
+                            </div>
+                            <strong>${coveragePct}%</strong>
+                        </div>
+                        <div class="chart-bar" style="margin-top: 12px;">
+                            <span style="width:${coveragePct}%; background: linear-gradient(90deg, #10B981, #38BDF8);"></span>
+                        </div>
+                        <div class="chart-subtitle" style="margin-top: 8px;">Agents online: ${agentsOnline}/${agentsTotal} (last ${onlineMinutes}m)</div>
+                    </div>
+                `;
+            }
         }
 
         // Update sites table
@@ -1306,6 +1647,176 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         replaceIcons();
     }
 
+    ipToNumber(ip) {
+        const parts = String(ip || '').trim().split('.');
+        if (parts.length !== 4) return null;
+        let value = 0;
+        for (const part of parts) {
+            if (!/^\d+$/.test(part)) return null;
+            const octet = Number(part);
+            if (octet < 0 || octet > 255) return null;
+            value = (value * 256) + octet;
+        }
+        return value >>> 0;
+    }
+
+    parseCidr(cidr) {
+        const match = String(cidr || '').trim().match(/^(\d+\.\d+\.\d+\.\d+)\/(\d{1,2})$/);
+        if (!match) return null;
+        const base = this.ipToNumber(match[1]);
+        const prefix = Number(match[2]);
+        if (base === null || prefix < 0 || prefix > 32) return null;
+        const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+        const network = (base & mask) >>> 0;
+        return { cidr: `${this.numberToIp(network)}/${prefix}`, network, mask, prefix };
+    }
+
+    numberToIp(value) {
+        const n = value >>> 0;
+        return [
+            (n >>> 24) & 255,
+            (n >>> 16) & 255,
+            (n >>> 8) & 255,
+            n & 255
+        ].join('.');
+    }
+
+    cidrForIp(ip, prefix = 24) {
+        const value = this.ipToNumber(ip);
+        if (value === null) return null;
+        const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+        return `${this.numberToIp((value & mask) >>> 0)}/${prefix}`;
+    }
+
+    ipInCidr(ip, cidrInfo) {
+        const value = this.ipToNumber(ip);
+        if (value === null || !cidrInfo) return false;
+        return ((value & cidrInfo.mask) >>> 0) === cidrInfo.network;
+    }
+
+    getConfiguredNetworksForSite(siteName) {
+        const networks = [];
+        const add = (value) => {
+            const parsed = this.parseCidr(value);
+            if (parsed && !networks.some(item => item.cidr === parsed.cidr)) {
+                networks.push(parsed);
+            }
+        };
+        (this.agents || []).forEach(agent => {
+            if (!agent || agent.site !== siteName) return;
+            add(agent.target_range);
+            (agent.target_ranges || []).forEach(add);
+            (agent.network_ranges || []).forEach(add);
+        });
+        networks.sort((a, b) => b.prefix - a.prefix || a.cidr.localeCompare(b.cidr, undefined, { numeric: true }));
+        return networks;
+    }
+
+    getDeviceNetworkOptions(siteDevices, siteName) {
+        const configured = this.getConfiguredNetworksForSite(siteName);
+        const networkMap = new Map(configured.map(item => [item.cidr, { ...item, count: 0 }]));
+        let unknownCount = 0;
+
+        siteDevices.forEach(device => {
+            const ip = device.ip || '';
+            const value = this.ipToNumber(ip);
+            if (value === null) {
+                unknownCount += 1;
+                return;
+            }
+            const configuredMatch = configured.find(info => this.ipInCidr(ip, info));
+            if (configuredMatch) {
+                networkMap.get(configuredMatch.cidr).count += 1;
+                return;
+            }
+            const fallbackCidr = this.cidrForIp(ip, 24);
+            const parsed = this.parseCidr(fallbackCidr);
+            if (!parsed) {
+                unknownCount += 1;
+                return;
+            }
+            if (!networkMap.has(parsed.cidr)) {
+                networkMap.set(parsed.cidr, { ...parsed, count: 0 });
+            }
+            networkMap.get(parsed.cidr).count += 1;
+        });
+
+        const networks = Array.from(networkMap.values())
+            .filter(item => item.count > 0)
+            .sort((a, b) => a.network - b.network || b.prefix - a.prefix);
+        return { networks, unknownCount };
+    }
+
+    updateDeviceNetworkFilter(siteDevices, siteName) {
+        const networkFilter = document.getElementById('deviceNetworkFilter');
+        if (!networkFilter) return '';
+        if (!siteName) {
+            networkFilter.innerHTML = '<option value="">All Networks</option>';
+            networkFilter.value = '';
+            networkFilter.disabled = true;
+            this.devicesNetworkFilter = '';
+            return '';
+        }
+
+        const { networks, unknownCount } = this.getDeviceNetworkOptions(siteDevices, siteName);
+        const currentValue = this.devicesNetworkFilter || networkFilter.value || '';
+        const validValues = new Set(['']);
+        let html = '<option value="">All Networks</option>';
+        networks.forEach(item => {
+            validValues.add(item.cidr);
+            html += `<option value="${item.cidr}">${item.cidr} (${item.count})</option>`;
+        });
+        if (unknownCount > 0) {
+            validValues.add('__unknown__');
+            html += `<option value="__unknown__">Unknown / No IP (${unknownCount})</option>`;
+        }
+        networkFilter.innerHTML = html;
+        networkFilter.disabled = networks.length === 0 && unknownCount === 0;
+        const nextValue = validValues.has(currentValue) ? currentValue : '';
+        networkFilter.value = nextValue;
+        this.devicesNetworkFilter = nextValue;
+        return nextValue;
+    }
+
+    deviceMatchesNetwork(device, networkValue) {
+        if (!networkValue) return true;
+        const ip = device.ip || '';
+        if (networkValue === '__unknown__') {
+            return this.ipToNumber(ip) === null;
+        }
+        return this.ipInCidr(ip, this.parseCidr(networkValue));
+    }
+
+    applyDeviceColumnSearch() {
+        const filters = {};
+        document.querySelectorAll('.device-column-search').forEach(input => {
+            const key = input.dataset.deviceFilterKey;
+            const value = input.value.trim();
+            if (key && value) {
+                filters[key] = value.toLowerCase();
+            }
+        });
+        this.deviceColumnFilters = filters;
+        this.devicesPage = 1;
+        this.updateDevicesTab();
+    }
+
+    getDeviceFilterValue(device, key) {
+        if (key === 'discovered_at' || key === 'last_seen') {
+            if (device[key]) return this.formatTime(device[key]);
+            return key === 'last_seen' ? 'Never' : 'N/A';
+        }
+        return String(device[key] ?? '');
+    }
+
+    deviceMatchesColumnFilters(device) {
+        const filters = this.deviceColumnFilters || {};
+        return Object.entries(filters).every(([key, prefix]) => {
+            if (!prefix) return true;
+            return this.getDeviceFilterValue(device, key).toLowerCase().startsWith(prefix);
+        });
+    }
+
     updateDevicesTab() {
         // Update site filter dropdown
         const siteFilter = document.getElementById('deviceSiteFilter');
@@ -1322,10 +1833,16 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             this.devicesPage = 1;
             this.devicesPageFilter = filterSite;
         }
-        const filteredDevices = filterSite 
+        const siteDevices = filterSite 
             ? this.devices.filter(d => d.site === filterSite)
             : this.devices;
-        const sortedDevices = this.sortDevices(filteredDevices);
+        const networkValue = this.updateDeviceNetworkFilter(siteDevices, filterSite);
+        const filteredDevices = networkValue
+            ? siteDevices.filter(device => this.deviceMatchesNetwork(device, networkValue))
+            : siteDevices;
+        const columnFilteredDevices = filteredDevices.filter(device => this.deviceMatchesColumnFilters(device));
+        const rootIpBySite = new Map((this.sites || []).map(site => [site.name, site.root_ip]));
+        const sortedDevices = this.sortDevices(columnFilteredDevices);
         const totalDevices = sortedDevices.length;
         const pageSize = this.devicesPageSize || 50;
         const totalPages = Math.max(1, Math.ceil(totalDevices / pageSize));
@@ -1336,10 +1853,13 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         const pagedDevices = sortedDevices.slice(startIndex, startIndex + pageSize);
         const countLabel = document.getElementById('deviceCountLabel');
         if (countLabel) {
-            const count = filteredDevices.length;
+            const count = columnFilteredDevices.length;
+            const activeColumnFilters = Object.keys(this.deviceColumnFilters || {}).length;
             const suffix = count === 1 ? 'device' : 'devices';
-            const scope = filterSite ? `in ${filterSite}` : 'total';
-            countLabel.textContent = `${count} ${suffix} (${scope})`;
+            const networkScope = networkValue === '__unknown__' ? ' / Unknown' : (networkValue ? ` / ${networkValue}` : '');
+            const searchScope = activeColumnFilters ? ` / Search from ${filteredDevices.length}` : '';
+            const scope = filterSite ? `in ${filterSite}${networkScope}` : 'total';
+            countLabel.textContent = `${count} ${suffix} (${scope}${searchScope})`;
         }
         this.updateDevicesPagination(totalDevices, totalPages);
         
@@ -1348,6 +1868,8 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         if (pagedDevices.length > 0) {
             devicesBody.innerHTML = pagedDevices.map(device => {
                 const checked = this.selectedDeviceIds.has(device.id) ? 'checked' : '';
+                const isRoot = device.ip && rootIpBySite.get(device.site) === device.ip;
+                const rootBadge = isRoot ? '<span class="status-badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-size: 11px;">Root</span>' : '';
                 return `
                     <tr>
                         <td>
@@ -1357,6 +1879,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <i data-feather="server" style="width: 16px; height: 16px;"></i>
                                 <strong>${device.name || device.id}</strong>
+                                ${rootBadge}
                                 ${device.locked ? '<i data-feather="lock" style="width: 12px; height: 12px; color: var(--warning);"></i>' : ''}
                             </div>
                         </td>
@@ -1366,11 +1889,6 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                         <td>
                             <span class="status-badge" style="background: rgba(59, 130, 246, 0.1); color: var(--info);">
                                 ${device.type || 'unknown'}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="status-badge status-${device.status || 'unknown'}">
-                                ${device.status || 'unknown'}
                             </span>
                         </td>
                         <td>${device.discovered_at ? this.formatTime(device.discovered_at) : 'N/A'}</td>
@@ -1392,13 +1910,19 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 `;
             }).join('');
         } else {
-            const message = filterSite 
+            const networkText = networkValue === '__unknown__' ? 'Unknown / No IP' : networkValue;
+            const activeColumnFilters = Object.keys(this.deviceColumnFilters || {}).length;
+            const message = activeColumnFilters
+                ? 'No devices match the search'
+                : filterSite && networkValue
+                ? `No devices in "${filterSite}" for ${networkText}`
+                : filterSite 
                 ? `No devices in site "${filterSite}"`
                 : 'No devices found';
                 
             devicesBody.innerHTML = `
                 <tr>
-                    <td colspan="10" class="empty-state">
+                    <td colspan="9" class="empty-state">
                         <div style="padding: 32px; text-align: center;">
                             <i data-feather="server" style="width: 48px; height: 48px;"></i>
                             <h3 style="margin: 16px 0 8px;">${message}</h3>
@@ -1468,6 +1992,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                     this.updateSitesTab();
                 } else if (target === 'devices') {
                     this.updateDevicesTab();
+                } else if (target === 'ouiRanges') {
+                    this.captureOuiTableRows();
+                    this.renderOuiRangesTable();
                 }
             });
         });
@@ -1580,11 +2107,24 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         if (!confirm(`Delete ${ids.length} devices?`)) {
             return;
         }
-        for (const id of ids) {
+        const batchSize = 50;
+        for (let i = 0; i < ids.length; i += batchSize) {
+            const batch = ids.slice(i, i + batchSize);
             try {
-                await fetch(`/api/devices/${id}`, { method: 'DELETE' });
+                const response = await fetch('/api/devices/bulk_delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: batch })
+                });
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    this.showError(data.error || 'Failed to delete devices');
+                    break;
+                }
             } catch (error) {
-                console.error('Delete failed:', error);
+                console.error('Bulk delete failed:', error);
+                this.showError('Failed to delete devices');
+                break;
             }
         }
         this.selectedDeviceIds.clear();
@@ -1644,7 +2184,6 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         this.currentSite = siteName;
         this.runModule('add_device_manual');
     }
-
     normalizeMac(mac) {
         if (!mac) return '';
         return mac.trim().replace(/-/g, ':').toUpperCase();
@@ -1735,6 +2274,8 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             }
             this.showMessage('OUI range added');
             this.ouiRangesText = content;
+            this.ouiRangesEntries = this.parseOuiRanges(content);
+            this.renderOuiRangesTable();
         } catch (error) {
             console.error('Add OUI range error:', error);
             this.showError('Failed to add OUI range');
@@ -1829,6 +2370,8 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                         body: JSON.stringify({ content })
                     });
                     this.ouiRangesText = content;
+                    this.ouiRangesEntries = this.parseOuiRanges(content);
+                    this.renderOuiRangesTable();
                 }
             }
             this.closeAllModals();
@@ -1850,8 +2393,11 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         
         // Update modules grid
         const modulesGrid = document.getElementById('modulesGrid');
+        const agentEligible = new Set(['ubiquiti_cdp_reader', 'uniview_nvr_capture', 'agent_ip_scan']);
         if (this.modules && this.modules.length > 0) {
             modulesGrid.innerHTML = this.modules.map(module => {
+                const showAgent = agentEligible.has(module.id);
+                const showServer = module.id !== 'agent_ip_scan';
                 return `
                     <div class="module-card">
                         <div class="module-header">
@@ -1861,11 +2407,19 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                         <div class="module-description">
                             ${module.description || 'No description available'}
                         </div>
-                        <div class="module-actions">
+                        <div class="module-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
+                            ${showServer ? `
                             <button class="btn btn-primary" onclick="platform.runModule('${module.id}')">
                                 <i data-feather="play"></i>
-                                Run Module
+                                Run on Server
                             </button>
+                            ` : ''}
+                            ${showAgent ? `
+                            <button class="btn btn-agent" onclick="platform.runModuleOnAgent('${module.id}')">
+                                <i data-feather="cpu"></i>
+                                Run on Agent
+                            </button>
+                            ` : ''}
                         </div>
                     </div>
                 `;
@@ -1911,8 +2465,8 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         const allMode = mode === 'all';
         container.classList.toggle('is-disabled', allMode);
         const allInput = container.querySelector('input[value="*"]');
-        if (allMode && allInput) {
-            allInput.checked = true;
+        if (allInput) {
+            allInput.checked = allMode ? true : false;
         }
         this.applyAllSitesState(container);
         this.updateMultiSelectLabel(container);
@@ -1937,15 +2491,44 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 return module ? module.name : mod.module_id;
             });
             const status = schedule.status || (schedule.enabled ? 'idle' : 'disabled');
-            const nextRun = schedule.next_run_at ? this.formatDateTime(schedule.next_run_at) : '—';
+            const nextRun = schedule.next_run_at ? this.formatDateTime(schedule.next_run_at) : '?';
+            const progress = schedule.progress || {};
+            const completedSites = progress.completed_sites || 0;
+            const totalSites = progress.total_sites || 0;
+            const activeSites = progress.active_sites || 0;
+            const progressLabel = totalSites ? `${completedSites}/${totalSites} sites` : '?';
+            const activeJobs = schedule.active_jobs || [];
+            const activeJobsText = activeJobs.slice(0, 3).map(job => {
+                const module = this.modules.find(entry => entry.id === job.module_id);
+                const name = module ? module.name : job.module_id;
+                const site = job.site_name || 'unknown site';
+                const jobStatus = job.status || 'running';
+                return `${name} for ${site} - ${jobStatus}`;
+            }).join('<br>');
+            const moreJobs = activeJobs.length > 3 ? `<div class="meta">+${activeJobs.length - 3} more</div>` : '';
+            const statusBadgeClass = status === 'running'
+                ? 'status-online'
+                : status === 'disabled'
+                    ? 'status-offline'
+                    : 'status-unknown';
             return `
                 <tr data-id="${schedule.id}">
                     <td>${schedule.name}</td>
                     <td>${sites}</td>
-                    <td>${moduleLabels.join(' → ') || '—'}</td>
+                    <td>${moduleLabels.join(', ') || 'None'}</td>
                     <td>${schedule.delay_between_modules_sec || 0}s</td>
                     <td>${schedule.repeat_interval_min || 0}m</td>
-                    <td>${status}</td>
+                    <td>
+                        <div>
+                            <span class="status-badge ${statusBadgeClass}">
+                                ${status}
+                            </span>
+                        </div>
+                        <div class="meta" style="margin-top: 6px;">
+                            ${progressLabel}${activeSites ? ` ? ${activeSites} active` : ''}
+                        </div>
+                        ${activeJobsText ? `<div class="meta" style="margin-top: 6px; line-height: 1.4;">${activeJobsText}${moreJobs}</div>` : ''}
+                    </td>
                     <td>${nextRun}</td>
                     <td style="display:flex; gap:8px;">
                         <button class="btn btn-secondary schedule-run" type="button">Run</button>
@@ -2060,7 +2643,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
 
         const updateProfiles = () => {
             const moduleId = moduleSelect.value;
-            const profiles = this.getModuleCredentialProfiles(moduleId);
+            const profiles = this.getRunnableModuleCredentialProfiles(moduleId);
             const options = ['<option value="">Manual</option>']
                 .concat(profiles.map(profile => `<option value="${profile.name}">${profile.name}</option>`));
             credentialSelect.innerHTML = options.join('');
@@ -2144,14 +2727,16 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         this.scheduleModuleEditRow = row;
         const siteName = this.getScheduleEditorSite();
         const prefill = row.dataset.parameters ? JSON.parse(row.dataset.parameters) : {};
+        const rowCredential = row.querySelector('.schedule-credential-select')?.value || '';
+        const mergedPrefill = rowCredential ? { ...prefill, credential_profile: rowCredential } : prefill;
         const modal = document.getElementById('scheduleModuleModal');
         const title = document.getElementById('scheduleModuleTitle');
         const formContainer = document.getElementById('scheduleModuleFormContainer');
         if (title) {
             title.textContent = `Configure: ${module.name || module.id}`;
         }
-        this.renderModuleFormInto(formContainer, module, siteName, prefill, {
-            includeCredentialProfiles: false,
+        this.renderModuleFormInto(formContainer, module, siteName, mergedPrefill, {
+            includeCredentialProfiles: true,
             showSiteDisplay: true,
             idPrefix: 'schedule_module_'
         });
@@ -2287,6 +2872,15 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             this.schedules = schedules;
             this.renderScheduleList();
         }
+        await this.refreshModuleJobs();
+    }
+
+    async refreshModuleJobs() {
+        const data = await this.fetchData('/api/modules/status', { timeoutMs: 8000 });
+        if (data && Array.isArray(data.running_jobs)) {
+            this.serverModuleJobs = data.running_jobs;
+        }
+        this.updateModuleJobs();
     }
 
     editSchedule(scheduleId) {
@@ -2383,13 +2977,12 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
     openExportDevices() {
         const siteSelect = document.getElementById('deviceSiteFilter');
         const selectedSite = siteSelect ? siteSelect.value : '';
-        if (!this.currentSite && selectedSite) {
-            this.currentSite = selectedSite;
-        }
-        if (!this.currentSite) {
-            this.showError('Select a site (or set default) to export devices.');
+        if (!selectedSite) {
+            this.showError('Select a site in the Devices tab to export devices.');
             return;
         }
+        this.currentSite = selectedSite;
+        this.updateCurrentSiteDisplay();
         this.runModule('export_devices');
     }
 
@@ -2406,6 +2999,11 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         document.getElementById('scanDepth').value = this.settings.default_scan_depth || 3;
         document.getElementById('autoRefresh').checked = this.settings.auto_refresh || false;
         document.getElementById('refreshInterval').value = this.settings.refresh_interval || 30;
+        const moduleMax = document.getElementById('moduleMaxConcurrent');
+        if (moduleMax) {
+            moduleMax.value = this.settings.module_max_concurrent || 2;
+            moduleMax.disabled = this.currentUserRole !== 'admin';
+        }
         const authEnabled = document.getElementById('authEnabled');
         if (authEnabled) {
             authEnabled.checked = !!(this.settings.auth && this.settings.auth.enabled);
@@ -2428,6 +3026,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             const textarea = document.getElementById('ouiRangesText');
             if (textarea && this.ouiRangesText) {
                 textarea.value = this.ouiRangesText;
+            }
+            if (this.currentUserRole === 'admin') {
+                this.renderOuiRangesTable();
             }
         }
         const moduleCredsSection = document.getElementById('moduleCredentialsSection');
@@ -2496,7 +3097,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         
         // Set title
         title.textContent = `Run: ${module.name}`;
-        this.renderModuleFormInto(formContainer, module, this.currentSite, prefill, {
+        const savedPrefill = this.getModuleLastParams(module.id, this.currentSite);
+        const mergedPrefill = { ...savedPrefill, ...prefill };
+        this.renderModuleFormInto(formContainer, module, this.currentSite, mergedPrefill, {
             includeCredentialProfiles: true,
             showSiteDisplay: true,
             idPrefix: 'module_'
@@ -2580,6 +3183,14 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         startBtn.onclick = () => this.startModule(module);
     }
 
+    getModuleLastParams(moduleId, siteName) {
+        const byModule = this.moduleLastParams?.[moduleId] || {};
+        if (siteName && byModule[siteName]) {
+            return byModule[siteName];
+        }
+        return byModule['*'] || {};
+    }
+
     renderModuleFormInto(container, module, siteName, prefill = {}, options = {}) {
         if (!container) return;
         const includeCredentialProfiles = !!options.includeCredentialProfiles;
@@ -2633,7 +3244,8 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                     const options = siteDevices.map(d => {
                         const ip = d.ip ? ` (${d.ip})` : '';
                         const dtype = d.type ? ` [${d.type}]` : '';
-                        return `<option value="${d.id}">${d.name}${ip}${dtype}</option>`;
+                        const mac = input.show_mac && d.mac ? ` - ${d.mac}` : '';
+                        return `<option value="${d.id}">${d.name}${ip}${dtype}${mac}</option>`;
                     }).join('');
                     formHTML += `
                         <div class="form-group">
@@ -2646,13 +3258,16 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                     `;
                 } else if (input.type === 'device_table') {
                     const siteDevices = this.getDevicesForSite(siteName);
+                    let autoselect = false;
                     const rows = siteDevices.map(d => {
                         let checked = '';
                         if (module.id === 'ubiquiti_cdp_reader' && this.isUbiquitiDevice(d)) {
                             checked = 'checked';
+                            autoselect = true;
                         }
                         if (module.id === 'uniview_nvr_capture' && this.isNvrDevice(d)) {
                             checked = 'checked';
+                            autoselect = true;
                         }
                         const vendor = d.vendor || d.platform || '';
                         return `
@@ -2691,6 +3306,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                             </div>
                         </div>
                     `;
+                    if (autoselect) {
+                        formHTML += `<input type="hidden" id="${idPrefix}${input.name}_autoselect" value="1">`;
+                    }
                 } else if (input.type === 'checkbox') {
                     const infoText = input.info || input.description || '';
                     const infoIcon = infoText
@@ -2874,6 +3492,14 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         statusDisplay.style.display = 'block';
         statusDisplay.querySelector('.status-message').textContent = 'Starting module...';
         statusDisplay.querySelector('.progress-fill').style.width = '5%';
+        const logWrap = document.getElementById('moduleLogOutput');
+        if (logWrap) {
+            logWrap.style.display = 'block';
+            const textarea = logWrap.querySelector('textarea');
+            if (textarea) {
+                textarea.value = '';
+            }
+        }
         startBtn.disabled = true;
         
         try {
@@ -2889,6 +3515,10 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             const result = await response.json();
             
             if (result.thread_id) {
+                this.moduleLogCache.delete(result.thread_id);
+                if (statusDisplay) {
+                    statusDisplay.dataset.logThread = result.thread_id;
+                }
                 // Track this module thread
                 this.activeModuleThreads.set(result.thread_id, {
                     module: module,
@@ -2900,6 +3530,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 
                 // Update UI
                 statusDisplay.querySelector('.status-message').textContent = 'Module running...';
+                this.updateModuleLog(result.thread_id, false);
                 this.updateModuleJobs();
             } else {
                 throw new Error(result.error || 'Failed to start module');
@@ -3028,6 +3659,10 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         let isValid = true;
         let error = '';
 
+        const credentialSelect = document.getElementById(`${idPrefix}credential_profile`);
+        const credentialProfile = credentialSelect && credentialSelect.value ? credentialSelect.value : '';
+        const credentialFields = new Set(['username', 'password']);
+
         (module.inputs || []).forEach(input => {
             if (input.name === 'site') {
                 return;
@@ -3056,8 +3691,13 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                         }
                     }
                 });
+                const autoMarker = document.getElementById(`${idPrefix}${input.name}_autoselect`);
                 if (input.required && deviceIds.length === 0 && manualDevices.length === 0) {
-                    isValid = false;
+                    if (autoMarker || (module && (module.id === 'ubiquiti_cdp_reader' || module.id === 'uniview_nvr_capture'))) {
+                        inputs[input.name] = { device_ids: '__AUTO__', manual_devices: [] };
+                    } else {
+                        isValid = false;
+                    }
                 } else {
                     inputs[input.name] = { device_ids: deviceIds, manual_devices: manualDevices };
                 }
@@ -3066,19 +3706,24 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             const element = document.getElementById(`${idPrefix}${input.name}`);
             if (element) {
                 const value = element.type === 'checkbox' ? element.checked : element.value;
+                if (input.required && !value && credentialProfile && credentialFields.has(input.name)) {
+                    element.style.borderColor = '';
+                    return;
+                }
                 if (input.required && !value) {
                     isValid = false;
                     element.style.borderColor = 'var(--error)';
                 } else {
-                    inputs[input.name] = value;
+                    if (!(credentialProfile && credentialFields.has(input.name) && !value)) {
+                        inputs[input.name] = value;
+                    }
                     element.style.borderColor = '';
                 }
             }
         });
 
-        const credentialSelect = document.getElementById(`${idPrefix}credential_profile`);
-        if (credentialSelect && credentialSelect.value) {
-            inputs.credential_profile = credentialSelect.value;
+        if (credentialProfile) {
+            inputs.credential_profile = credentialProfile;
         }
 
         if (!isValid && !error) {
@@ -3131,40 +3776,133 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
 
     updateModuleJobs() {
         const jobsBody = document.getElementById('moduleJobsBody');
+        const serverJobs = Array.isArray(this.serverModuleJobs) ? this.serverModuleJobs : [];
+        const useServerJobs = serverJobs.length > 0;
         const threads = Array.from(this.activeModuleThreads.entries());
+        const summary = document.getElementById('moduleJobsSummary');
         
-        if (threads.length > 0) {
-            jobsBody.innerHTML = threads.map(([threadId, threadInfo]) => {
-                const duration = Math.floor((new Date() - threadInfo.startTime) / 1000);
-                return `
-                    <tr>
-                        <td>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <i data-feather="box"></i>
-                                ${threadInfo.module.name}
-                            </div>
-                        </td>
-                        <td>
-                            <span class="status-badge status-online">
-                                Running
-                            </span>
-                        </td>
-                        <td>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 50%"></div>
-                            </div>
-                        </td>
-                        <td>${this.formatTime(threadInfo.startTime.toISOString())}</td>
-                        <td>${duration}s</td>
-                        <td>
-                            <button class="btn-icon" title="Cancel" onclick="platform.cancelModule('${threadId}')">
-                                <i data-feather="x-circle"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
+        if (useServerJobs || threads.length > 0) {
+            let jobs = useServerJobs ? serverJobs.slice() : [];
+            if (useServerJobs && !this.showCompletedJobs) {
+                jobs = jobs.filter(job => {
+                    const status = (job.status || '').toLowerCase();
+                    if (status === 'completed') {
+                        const output = job.output || {};
+                        return output && output.status === 'error';
+                    }
+                    return true;
+                });
+            }
+            const totalJobs = jobs.length;
+            const maxRows = 50;
+            const clipped = jobs.slice(0, maxRows);
+            if (summary) {
+                summary.textContent = `${totalJobs} job${totalJobs === 1 ? '' : 's'}`;
+            }
+            const rows = useServerJobs
+                ? clipped.map(job => {
+                    const module = (this.modules || []).find(m => m.id === job.module_id);
+                    const moduleName = module ? module.name : job.module_id;
+                    const status = job.status || 'running';
+                    const output = job.output || {};
+                    const errorMessage = (output && output.status === 'error') ? (output.message || output.error || '') : '';
+                    let statusText = status;
+                    if (errorMessage) {
+                        const msg = String(errorMessage).toLowerCase();
+                        if (msg.includes('ssh') || msg.includes('login') || msg.includes('username') || msg.includes('password')) {
+                            statusText = 'connecting failed';
+                        } else {
+                            statusText = 'failed';
+                        }
+                    }
+                    const progress = typeof job.progress === 'number' ? job.progress : 0;
+                    const startText = job.start_time || job.queued_at;
+                    const startTime = startText ? new Date(startText) : null;
+                    const duration = startTime ? Math.floor((new Date() - startTime) / 1000) : 0;
+                    const siteLabel = job.site_name ? ` • ${job.site_name}` : '';
+                    const scheduleLabel = job.schedule_name ? ` • ${job.schedule_name}` : '';
+                    const statusClass = (errorMessage || status === 'failed')
+                        ? 'status-offline'
+                        : status === 'running'
+                        ? 'status-online'
+                        : status === 'queued'
+                            ? 'status-unknown'
+                            : 'status-offline';
+                    return `
+                        <tr>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i data-feather="box"></i>
+                                    <div>
+                                        <div>${moduleName}</div>
+                                        <div class="meta">${siteLabel}${scheduleLabel}</div>
+                                        ${errorMessage ? `<div class="meta" style="color: var(--danger-color);">${this.escapeHtml(errorMessage)}</div>` : ''}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="status-badge ${statusClass}">
+                                    ${statusText}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${Math.min(100, Math.max(0, progress))}%"></div>
+                                </div>
+                            </td>
+                            <td>${startTime ? this.formatTime(startTime.toISOString()) : '—'}</td>
+                            <td>${duration}s</td>
+                            <td>
+                                <button class="btn-icon" title="Cancel" disabled>
+                                    <i data-feather="x-circle"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).concat(totalJobs > maxRows ? [`
+                        <tr>
+                            <td colspan="6" class="empty-state">
+                                <div style="padding: 12px; text-align: center; color: var(--text-secondary);">
+                                    Showing first ${maxRows} of ${totalJobs} jobs
+                                </div>
+                            </td>
+                        </tr>
+                    `] : [])
+                : threads.map(([threadId, threadInfo]) => {
+                    const duration = Math.floor((new Date() - threadInfo.startTime) / 1000);
+                    return `
+                        <tr>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i data-feather="box"></i>
+                                    ${threadInfo.module.name}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="status-badge status-online">
+                                    Running
+                                </span>
+                            </td>
+                            <td>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 50%"></div>
+                                </div>
+                            </td>
+                            <td>${this.formatTime(threadInfo.startTime.toISOString())}</td>
+                            <td>${duration}s</td>
+                            <td>
+                                <button class="btn-icon" title="Cancel" onclick="platform.cancelModule('${threadId}')">
+                                    <i data-feather="x-circle"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            jobsBody.innerHTML = rows.join('');
         } else {
+            if (summary) {
+                summary.textContent = '0 jobs';
+            }
             jobsBody.innerHTML = `
                 <tr>
                     <td colspan="6" class="empty-state">
@@ -3198,12 +3936,21 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
     showAddSiteModal() {
         document.getElementById('addSiteModal').classList.add('active');
         // Clear form
+        this.editingSiteId = null;
+        const title = document.getElementById('siteModalTitle');
+        const saveBtn = document.getElementById('saveSiteBtn');
+        if (title) title.textContent = 'Add New Site';
+        if (saveBtn) saveBtn.textContent = 'Add Site';
+        const siteIdInput = document.getElementById('siteId');
+        if (siteIdInput) siteIdInput.value = '';
         document.getElementById('siteName').value = '';
         document.getElementById('siteRootIP').value = '';
         document.getElementById('siteNotes').value = '';
+        this.populateSiteRootDeviceOptions('', '');
     }
 
     async saveSite() {
+        const siteId = document.getElementById('siteId')?.value || '';
         const name = document.getElementById('siteName').value.trim();
         const rootIP = document.getElementById('siteRootIP').value.trim();
         const notes = document.getElementById('siteNotes').value.trim();
@@ -3214,8 +3961,11 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         }
         
         try {
-            const response = await fetch('/api/sites', {
-                method: 'POST',
+            const isEdit = !!siteId;
+            const url = isEdit ? `/api/sites/${siteId}` : '/api/sites';
+            const method = isEdit ? 'PUT' : 'POST';
+            const response = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: name,
@@ -3226,11 +3976,11 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.error || 'Failed to add site');
+                throw new Error(error.error || (isEdit ? 'Failed to update site' : 'Failed to add site'));
             }
             
             this.closeAllModals();
-            this.showMessage(`Site "${name}" added successfully`);
+            this.showMessage(isEdit ? `Site "${name}" updated successfully` : `Site "${name}" added successfully`);
             this.loadData();
             
             // Auto-select the new site
@@ -3241,6 +3991,19 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             console.error('Error adding site:', error);
             this.showError(error.message);
         }
+    }
+
+    populateSiteRootDeviceOptions(siteName, currentRootIp) {
+        const select = document.getElementById('siteRootDevice');
+        if (!select) return;
+        const devices = (this.devices || []).filter(d => d.site === siteName && d.ip);
+        const options = devices
+            .map(d => ({ ip: d.ip, label: `${d.ip} (${d.name || d.id || 'Device'})` }))
+            .sort((a, b) => a.ip.localeCompare(b.ip));
+        const current = currentRootIp || '';
+        select.innerHTML = '<option value="">Manual entry</option>' + options.map(opt => (
+            `<option value="${opt.ip}" ${opt.ip === current ? 'selected' : ''}>${opt.label}</option>`
+        )).join('');
     }
 
 selectSite(siteName) {
@@ -3261,31 +4024,19 @@ selectSite(siteName) {
             this.showError('Site not found');
             return;
         }
-        
-        // For now, just show a simple edit
-        const newName = prompt('Enter new site name:', site.name);
-        if (newName && newName !== site.name) {
-            try {
-                const response = await fetch(`/api/sites/${siteId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: newName })
-                });
-                
-                if (response.ok) {
-                    this.showMessage(`Site renamed to "${newName}"`);
-                    this.loadData();
-                    
-                    // Update current site if it was the renamed one
-                    if (this.currentSite === site.name) {
-                        this.currentSite = newName;
-                        this.updateCurrentSiteDisplay();
-                    }
-                }
-            } catch (error) {
-                this.showError('Failed to update site');
-            }
-        }
+
+        const title = document.getElementById('siteModalTitle');
+        const saveBtn = document.getElementById('saveSiteBtn');
+        if (title) title.textContent = 'Edit Site';
+        if (saveBtn) saveBtn.textContent = 'Save Changes';
+        this.editingSiteId = siteId;
+        const siteIdInput = document.getElementById('siteId');
+        if (siteIdInput) siteIdInput.value = siteId;
+        document.getElementById('siteName').value = site.name || '';
+        document.getElementById('siteRootIP').value = site.root_ip || '';
+        document.getElementById('siteNotes').value = site.notes || '';
+        this.populateSiteRootDeviceOptions(site.name, site.root_ip || '');
+        document.getElementById('addSiteModal').classList.add('active');
     }
 
     async deleteSite(siteId, siteName) {
@@ -3328,7 +4079,6 @@ selectSite(siteName) {
         document.getElementById('editDeviceVlan').value = device.vlan || '';
         document.getElementById('editDeviceMac').value = device.mac || '';
         document.getElementById('editDeviceType').value = device.type || 'router';
-        document.getElementById('editDeviceStatus').value = device.status || 'unknown';
         document.getElementById('editDeviceNotes').value = device.notes || '';
         document.getElementById('editDeviceLocked').checked = device.locked || false;
         document.getElementById('editDeviceAlwaysShowMap').checked = device.always_show_on_map || false;
@@ -3363,7 +4113,6 @@ selectSite(siteName) {
             os: document.getElementById('editDeviceOS').value.trim(),
             vendor: document.getElementById('editDeviceVendor').value.trim(),
             platform: document.getElementById('editDevicePlatform').value.trim(),
-            status: document.getElementById('editDeviceStatus').value,
             notes: document.getElementById('editDeviceNotes').value.trim(),
             locked: document.getElementById('editDeviceLocked').checked,
             always_show_on_map: document.getElementById('editDeviceAlwaysShowMap').checked,
@@ -3503,6 +4252,19 @@ selectSite(siteName) {
             this.currentSite = this.settings.default_site;
             this.updateCurrentSiteDisplay();
         }
+
+        const agentUrlInput = document.getElementById('agentServerUrl');
+        if (agentUrlInput && this.settings.agent_server_url) {
+            agentUrlInput.value = this.settings.agent_server_url;
+        }
+        const staleInput = document.getElementById('staleScanDays');
+        if (staleInput && this.settings.stale_scan_days) {
+            staleInput.value = this.settings.stale_scan_days;
+        }
+        const agentOnlineInput = document.getElementById('agentOnlineMinutes');
+        if (agentOnlineInput && this.settings.agent_online_minutes) {
+            agentOnlineInput.value = this.settings.agent_online_minutes;
+        }
     }
 
     async saveSettings() {
@@ -3513,8 +4275,24 @@ selectSite(siteName) {
             auto_refresh: document.getElementById('autoRefresh').checked,
             refresh_interval: parseInt(document.getElementById('refreshInterval').value) || 30
         };
+        const agentUrlInput = document.getElementById('agentServerUrl');
+        if (agentUrlInput) {
+            settings.agent_server_url = agentUrlInput.value.trim();
+        }
+        const staleInput = document.getElementById('staleScanDays');
+        if (staleInput) {
+            settings.stale_scan_days = parseInt(staleInput.value) || 7;
+        }
+        const agentOnlineInput = document.getElementById('agentOnlineMinutes');
+        if (agentOnlineInput) {
+            settings.agent_online_minutes = parseInt(agentOnlineInput.value) || 5;
+        }
         if (this.currentUserRole === 'admin') {
             settings.module_credentials = this.moduleCredentials || {};
+            const moduleMax = document.getElementById('moduleMaxConcurrent');
+            if (moduleMax) {
+                settings.module_max_concurrent = parseInt(moduleMax.value) || 2;
+            }
         }
         
         try {
@@ -3901,474 +4679,6 @@ selectSite(siteName) {
             this.showError('Failed to change password');
         }
     }
-
-    async loadMonitoringForSite(siteName) {
-        const board = document.getElementById('monitoringBoard');
-        if (!board) return;
-        board.querySelectorAll('.monitoring-zone').forEach(zone => {
-            const content = zone.querySelector('.monitoring-zone-content');
-            if (content) {
-                content.innerHTML = '';
-            }
-        });
-        const data = await this.fetchData(`/api/monitoring/site/${encodeURIComponent(siteName)}`, { timeoutMs: 8000 });
-        if (!data) {
-            const center = board.querySelector('[data-dock="center"]');
-            if (center) {
-                center.innerHTML = `
-                    <div class="empty-state" style="text-align: center; padding: 24px;">
-                        <i data-feather="alert-circle" style="width: 32px; height: 32px; margin-bottom: 12px;"></i>
-                        <h3 style="margin-bottom: 8px;">No Data</h3>
-                        <p style="color: var(--text-secondary); margin-bottom: 12px;">
-                            Run the ping monitor module to populate status.
-                        </p>
-                    </div>
-                `;
-                replaceIcons();
-            }
-            return;
-        }
-        this.monitoringData = data;
-        this.monitoringLayout = data.layout || null;
-        this.applyMonitoringLayout();
-        this.bindMonitoringLayoutHandlers();
-        this.renderMonitoringNodes();
-        this.renderMonitoringDeviceList();
-        this.renderMonitoringLogs(siteName);
-        this.startMonitoringAutoRefresh(siteName);
-        this.updateMonitoringSelection();
-        this.bindMonitoringResize();
-    }
-
-    renderMonitoringNodes() {
-        const board = document.getElementById('monitoringBoard');
-        if (!board) return;
-        const zones = {
-            top: board.querySelector('[data-dock="top"] .monitoring-zone-content'),
-            left: board.querySelector('[data-dock="left"] .monitoring-zone-content'),
-            center: board.querySelector('[data-dock="center"] .monitoring-zone-content'),
-            right: board.querySelector('[data-dock="right"] .monitoring-zone-content'),
-            bottom: board.querySelector('[data-dock="bottom"] .monitoring-zone-content'),
-            none: board.querySelector('[data-dock="none"]'),
-        };
-        Object.values(zones).forEach(zone => {
-            if (zone && zone !== zones.none) {
-                zone.innerHTML = '';
-            }
-        });
-        const devices = (this.monitoringData?.devices || []).filter(d => d.placed);
-        if (!devices.length) {
-            const center = zones.center;
-            if (center) {
-                center.innerHTML = `
-                    <div class="empty-state" style="text-align: center; padding: 24px;">
-                        <i data-feather="activity" style="width: 32px; height: 32px; margin-bottom: 12px;"></i>
-                        <h3 style="margin-bottom: 8px;">Drop devices here</h3>
-                        <p style="color: var(--text-secondary); margin-bottom: 12px;">
-                            Drag from the Devices list to build your monitoring layout.
-                        </p>
-                    </div>
-                `;
-                replaceIcons();
-            }
-        }
-        devices.forEach(device => {
-            const status = device.status || 'unknown';
-            const statusClass = status === 'ok' ? '' : status === 'not_ok' ? 'status-bad' : 'status-unknown';
-            const loss = device.packet_loss != null ? `${device.packet_loss}% loss` : 'Loss: n/a';
-            const latency = device.avg_latency_ms != null ? `${device.avg_latency_ms} ms` : 'Latency: n/a';
-            const last = device.last_check ? this.formatTime(device.last_check) : 'Never';
-            const enabled = device.enabled ? 'Monitoring: on' : 'Monitoring: off';
-            const selected = device.id === this.monitoringSelectedDeviceId ? 'selected' : '';
-
-            const node = document.createElement('div');
-            node.className = `monitoring-node ${statusClass} ${selected}`;
-            node.dataset.deviceId = device.id;
-            node.draggable = true;
-            node.title = `${device.name || device.id} | ${loss} | ${latency} | ${enabled} | Last: ${last}`;
-            node.textContent = device.name || device.id || 'Unknown';
-            node.addEventListener('click', () => {
-                this.monitoringSelectedDeviceId = device.id;
-                this.renderMonitoringNodes();
-                this.updateMonitoringSelection();
-            });
-            node.addEventListener('dragstart', (event) => {
-                event.dataTransfer.setData('text/plain', device.id);
-            });
-
-            const dock = (device.dock || 'center').toLowerCase();
-            const target = zones[dock] || zones.center;
-            if (target) {
-                target.appendChild(node);
-            }
-        });
-
-        board.querySelectorAll('.monitoring-zone').forEach(zone => {
-            if (zone.dataset.bound === 'true') {
-                return;
-            }
-            zone.dataset.bound = 'true';
-            zone.addEventListener('dragover', (event) => {
-                event.preventDefault();
-            });
-            zone.addEventListener('drop', (event) => {
-                event.preventDefault();
-                const deviceId = event.dataTransfer.getData('text/plain');
-                const dock = zone.dataset.dock;
-                if (deviceId && dock) {
-                    this.updateMonitoringDock(deviceId, dock);
-                }
-            });
-        });
-
-        this.renderMonitoringLinks();
-    }
-
-    applyMonitoringLayout() {
-        const board = document.getElementById('monitoringBoard');
-        if (!board || !this.monitoringLayout) return;
-        const layout = this.monitoringLayout;
-        board.style.setProperty('--monitoring-top', `${layout.top || 90}px`);
-        board.style.setProperty('--monitoring-bottom', `${layout.bottom || 90}px`);
-        board.style.setProperty('--monitoring-left', `${layout.left || 120}px`);
-        board.style.setProperty('--monitoring-right', `${layout.right || 120}px`);
-        board.querySelectorAll('.monitoring-zone-label').forEach(label => {
-            const zone = label.dataset.zone;
-            const text = layout.labels?.[zone];
-            if (text) {
-                label.textContent = text;
-            }
-        });
-    }
-
-    bindMonitoringLayoutHandlers() {
-        const board = document.getElementById('monitoringBoard');
-        if (!board || board.dataset.layoutBound === 'true') {
-            return;
-        }
-        board.dataset.layoutBound = 'true';
-        board.querySelectorAll('.monitoring-zone-label').forEach(label => {
-            label.addEventListener('blur', () => {
-                const zone = label.dataset.zone;
-                if (!zone || !this.monitoringLayout) return;
-                const value = (label.textContent || '').trim();
-                if (!value) return;
-                this.monitoringLayout.labels = this.monitoringLayout.labels || {};
-                this.monitoringLayout.labels[zone] = value;
-                this.scheduleMonitoringLayoutSave();
-            });
-        });
-
-    }
-
-    scheduleMonitoringLayoutSave() {
-        if (this.monitoringLayoutSaveTimer) {
-            clearTimeout(this.monitoringLayoutSaveTimer);
-        }
-        this.monitoringLayoutSaveTimer = setTimeout(() => {
-            this.saveMonitoringLayout();
-        }, 500);
-    }
-
-    async saveMonitoringLayout() {
-        const siteName = document.getElementById('monitoringSiteSelect').value;
-        if (!siteName || !this.monitoringLayout) return;
-        try {
-            await fetch(`/api/monitoring/layout/${encodeURIComponent(siteName)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ layout: this.monitoringLayout })
-            });
-        } catch (error) {
-            console.error('Error saving monitoring layout:', error);
-        }
-    }
-
-    async updateMonitoringDock(deviceId, dock) {
-        const siteName = document.getElementById('monitoringSiteSelect').value;
-        if (!siteName) return;
-        const device = (this.monitoringData?.devices || []).find(d => d.id === deviceId);
-        const nextPlaced = dock !== 'none';
-        if (device) {
-            const sameDock = (device.dock || 'center') === dock;
-            if (device.placed === nextPlaced && sameDock) {
-                return;
-            }
-        }
-        try {
-            const payload = dock === 'none' ? { placed: false } : { placed: true, dock };
-            const response = await fetch(`/api/monitoring/device/${encodeURIComponent(siteName)}/${encodeURIComponent(deviceId)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await response.json();
-            if (!response.ok) {
-                this.showError(data.error || 'Failed to update dock');
-                return;
-            }
-            const device = (this.monitoringData?.devices || []).find(d => d.id === deviceId);
-            if (device) {
-                device.dock = data.dock;
-                device.placed = data.placed;
-            }
-            if (this.monitoringSelectedDeviceId === deviceId && dock === 'none') {
-                this.monitoringSelectedDeviceId = '';
-            }
-            this.renderMonitoringNodes();
-            this.renderMonitoringDeviceList();
-            this.renderMonitoringLinks();
-            this.updateMonitoringSelection();
-        } catch (error) {
-            console.error('Dock update error:', error);
-            this.showError('Failed to update dock');
-        }
-    }
-
-    bindMonitoringResize() {
-        if (this.monitoringResizeBound) {
-            return;
-        }
-        this.monitoringResizeBound = true;
-        window.addEventListener('resize', () => {
-            if (this.currentTab === 'monitoring') {
-                this.renderMonitoringLinks();
-            }
-        });
-    }
-
-    renderMonitoringDeviceList() {
-        const list = document.getElementById('monitoringDeviceList');
-        if (!list) return;
-        const siteName = document.getElementById('monitoringSiteSelect').value;
-        const siteDevices = (this.devices || []).filter(d => d.site === siteName);
-        const monitoringMap = new Map((this.monitoringData?.devices || []).map(d => [d.id, d]));
-        const available = siteDevices.filter(device => {
-            const entry = monitoringMap.get(device.id);
-            return !entry || !entry.placed;
-        });
-
-        if (!available.length) {
-            list.innerHTML = '<div class="meta">All devices are placed.</div>';
-            return;
-        }
-
-        list.innerHTML = available.map(device => {
-            const ip = device.ip ? ` ${device.ip}` : '';
-            const hasLinks = (device.connections || []).length > 0;
-            const tag = hasLinks ? '' : '<span class="tag">no links</span>';
-            return `
-                <div class="monitoring-device-item" draggable="true" data-device-id="${device.id}">
-                    <span>${device.name || device.id}</span>
-                    <span class="meta">${ip}</span>
-                    ${tag}
-                </div>
-            `;
-        }).join('');
-
-        list.querySelectorAll('.monitoring-device-item').forEach(item => {
-            item.addEventListener('dragstart', (event) => {
-                event.dataTransfer.setData('text/plain', item.dataset.deviceId || '');
-            });
-        });
-    }
-
-    async renderMonitoringLogs(siteName) {
-        const list = document.getElementById('monitoringLogList');
-        if (!list) return;
-        const data = await this.fetchData(`/api/monitoring/logs/${encodeURIComponent(siteName)}`, { timeoutMs: 8000 });
-        const lines = data?.lines || [];
-        if (!lines.length) {
-            list.innerHTML = '<div class="monitoring-log-line">No activity yet.</div>';
-            return;
-        }
-        list.innerHTML = lines.slice(-50).map(line => `<div class="monitoring-log-line">${line}</div>`).join('');
-    }
-
-    renderMonitoringLinks() {
-        const svg = document.getElementById('monitoringLinks');
-        const board = document.getElementById('monitoringBoard');
-        if (!svg || !board) return;
-        const placed = (this.monitoringData?.devices || []).filter(d => d.placed);
-        const placedIds = new Set(placed.map(d => d.id));
-        const siteName = document.getElementById('monitoringSiteSelect').value;
-        const devices = (this.devices || []).filter(d => d.site === siteName);
-        const idToElement = new Map();
-        board.querySelectorAll('.monitoring-node').forEach(node => {
-            idToElement.set(node.dataset.deviceId, node);
-        });
-
-        svg.innerHTML = '';
-        const edges = new Set();
-        devices.forEach(device => {
-            const id = device.id;
-            if (!placedIds.has(id)) return;
-            (device.connections || []).forEach(conn => {
-                const remote = conn.remote_device;
-                if (!placedIds.has(remote)) return;
-                const a = [id, remote].sort().join('|');
-                if (edges.has(a)) return;
-                edges.add(a);
-                const elA = idToElement.get(id);
-                const elB = idToElement.get(remote);
-                if (!elA || !elB) return;
-                const rectA = elA.getBoundingClientRect();
-                const rectB = elB.getBoundingClientRect();
-                const rectBoard = board.getBoundingClientRect();
-                const x1 = rectA.left - rectBoard.left + rectA.width / 2;
-                const y1 = rectA.top - rectBoard.top + rectA.height / 2;
-                const x2 = rectB.left - rectBoard.left + rectB.width / 2;
-                const y2 = rectB.top - rectBoard.top + rectB.height / 2;
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', x1);
-                line.setAttribute('y1', y1);
-                line.setAttribute('x2', x2);
-                line.setAttribute('y2', y2);
-                line.setAttribute('stroke', 'rgba(15, 23, 32, 0.25)');
-                line.setAttribute('stroke-width', '1.2');
-                svg.appendChild(line);
-            });
-        });
-    }
-
-    startMonitoringAutoRefresh(siteName) {
-        if (this.monitoringSiteName === siteName && this.monitoringInterval) {
-            return;
-        }
-        if (this.monitoringInterval) {
-            clearInterval(this.monitoringInterval);
-        }
-        this.monitoringSiteName = siteName;
-        this.monitoringInterval = setInterval(() => {
-            if (this.currentTab === 'monitoring') {
-                this.loadMonitoringForSite(siteName);
-            }
-        }, 5000);
-    }
-
-    openMonitoringRules(siteName, deviceId) {
-        const modal = document.getElementById('monitoringRulesModal');
-        if (!modal) return;
-        const device = (this.monitoringData?.devices || []).find(d => d.id === deviceId);
-        const rules = device?.rules || [];
-        const lossRule = rules.find(rule => rule.type === 'loss');
-        const latencyRule = rules.find(rule => rule.type === 'latency');
-        document.getElementById('monitorLossThreshold').value = lossRule?.threshold ?? 100;
-        document.getElementById('monitorLatencyThreshold').value = latencyRule?.threshold ?? 500;
-        modal.classList.add('active');
-    }
-
-    async saveMonitoringRules(siteName) {
-        if (!this.monitoringSelectedDeviceId) {
-            this.showError('Select a node first');
-            return;
-        }
-        const loss = parseInt(document.getElementById('monitorLossThreshold').value, 10);
-        const latency = parseInt(document.getElementById('monitorLatencyThreshold').value, 10);
-        if ([loss, latency].some(v => Number.isNaN(v))) {
-            this.showError('All rule values must be numbers');
-            return;
-        }
-        try {
-            const response = await fetch(`/api/monitoring/rules/${encodeURIComponent(siteName)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    device_id: this.monitoringSelectedDeviceId,
-                    rules: [
-                        { id: 'loss', type: 'loss', threshold: loss, enabled: true },
-                        { id: 'latency', type: 'latency', threshold: latency, enabled: true }
-                    ]
-                })
-            });
-            const data = await response.json();
-            if (!response.ok) {
-                this.showError(data.error || 'Failed to save rules');
-                return;
-            }
-            const device = (this.monitoringData?.devices || []).find(d => d.id === this.monitoringSelectedDeviceId);
-            if (device) {
-                device.rules = data.rules;
-            }
-            this.showMessage('Monitoring rules saved');
-            this.closeAllModals();
-            this.renderMonitoringNodes();
-        } catch (error) {
-            console.error('Error saving monitoring rules:', error);
-            this.showError('Failed to save rules');
-        }
-    }
-
-
-    exportData() {
-        if (this.currentUserRole !== 'admin') {
-            this.showError('Only admins can export data');
-            return;
-        }
-        window.location.href = '/api/export';
-    }
-
-    async importData() {
-        if (this.currentUserRole !== 'admin') {
-            this.showError('Only admins can import data');
-            return;
-        }
-        const fileInput = document.getElementById('importDataFile');
-        const file = fileInput?.files?.[0];
-        if (!file) {
-            this.showError('Select a ZIP file to import');
-            return;
-        }
-        const formData = new FormData();
-        formData.append('file', file);
-        try {
-            const response = await fetch('/api/import', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-            if (!response.ok) {
-                this.showError(data.error || 'Import failed');
-                return;
-            }
-            this.showMessage('Import completed. Reloading...');
-            window.location.reload();
-        } catch (error) {
-            console.error('Import error:', error);
-            this.showError('Import failed');
-        }
-    }
-
-
-    async toggleMonitoringDevice(siteName, deviceId) {
-        const device = (this.monitoringData?.devices || []).find(d => d.id === deviceId);
-        if (!device) return;
-        const enabled = !device.enabled;
-        try {
-            const response = await fetch(`/api/monitoring/rules/${encodeURIComponent(siteName)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    device_id: deviceId,
-                    enabled: enabled,
-                    rules: device.rules && device.rules.length ? device.rules : [{ id: 'loss', type: 'loss', threshold: 100, enabled: true }]
-                })
-            });
-            const data = await response.json();
-            if (!response.ok) {
-                this.showError(data.error || 'Failed to update device');
-                return;
-            }
-            device.enabled = data.enabled;
-            device.rules = data.rules;
-            this.renderMonitoringNodes();
-            this.updateMonitoringSelection();
-        } catch (error) {
-            console.error('Error updating monitoring device:', error);
-            this.showError('Failed to update device');
-        }
-    }
-
     renderSiteMultiSelect(container, selectedSites, siteNames) {
         if (!container) return;
         const panel = container.querySelector('.multi-select-panel');
@@ -4409,9 +4719,16 @@ selectSite(siteName) {
         const toggle = container.querySelector('.multi-select-toggle');
         if (!toggle || toggle.dataset.bound) return;
         toggle.dataset.bound = 'true';
-        toggle.addEventListener('click', () => {
+        toggle.addEventListener('click', (event) => {
+            event.stopPropagation();
             container.classList.toggle('open');
         });
+        const panel = container.querySelector('.multi-select-panel');
+        if (panel) {
+            panel.addEventListener('click', (event) => {
+                event.stopPropagation();
+            });
+        }
         document.addEventListener('click', (event) => {
             if (!container.contains(event.target)) {
                 container.classList.remove('open');
@@ -4467,6 +4784,556 @@ selectSite(siteName) {
 
     // ==================== UTILITIES ====================
 
+    async runAgentDiscoveryForSite() {
+        const siteFilter = document.getElementById('deviceSiteFilter')?.value || '';
+        const siteName = siteFilter || this.currentSite || '';
+        if (!siteName) {
+            this.showError('Select a site first.');
+            return;
+        }
+        const agent = this.getAgentForSite(siteName);
+        if (!agent) {
+            this.showError('No agent available for this site.');
+            return;
+        }
+        if (!this.isAgentReady(agent)) {
+            this.showError(`Agent is busy (${agent.last_state || 'running'}). Wait until it finishes.`);
+            return;
+        }
+        try {
+            const response = await fetch(`/api/agents/${agent.id}/trigger`, { method: 'POST' });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showError(data.error || 'Failed to trigger agent');
+                return;
+            }
+            this.showMessage(`Agent run requested for ${siteName}`);
+        } catch (error) {
+            console.error('Error triggering agent:', error);
+            this.showError('Failed to trigger agent');
+        }
+    }
+
+    async runModuleOnAgent(moduleId) {
+        const siteSelect = document.getElementById('moduleSiteSelect');
+        const siteName = siteSelect?.value || this.currentSite || '';
+        if (!siteName) {
+            this.showError('Select a site first.');
+            return;
+        }
+        const agent = this.getAgentForSite(siteName);
+        if (!agent) {
+            this.showError('No agent available for this site.');
+            return;
+        }
+        if (!this.isAgentReady(agent)) {
+            this.showError(`Agent is busy (${agent.last_state || 'running'}). Wait until it finishes.`);
+            return;
+        }
+        const module = (this.modules || []).find(m => m.id === moduleId);
+        if (!module) {
+            this.showError('Module not found');
+            return;
+        }
+        this.showModuleFormOnAgent(module);
+    }
+
+    getAgentForSite(siteName) {
+        const agents = this.agents || [];
+        return agents.find(a => (a.site || '') === siteName && a.enabled !== false);
+    }
+
+    isAgentReady(agent) {
+        const state = (agent?.last_state || '').toLowerCase();
+        if (!state) return true;
+        return state === 'done' || state === 'idle' || state.startsWith('module:');
+    }
+
+    showModuleFormOnAgent(module, prefill = {}) {
+        const modal = document.getElementById('moduleRunnerModal');
+        const title = document.getElementById('moduleModalTitle');
+        const formContainer = document.getElementById('moduleFormContainer');
+        const statusDisplay = document.getElementById('moduleStatusDisplay');
+        const startBtn = document.getElementById('startModuleBtn');
+
+        statusDisplay.style.display = 'none';
+        title.textContent = `Run on Agent: ${module.name}`;
+        const savedPrefill = this.getModuleLastParams(module.id, this.currentSite);
+        const mergedPrefill = { ...savedPrefill, ...prefill };
+        this.renderModuleFormInto(formContainer, module, this.currentSite, mergedPrefill, {
+            includeCredentialProfiles: true,
+            showSiteDisplay: true,
+            idPrefix: 'module_'
+        });
+        this.bindManualDeviceButtons(module, 'module_');
+        this.applyPrefillValues(mergedPrefill, 'module_');
+
+        const credentialSelect = document.getElementById('module_credential_profile');
+        if (credentialSelect) {
+            credentialSelect.addEventListener('change', () => {
+                const selected = credentialSelect.value;
+                if (!selected) {
+                    return;
+                }
+                const profile = this.getModuleCredentialProfiles(module.id).find(entry => entry.name === selected);
+                if (!profile) {
+                    return;
+                }
+                const usernameInput = document.getElementById('module_username');
+                const passwordInput = document.getElementById('module_password');
+                if (usernameInput) {
+                    usernameInput.value = profile.username || '';
+                }
+                if (passwordInput) {
+                    passwordInput.value = profile.password || '';
+                }
+            });
+        }
+
+        modal.classList.add('active');
+        const logWrap = document.getElementById('moduleLogOutput');
+        if (logWrap) {
+            logWrap.style.display = 'none';
+            const textarea = logWrap.querySelector('textarea');
+            if (textarea) {
+                textarea.value = '';
+            }
+        }
+        startBtn.disabled = false;
+        startBtn.onclick = () => this.startAgentModule(module);
+    }
+
+    buildAgentTargetsFromInputs(module, inputs, siteName) {
+        let targets = [];
+        const inputDefs = module.inputs || [];
+        inputDefs.forEach(input => {
+            if (input.type !== 'device_table') {
+                return;
+            }
+            const value = inputs[input.name] || {};
+            let deviceIds = value.device_ids || [];
+            if (deviceIds === '__AUTO__') {
+                deviceIds = this.getDevicesForSite(siteName, input).map(d => d.id);
+            }
+            if (Array.isArray(deviceIds)) {
+                deviceIds.forEach(id => {
+                    const dev = (this.devices || []).find(d => d.id === id);
+                    if (dev && dev.ip) {
+                        targets.push({ ip: dev.ip, name: dev.name || dev.ip, mac: dev.mac || '' });
+                    }
+                });
+            }
+            const manual = value.manual_devices || [];
+            if (Array.isArray(manual)) {
+                manual.forEach(entry => {
+                    if (entry && entry.ip) {
+                        targets.push({ ip: entry.ip, name: entry.name || entry.ip, mac: entry.mac || '' });
+                    }
+                });
+            }
+        });
+        return targets;
+    }
+
+    async startAgentModule(module) {
+        const inputResult = this.collectModuleInputs(module, 'module_');
+        if (inputResult.error) {
+            this.showError(inputResult.error);
+            return;
+        }
+        if (!inputResult.isValid) {
+            this.showError('Please fill all required fields');
+            return;
+        }
+        const siteName = this.currentSite;
+        const agent = this.getAgentForSite(siteName);
+        if (!agent) {
+            this.showError('No agent available for this site.');
+            return;
+        }
+        if (!this.isAgentReady(agent)) {
+            this.showError(`Agent is busy (${agent.last_state || 'running'}). Wait until it finishes.`);
+            return;
+        }
+
+        const inputs = inputResult.inputs || {};
+        const targets = this.buildAgentTargetsFromInputs(module, inputs, siteName);
+        const params = { ...inputs };
+        (module.inputs || []).forEach(input => {
+            if (input.type === 'device_table') {
+                delete params[input.name];
+            }
+        });
+        delete params.credential_profile;
+        if (module.id === 'ubiquiti_cdp_reader') {
+            params.capture_seconds = parseInt(params.capture_seconds || 60, 10);
+            if (!params.packet_size) {
+                params.packet_size = parseInt(params.batch_size || 1500, 10);
+            }
+            if (!params.interface) {
+                params.interface = 'eth0';
+            }
+        }
+        if (module.id === 'uniview_nvr_capture') {
+            if (!params.ip_mode) {
+                params.ip_mode = 'filter';
+            }
+        }
+        if ((module.id === 'ubiquiti_cdp_reader' || module.id === 'uniview_nvr_capture') && targets.length === 0) {
+            this.showError('No target devices selected');
+            return;
+        }
+
+        const statusDisplay = document.getElementById('moduleStatusDisplay');
+        const startBtn = document.getElementById('startModuleBtn');
+        statusDisplay.style.display = 'block';
+        statusDisplay.querySelector('.status-message').textContent = 'Sending to agent...';
+        statusDisplay.querySelector('.progress-fill').style.width = '20%';
+        startBtn.disabled = true;
+
+        try {
+            const response = await fetch(`/api/agents/${agent.id}/trigger`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    module_id: module.id,
+                    targets,
+                    params
+                })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showError(data.error || 'Failed to trigger agent');
+                statusDisplay.querySelector('.status-message').textContent = 'Failed to send to agent';
+                statusDisplay.querySelector('.progress-fill').style.width = '0%';
+                startBtn.disabled = false;
+                return;
+            }
+            statusDisplay.querySelector('.status-message').textContent = 'Agent run queued';
+            statusDisplay.querySelector('.progress-fill').style.width = '100%';
+            this.showMessage(`Agent run requested for ${siteName}`);
+        } catch (error) {
+            console.error('Error triggering agent:', error);
+            this.showError('Failed to trigger agent');
+            statusDisplay.querySelector('.status-message').textContent = 'Failed to send to agent';
+            statusDisplay.querySelector('.progress-fill').style.width = '0%';
+        } finally {
+            startBtn.disabled = false;
+        }
+    }
+
+    getModuleCredentialProfiles(moduleId) {
+        if (!moduleId) {
+            return [];
+        }
+        const profiles = [...(((this.moduleCredentials || {})[moduleId]) || [])];
+        if (moduleId === 'mac_table_search' || moduleId === 'mac_group_map') {
+            const knownNames = new Set(profiles.map(profile => profile.name));
+            (((this.moduleCredentials || {}).cdp_discovery) || []).forEach(profile => {
+                if (!knownNames.has(profile.name)) {
+                    profiles.push(profile);
+                }
+            });
+        }
+        return profiles;
+    }
+
+    getRunnableModuleCredentialProfiles(moduleId) {
+        return this.getModuleCredentialProfiles(moduleId);
+    }
+
+    // ==================== AGENTS ====================
+    renderAgents() {
+        const body = document.getElementById('agentsTableBody');
+        if (!body) return;
+        const rows = [];
+        (this.agents || []).forEach(agent => {
+            const mode = [
+                agent.allow_interval ? 'interval' : null,
+                agent.allow_on_demand ? 'on-demand' : null
+            ].filter(Boolean).join(' + ') || 'disabled';
+            const isPending = !!agent.run_now;
+            let status = agent.enabled ? (isPending ? 'pending' : 'idle') : 'disabled';
+            if (agent.agent_status === 'online') {
+                status = 'online';
+            } else if (agent.agent_status === 'offline') {
+                status = agent.enabled ? 'offline' : 'disabled';
+            }
+            if (agent.last_result === 'success') {
+                status = 'success';
+            } else if (agent.last_result === 'identity_mismatch') {
+                status = 'identity mismatch';
+            }
+            const lastScan = agent.last_scan_at ? this.formatDateTime(agent.last_scan_at) : '--';
+            const queued = Array.isArray(agent.queued_modules) ? agent.queued_modules : [];
+            const queueLabel = queued.length ? `${queued.length} pending` : 'empty';
+            const stateLabel = agent.last_state ? ` (${agent.last_state})` : '';
+            const agentHost = [
+                agent.device_name || '',
+                agent.device_ip || '',
+                agent.device_mac || ''
+            ].filter(Boolean).join(' | ') || '--';
+            rows.push(`
+                <tr>
+                    <td>${this.escapeHtml(agent.name || '')}</td>
+                    <td>${this.escapeHtml(agent.site || '')}</td>
+                    <td>${this.escapeHtml(agent.target_range || '')}</td>
+                    <td>${this.escapeHtml(agentHost)}</td>
+                    <td>${mode}</td>
+                    <td>${agent.interval_min ?? 0}</td>
+                    <td>${status}${stateLabel}</td>
+                    <td>${queueLabel}</td>
+                    <td>${lastScan}</td>
+                    <td>
+                        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                            <button class="btn btn-secondary" onclick="platform.openAgentModalById('${agent.id}')">Edit</button>
+                            <button class="btn btn-secondary" onclick="platform.triggerAgent('${agent.id}')">Run</button>
+                            <button class="btn btn-secondary" onclick="platform.downloadAgentConfig('${agent.id}')">Config</button>
+                            <button class="btn btn-secondary" onclick="platform.downloadAgentPackage('${agent.id}')">Package</button>
+                            <button class="btn btn-secondary" onclick="platform.clearAgentQueue('${agent.id}')">Clear Queue</button>
+                            <button class="btn btn-secondary" onclick="platform.resetAgentIdentity('${agent.id}')">Reset ID</button>
+                            <button class="btn btn-danger" onclick="platform.deleteAgent('${agent.id}')">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            `);
+        });
+        body.innerHTML = rows.join('') || '<tr><td colspan="10">No agents configured.</td></tr>';
+        replaceIcons();
+    }
+
+    openAgentModalById(agentId) {
+        const agent = (this.agents || []).find(a => a.id === agentId);
+        this.openAgentModal(agent || null);
+    }
+
+    openAgentModal(agent = null) {
+        const title = document.getElementById('agentModalTitle');
+        if (title) title.textContent = agent ? 'Edit Agent' : 'Add Agent';
+        document.getElementById('agentId').value = agent?.id || '';
+        document.getElementById('agentName').value = agent?.name || '';
+        document.getElementById('agentRange').value = agent?.target_range || '';
+        document.getElementById('agentServerHost').value = agent?.server_host || '';
+        document.getElementById('agentEnabled').checked = agent ? !!agent.enabled : true;
+        document.getElementById('agentAllowInterval').checked = agent ? !!agent.allow_interval : true;
+        document.getElementById('agentAllowOnDemand').checked = agent ? !!agent.allow_on_demand : true;
+        document.getElementById('agentInterval').value = agent?.interval_min ?? 10;
+        document.getElementById('agentToken').value = agent?.token || '';
+        document.getElementById('agentDeviceName').value = agent?.device_name || '';
+        document.getElementById('agentDeviceIp').value = agent?.device_ip || '';
+        document.getElementById('agentDeviceMac').value = agent?.device_mac || '';
+        document.getElementById('agentTrustMode').value = agent?.trust_mode || 'augment';
+        document.getElementById('agentIpScanMin').value = agent?.ip_scan_min ?? 10;
+        document.getElementById('agentPingMin').value = agent?.ping_min ?? 2;
+        this.renderAgentRanges(agent);
+
+        const siteSelect = document.getElementById('agentSite');
+        if (siteSelect) {
+            const options = (this.sites || []).map(site => (
+                `<option value="${this.escapeHtml(site.name || '')}">${this.escapeHtml(site.name || '')}</option>`
+            ));
+            siteSelect.innerHTML = options.join('');
+            siteSelect.value = agent?.site || (this.sites?.[0]?.name || '');
+        }
+
+        document.getElementById('agentModal').classList.add('active');
+    }
+
+    renderAgentRanges(agent) {
+        const container = document.getElementById('agentDetectedRanges');
+        if (!container) return;
+        const detected = Array.isArray(agent?.network_ranges) ? agent.network_ranges : [];
+        const selected = new Set(Array.isArray(agent?.target_ranges) ? agent.target_ranges : []);
+        if (!detected.length) {
+            container.innerHTML = '<div class="form-hint">No ranges reported yet. Run the agent once.</div>';
+            return;
+        }
+        container.innerHTML = detected.map(range => `
+            <label class="range-item">
+                <input type="checkbox" class="agent-range-select" value="${range}" ${selected.has(range) ? 'checked' : ''}>
+                <span>${range}</span>
+            </label>
+        `).join('');
+    }
+
+    async saveAgent() {
+        const id = document.getElementById('agentId').value.trim();
+        const rangeInputs = document.querySelectorAll('.agent-range-select:checked');
+        const targetRanges = Array.from(rangeInputs).map(input => input.value).filter(Boolean);
+        const payload = {
+            id: id || undefined,
+            name: document.getElementById('agentName').value.trim(),
+            site: document.getElementById('agentSite').value,
+            target_range: document.getElementById('agentRange').value.trim(),
+            target_ranges: targetRanges,
+            server_host: document.getElementById('agentServerHost').value.trim(),
+            enabled: document.getElementById('agentEnabled').checked,
+            allow_interval: document.getElementById('agentAllowInterval').checked,
+            allow_on_demand: document.getElementById('agentAllowOnDemand').checked,
+            interval_min: parseInt(document.getElementById('agentInterval').value) || 0,
+            token: document.getElementById('agentToken').value.trim(),
+            device_name: document.getElementById('agentDeviceName').value.trim(),
+            device_ip: document.getElementById('agentDeviceIp').value.trim(),
+            device_mac: document.getElementById('agentDeviceMac').value.trim(),
+            trust_mode: document.getElementById('agentTrustMode').value,
+            ip_scan_min: parseInt(document.getElementById('agentIpScanMin').value) || 10,
+            ping_min: parseInt(document.getElementById('agentPingMin').value) || 2
+        };
+        if (!payload.name || !payload.site || (!payload.target_range && (!payload.target_ranges || !payload.target_ranges.length))) {
+            this.showError('Agent name, site, and at least one range are required.');
+            return;
+        }
+        const url = id ? `/api/agents/${id}` : '/api/agents';
+        const method = id ? 'PUT' : 'POST';
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                this.showError(data.error || 'Failed to save agent');
+                return;
+            }
+            await this.loadData();
+            this.closeAllModals();
+            this.showMessage('Agent saved');
+        } catch (error) {
+            console.error('Error saving agent:', error);
+            this.showError('Failed to save agent');
+        }
+    }
+
+    async deleteAgent(agentId) {
+        if (!confirm('Delete this agent?')) return;
+        try {
+            const response = await fetch(`/api/agents/${agentId}`, { method: 'DELETE' });
+            if (!response.ok) {
+                this.showError('Failed to delete agent');
+                return;
+            }
+            await this.loadData();
+            this.showMessage('Agent deleted');
+        } catch (error) {
+            console.error('Error deleting agent:', error);
+            this.showError('Failed to delete agent');
+        }
+    }
+
+    async triggerAgent(agentId) {
+        try {
+            const response = await fetch(`/api/agents/${agentId}/trigger`, { method: 'POST' });
+            if (!response.ok) {
+                this.showError('Failed to trigger agent');
+                return;
+            }
+            this.showMessage('Agent run requested');
+        } catch (error) {
+            console.error('Error triggering agent:', error);
+            this.showError('Failed to trigger agent');
+        }
+    }
+
+    async pullAgentIdentity() {
+        const id = document.getElementById('agentId')?.value.trim();
+        if (!id) {
+            this.showError('Save the agent first.');
+            return;
+        }
+        try {
+            const response = await fetch(`/api/agents/${id}/identity`);
+            const data = await response.json();
+            if (!response.ok) {
+                this.showError(data.error || 'Failed to load identity');
+                return;
+            }
+            const name = data.device_name || '';
+            const ip = data.device_ip || '';
+            const mac = data.device_mac || '';
+            document.getElementById('agentDeviceName').value = name;
+            document.getElementById('agentDeviceIp').value = ip;
+            document.getElementById('agentDeviceMac').value = mac;
+            if (!name && !ip && !mac) {
+                await this.triggerAgent(id);
+                this.showMessage('No identity yet. Agent run requested; try again after it reports.');
+            } else {
+                this.showMessage('Identity loaded');
+            }
+        } catch (error) {
+            console.error('Error loading identity:', error);
+            this.showError('Failed to load identity');
+        }
+    }
+
+    async resetAgentIdentity(agentId) {
+        if (!confirm('Reset agent identity? The next report will re-bind this agent to a device.')) {
+            return;
+        }
+        try {
+            const response = await fetch(`/api/agents/${agentId}/reset_identity`, { method: 'POST' });
+            if (!response.ok) {
+                this.showError('Failed to reset agent identity');
+                return;
+            }
+            await this.loadData();
+            this.showMessage('Agent identity reset');
+        } catch (error) {
+            console.error('Error resetting agent identity:', error);
+            this.showError('Failed to reset agent identity');
+        }
+    }
+
+    async clearAgentQueue(agentId) {
+        if (!confirm('Clear queued modules for this agent?')) {
+            return;
+        }
+        try {
+            const response = await fetch(`/api/agents/${agentId}/clear_queue`, { method: 'POST' });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showError(data.error || 'Failed to clear queue');
+                return;
+            }
+            this.showMessage('Agent queue cleared');
+            await this.loadData();
+        } catch (error) {
+            console.error('Error clearing agent queue:', error);
+            this.showError('Failed to clear queue');
+        }
+    }
+
+    downloadAgentConfig(agentId) {
+        window.open(`/api/agents/${agentId}/config?format=json`, '_blank');
+    }
+
+    downloadAgentPackage(agentId) {
+        window.open(`/api/agents/${agentId}/package`, '_blank');
+    }
+
+    async downloadAgentExe() {
+        try {
+            const response = await fetch('/api/agents/agent_exe');
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                this.showError(data.error || 'Agent EXE not found. Build it first.');
+                return;
+            }
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'cmapp-agent.exe';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error downloading agent exe:', error);
+            this.showError('Failed to download agent EXE');
+        }
+    }
+
     switchTab(tabName) {
     // Update active tab in sidebar
     document.querySelectorAll('.nav-item').forEach(item => {
@@ -4484,15 +5351,15 @@ selectSite(siteName) {
     const activeTab = document.getElementById(`${tabName}Tab`);
     if (activeTab) {
         activeTab.classList.add('active');
-        const titleMap = {
-            topology: 'Module Scheduler',
-            dashboard: 'Dashboard',
-            sites: 'Sites',
-            devices: 'Devices',
-            map: 'Map',
-            monitoring: 'Monitoring',
-            settings: 'Settings'
-        };
+          const titleMap = {
+              topology: 'Module Scheduler',
+              dashboard: 'Dashboard',
+              sites: 'Sites',
+              devices: 'Devices',
+              map: 'Map',
+              agents: 'Agent Manager',
+              settings: 'Settings'
+          };
         document.getElementById('pageTitle').textContent =
             titleMap[tabName] || (tabName.charAt(0).toUpperCase() + tabName.slice(1));
     }
@@ -4502,9 +5369,6 @@ selectSite(siteName) {
     // ADD THIS: Update map tab when switched to it
     if (tabName === 'map') {
         this.updateMapTab();
-    }
-    if (tabName === 'monitoring') {
-        this.updateMonitoringTab();
     }
 }
 

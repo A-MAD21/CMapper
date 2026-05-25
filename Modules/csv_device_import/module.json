@@ -1,0 +1,19 @@
+{
+  "id": "csv_device_import",
+  "name": "CSV Device Import",
+  "version": "1.0",
+  "description": "Import devices from a CSV file (name, IP, MAC).",
+  "author": "System",
+  "entry_point": "csv_device_import.py",
+  "inputs": [
+    {
+      "name": "csv_path",
+      "type": "text",
+      "required": false,
+      "default": "share/test1.csv",
+      "label": "CSV Path",
+      "placeholder": "share/test1.csv",
+      "description": "Path to CSV file (relative to project root)."
+    }
+  ]
+}

@@ -9,7 +9,6 @@ with parent switch name/IP/port and VLAN. Overrides fields because CDP is author
 from __future__ import annotations
 
 import json
-import portalocker
 import os
 import re
 import sys
@@ -18,15 +17,24 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Dict, Any, Optional, Tuple
 
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DIR = os.path.abspath(os.path.join(MODULE_DIR, "..", "_shared"))
+if SHARED_DIR not in sys.path:
+    sys.path.insert(0, SHARED_DIR)
+from sqlite_store import read_json_store, write_json_store
 
-def load_json(path: str) -> Dict[str, Any]:
-    with portalocker.Lock(path, "r", timeout=5, encoding="utf-8") as f:
+
+def load_config(path: str) -> Dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
+def load_db(path: str) -> Dict[str, Any]:
+    return read_json_store(path, "devices") or {}
+
+
 def save_json(path: str, data: Dict[str, Any]) -> None:
-    with portalocker.Lock(path, "w", timeout=5, encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    write_json_store(path, "devices", data)
 
 
 def normalize_mac(mac: str) -> str:
@@ -347,13 +355,27 @@ def _upsert_connection(
         "status": "up"
     })
 
+def _is_ubiquiti_device(device: Dict[str, Any]) -> bool:
+    vendor = (device.get("vendor") or "").lower()
+    platform = (device.get("platform") or "").lower()
+    dtype = (device.get("type") or "").lower()
+    if dtype == "nvr":
+        return False
+    return (
+        "ubiquiti" in vendor
+        or "apunifi" in vendor
+        or "ubiquiti" in platform
+        or "apunifi" in platform
+        or dtype == "ap"
+    )
+
 
 def main() -> None:
     if len(sys.argv) < 2:
         print(json.dumps({"status": "error", "message": "Config file required"}))
         return
 
-    config = load_json(sys.argv[1])
+    config = load_config(sys.argv[1])
     params = config.get("parameters", {})
     db_path = config.get("database_path")
     site_name = config.get("site_name")
@@ -369,6 +391,8 @@ def main() -> None:
     targets = params.get("targets") or {}
     device_ids = targets.get("device_ids") or []
     manual_devices = targets.get("manual_devices") or []
+    auto_targets = bool(targets.get("auto"))
+    auto_on_empty = bool(targets.get("auto_on_empty"))
 
     if not db_path or not site_name:
         print(json.dumps({"status": "error", "message": "Missing database_path or site_name"}))
@@ -378,7 +402,7 @@ def main() -> None:
         return
 
     try:
-        data = load_json(db_path)
+        data = load_db(db_path)
     except Exception as e:
         print(json.dumps({"status": "error", "message": f"Failed to read database: {e}"}))
         return
@@ -387,6 +411,11 @@ def main() -> None:
     devices = [d for d in data.get("devices", []) if d.get("site") == site_name and d.get("ip")]
     if device_ids:
         devices = [d for d in devices if d.get("id") in set(device_ids)]
+        if not devices and (auto_targets or auto_on_empty) and not manual_devices:
+            devices = [d for d in data.get("devices", []) if d.get("site") == site_name and d.get("ip")]
+            devices = [d for d in devices if _is_ubiquiti_device(d)]
+    elif auto_targets:
+        devices = [d for d in devices if _is_ubiquiti_device(d)]
 
     if manual_devices:
         existing_by_ip = {d.get("ip"): d for d in data.get("devices", []) if d.get("site") == site_name}
@@ -430,7 +459,20 @@ def main() -> None:
 
     updated = 0
     if not devices:
-        print(json.dumps({"status": "error", "message": "No target devices selected"}))
+        if auto_targets:
+            print(json.dumps({
+                "status": "success",
+                "message": "No target devices found",
+                "site": site_name,
+                "updated": 0,
+                "devices": []
+            }))
+        else:
+            print(json.dumps({
+                "status": "error",
+                "message": "No target devices selected",
+                "site": site_name
+            }))
         return
 
     cmd = (

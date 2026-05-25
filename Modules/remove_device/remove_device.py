@@ -4,9 +4,15 @@ Remove Device - module for deleting a device and handling dependencies.
 """
 
 import json
-import portalocker
 import sys
+import os
 from datetime import datetime
+
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DIR = os.path.abspath(os.path.join(MODULE_DIR, "..", "_shared"))
+if SHARED_DIR not in sys.path:
+    sys.path.insert(0, SHARED_DIR)
+from sqlite_store import read_json_store, write_json_store
 
 
 def main():
@@ -26,7 +32,7 @@ def main():
     params = config.get("parameters", {})
     device_id = (params.get("device_id") or "").strip()
     keep_dependents = bool(params.get("keep_dependents", True))
-    db_path = config.get("database_path", "database.json")
+    db_path = config.get("database_path")
 
     if not site_name:
         print(json.dumps({"error": "Site name is required", "status": "failed"}))
@@ -35,11 +41,9 @@ def main():
         print(json.dumps({"error": "Device id is required", "status": "failed"}))
         sys.exit(1)
 
-    try:
-        with portalocker.Lock(db_path, "r", timeout=5, encoding="utf-8") as handle:
-            database = json.load(handle)
-    except Exception as exc:
-        print(json.dumps({"error": f"Failed to read database: {exc}", "status": "failed"}))
+    database = read_json_store(db_path, "devices")
+    if database is None:
+        print(json.dumps({"error": "Failed to read database", "status": "failed"}))
         sys.exit(1)
 
     devices = database.get("devices", [])
@@ -87,10 +91,9 @@ def main():
     database["devices"] = kept_devices
 
     try:
-        with portalocker.Lock(db_path, "w", timeout=5, encoding="utf-8") as handle:
-            json.dump(database, handle, indent=2)
-    except Exception as exc:
-        print(json.dumps({"error": f"Failed to write database: {exc}", "status": "failed"}))
+        write_json_store(db_path, "devices", database)
+    except Exception:
+        print(json.dumps({"error": "Failed to write database", "status": "failed"}))
         sys.exit(1)
 
     result = {

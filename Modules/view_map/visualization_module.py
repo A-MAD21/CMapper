@@ -11,6 +11,12 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DIR = os.path.abspath(os.path.join(MODULE_DIR, "..", "_shared"))
+if SHARED_DIR not in sys.path:
+    sys.path.insert(0, SHARED_DIR)
+from sqlite_store import read_json_store
+
 def generate_network_map(database, site_name, output_dir="static/maps"):
     """
     Generate interactive HTML network map from database
@@ -43,13 +49,14 @@ def generate_network_map(database, site_name, output_dir="static/maps"):
             'ap': '#06D6A0',           # Green
             'phone': '#EF476F',        # Pink
             'host': '#118AB2',         # Blue
+            'finger': '#FDE68A',       # Amber
             'unknown': '#073B4C'       # Dark blue
         }
         
         base_dir = os.path.dirname(output_dir) if os.path.isabs(output_dir) else os.path.dirname(
             os.path.join(os.getcwd(), output_dir)
         )
-        icons_dir = os.path.join(base_dir, "icons", "map")
+        icons_dir = os.path.join(base_dir, "Static", "icons", "map")
         icon_web_base = "/static/icons/map"
         blank_icon = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
 
@@ -58,12 +65,17 @@ def generate_network_map(database, site_name, output_dir="static/maps"):
             "switch": "switch.png",
             "firewall": "firewall.png",
             "ap": "ap.png",
-            "phone": "phone.png",
+            "phone": "host.png",
+            "pc": "host.png",
             "host": "host.png",
             "server": "server.png",
             "nvr": "nvr.png",
             "pda": "pda.png",
-            "unknown": "unknown.png"
+            "finger": "finger.png",
+            "camera": "nvr.png",
+            "printer": "host.png",
+            "other": "host.png",
+            "unknown": "host.png"
         }
 
         # Process each device
@@ -593,11 +605,10 @@ def main():
             config = json.load(f)
         
         site_name = config.get("site_name", "")
-        db_path = config.get("database_path", "database.json")
+        db_path = config.get("database_path")
         
         # Load database
-        with open(db_path, 'r') as f:
-            database = json.load(f)
+        database = read_json_store(db_path, "devices") or {}
         
         # Check if site exists
         site_exists = any(s.get("name") == site_name for s in database.get("sites", []))
@@ -639,3 +650,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DIR = os.path.abspath(os.path.join(MODULE_DIR, "..", "_shared"))
+if SHARED_DIR not in sys.path:
+    sys.path.insert(0, SHARED_DIR)

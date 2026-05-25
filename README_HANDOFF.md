@@ -211,6 +211,7 @@ Updated config:
 ## 13) Uniview NVR Packet Capture Module
 - New module: `Modules/uniview_nvr_capture/` (uses Digest auth via `requests`).
 - UI is a device table listing NVRs (pre-selected) + NIC (1/2), packet size, IP/Port modes (all/specify/filter).
+- Important connection note: the module talks directly to LAN NVRs and ignores server internet proxy environment variables. It logs this as `CONNECT <ip> direct`.
 - Captures for a fixed 30s internally, Start/Stop via:
   - `PUT /LAPI/V1.1/Network/PacketCapture/Start`
   - `PUT /LAPI/V1.1/Network/PacketCapture/Stop` (best-effort)
@@ -218,6 +219,31 @@ Updated config:
 - Saves pcaps under `generated_maps/nvr_captures/`.
 - No CDP parsing yet; only capture/download.
 - Requires `requests` in `requirements.txt`.
+
+---
+
+## 14) Auth Hardening: SQLite Users + Server-Side Sessions
+- Auth users are now migrated out of `settings.auth.users` into SQLite table `auth_users`.
+- Browser login now creates a unique row in `auth_sessions`; each client must present its own Flask session cookie containing `auth_session_id`.
+- This prevents one admin login from implicitly authenticating other browsers/devices hitting `ip:5000`.
+- Existing auth endpoints are preserved for the UI:
+  - `GET /api/auth/me`
+  - `POST /api/auth/login`
+  - `POST /api/auth/logout`
+  - `POST /api/auth/setup`
+  - `POST /api/auth/change_password`
+  - `PUT /api/auth/config`
+  - `GET/POST /api/users`
+  - `PUT/DELETE /api/users/<username>`
+- Any `admin` user can still manage users in Settings.
+- Safety guard: the backend rejects deleting, disabling, or demoting the last active admin.
+- Added tables:
+  - `auth_users`
+  - `auth_sessions`
+  - `auth_login_attempts`
+  - `audit_log`
+- Existing users from old settings are migrated automatically and `settings.auth.users_migrated_to_sqlite` is set.
+- `settings.auth.enabled` remains the switch for requiring login.
 
 ---
 

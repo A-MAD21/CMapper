@@ -1,15 +1,22 @@
-# Generated maps and logs
-generated_maps/
-logs/
-*.log
-
-# Module runtime artifacts
-module_log_*.txt
-module_config_*.json
-
-# Corrupt DB backups
-*.corrupt.*
-
-# Python caches
 __pycache__/
 *.pyc
+*.sqlite3-journal
+*.sqlite3
+*.db
+settings.json
+*.har
+*.deb
+*.log
+*.corrupt.*
+/.vscode/
+
+# Runtime outputs
+/generated_maps/
+/logs/
+module_log_*.txt
+module_config_*.json
+corrupt_backups/
+share/agent_scans/
+share/agent_configs/
+/agent/build/
+/agent/dist/

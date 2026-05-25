@@ -1,0 +1,9 @@
+{
+  "id": "agent_ip_scan",
+  "name": "Agent IP Scan",
+  "version": "1.0",
+  "description": "Run IP scan on the site agent and sync results.",
+  "author": "System",
+  "entry_point": "agent_ip_scan.py",
+  "inputs": []
+}

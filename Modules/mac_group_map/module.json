@@ -1,0 +1,78 @@
+{
+  "id": "mac_group_map",
+  "name": "Map Group",
+  "version": "1.0",
+  "description": "Map matching inventory devices by tracing their MAC addresses through Cisco switches.",
+  "author": "System",
+  "entry_point": "mac_group_map.py",
+  "inputs": [
+    {
+      "name": "device_type",
+      "type": "select",
+      "required": true,
+      "default": "pda",
+      "options": ["all", "router", "switch", "server", "ap", "nvr", "finger", "other", "pc", "pda", "phone", "camera", "printer", "unknown"],
+      "label": "Device Type"
+    },
+    {
+      "name": "name_prefix",
+      "type": "text",
+      "required": true,
+      "label": "Name Starts With",
+      "placeholder": "OKR"
+    },
+    {
+      "name": "start_switch_id",
+      "type": "device_select",
+      "required": false,
+      "label": "Starting Switch",
+      "device_types": ["switch"],
+      "description": "Cisco switch where MAC tracing should begin."
+    },
+    {
+      "name": "start_switch_ip",
+      "type": "text",
+      "required": false,
+      "label": "Starting Switch IP (optional)",
+      "placeholder": "10.192.92.2"
+    },
+    {
+      "name": "username",
+      "type": "text",
+      "required": true,
+      "label": "SSH Username",
+      "placeholder": "admin"
+    },
+    {
+      "name": "password",
+      "type": "password",
+      "required": true,
+      "label": "SSH Password"
+    },
+    {
+      "name": "ssh_port",
+      "type": "number",
+      "required": false,
+      "default": 22,
+      "label": "SSH Port",
+      "min": 1,
+      "max": 65535
+    },
+    {
+      "name": "max_hops",
+      "type": "number",
+      "required": false,
+      "default": 10,
+      "label": "Maximum Trunk Hops",
+      "min": 1,
+      "max": 30
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mapped_devices",
+      "type": "number",
+      "description": "Number of matching devices added to the topology map."
+    }
+  ]
+}

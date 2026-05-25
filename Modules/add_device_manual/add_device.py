@@ -5,11 +5,16 @@ This shows exactly how to write modules for the platform
 """
 
 import json
-import portalocker
 import sys
 import os
 from datetime import datetime
 import uuid
+
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DIR = os.path.abspath(os.path.join(MODULE_DIR, "..", "_shared"))
+if SHARED_DIR not in sys.path:
+    sys.path.insert(0, SHARED_DIR)
+from sqlite_store import read_json_store, write_json_store
 
 def main():
     print("DEBUG: Module starting", file=sys.stderr)
@@ -38,14 +43,11 @@ def main():
     # ... rest of the code ...
     
     # 2. Read current database
-    db_path = config.get("database_path", "database.json")
-    
-    try:
-        with portalocker.Lock(db_path, 'r', timeout=5, encoding='utf-8') as f:
-            database = json.load(f)
-    except Exception as e:
+    db_path = config.get("database_path")
+    database = read_json_store(db_path, "devices")
+    if database is None:
         print(json.dumps({
-            "error": f"Failed to read database: {str(e)}",
+            "error": "Failed to read database",
             "status": "failed"
         }))
         sys.exit(1)
@@ -275,11 +277,10 @@ def main():
     
     # 9. Write back to database
     try:
-        with portalocker.Lock(db_path, 'w', timeout=5, encoding='utf-8') as f:
-            json.dump(database, f, indent=2)
-    except Exception as e:
+        write_json_store(db_path, "devices", database)
+    except Exception:
         print(json.dumps({
-            "error": f"Failed to write database: {str(e)}",
+            "error": "Failed to write database",
             "status": "failed"
         }))
         sys.exit(1)

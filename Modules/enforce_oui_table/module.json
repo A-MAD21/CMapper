@@ -5,5 +5,14 @@
   "description": "Rename MAC-named devices using OUI vendor and optionally set device type from vendor mapping.",
   "author": "System",
   "entry_point": "enforce_oui_table.py",
-  "inputs": []
+  "inputs": [
+    {
+      "name": "override_existing_type",
+      "type": "checkbox",
+      "required": false,
+      "default": false,
+      "label": "Override existing device type",
+      "description": "When enabled, OUI device_type values replace existing device types, not only empty/unknown types."
+    }
+  ]
 }

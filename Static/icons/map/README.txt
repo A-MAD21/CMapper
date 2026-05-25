@@ -14,4 +14,5 @@ Device type to filename mapping (set device.type to these values):
 - server -> server.png
 - nvr -> nvr.png
 - pda -> pda.png
+- finger -> finger.png
 - unknown -> unknown.png

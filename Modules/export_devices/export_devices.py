@@ -9,16 +9,26 @@ import base64
 import csv
 import ipaddress
 import json
-import portalocker
 import sys
+import os
 from datetime import datetime
 from io import StringIO
 from typing import Any, Dict, Iterable, List, Optional
 
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DIR = os.path.abspath(os.path.join(MODULE_DIR, "..", "_shared"))
+if SHARED_DIR not in sys.path:
+    sys.path.insert(0, SHARED_DIR)
+from sqlite_store import read_json_store
 
-def load_json(path: str) -> Dict[str, Any]:
-    with portalocker.Lock(path, "r", timeout=5, encoding="utf-8") as f:
+
+def load_config(path: str) -> Dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def load_db(path: str) -> Dict[str, Any]:
+    return read_json_store(path, "devices") or {}
 
 
 def parse_device_types(raw: str) -> List[str]:
@@ -61,7 +71,7 @@ def main() -> None:
         print(json.dumps({"status": "error", "message": "Config file required"}))
         return
 
-    config = load_json(sys.argv[1])
+    config = load_config(sys.argv[1])
     params = config.get("parameters", {}) if isinstance(config, dict) else {}
     site_name = config.get("site_name") or params.get("site_name") or ""
     site_scope = (params.get("site_scope") or "current").lower()
@@ -83,10 +93,9 @@ def main() -> None:
         print(json.dumps({"status": "error", "message": "Invalid IP range format"}))
         return
 
-    try:
-        data = load_json(db_path)
-    except Exception as exc:
-        print(json.dumps({"status": "error", "message": f"Failed to read database: {exc}"}))
+    data = load_db(db_path)
+    if not data:
+        print(json.dumps({"status": "error", "message": "Failed to read database"}))
         return
 
     devices = data.get("devices", [])

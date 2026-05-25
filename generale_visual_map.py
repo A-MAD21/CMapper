@@ -12,19 +12,24 @@ from __future__ import annotations
 import json
 import os
 import glob
+import sqlite3
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
-def _load_database(db_path: str, fallback_path: str | None = None) -> Dict[str, Any]:
-    target = db_path if os.path.exists(db_path) else fallback_path
-    if not target:
+def _load_database(db_path: str) -> Dict[str, Any]:
+    if not os.path.exists(db_path):
         raise FileNotFoundError(f"Database not found at {db_path}")
-    with open(target, "r", encoding="utf-8") as f:
-        return json.load(f)
+    conn = sqlite3.connect(db_path)
+    cur = conn.execute("SELECT json FROM json_store WHERE name = 'devices'")
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        raise FileNotFoundError("No devices data in sqlite database")
+    return json.loads(row[0])
 
 
-def _simple_positions(nodes: List[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
+def _simple_positions(nodes: List[Dict[str, Any]], spacing: float) -> Dict[str, Dict[str, float]]:
     """
     Assign deterministic positions without external dependencies.
 
@@ -33,32 +38,31 @@ def _simple_positions(nodes: List[Dict[str, Any]]) -> Dict[str, Dict[str, float]
     try:
         import math
         count = max(len(nodes), 1)
-        radius = max(150, 40 * count)
+        radius = max(320, 70 * count) * spacing
         positions: Dict[str, Dict[str, float]] = {}
         for idx, node in enumerate(nodes):
             angle = (2 * math.pi * idx) / count
             positions[node["id"]] = {
-                "x": radius + radius * 0.8 * math.cos(angle),
-                "y": radius + radius * 0.8 * math.sin(angle),
+                "x": radius + radius * 1.1 * math.cos(angle),
+                "y": radius + radius * 1.1 * math.sin(angle),
             }
         return positions
     except Exception:
         # Basic grid fallback
         positions = {}
         cols = max(1, int(len(nodes) ** 0.5))
-        gap = 120
+        gap = 180 * spacing
         for idx, node in enumerate(nodes):
             r, c = divmod(idx, cols)
             positions[node["id"]] = {"x": 80 + c * gap, "y": 80 + r * gap}
         return positions
 
 
-def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
+def generate_visual_map(site_name: str | None = None, spacing: Any = None) -> Dict[str, Any]:
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    db_path = os.path.join(base_dir, "devices.db")
-    fallback_db_path = os.path.join(base_dir, "database.json")
+    db_path = os.path.join(base_dir, "cmapp.sqlite3")
     out_dir = os.path.join(base_dir, "generated_maps")
-    icons_dir = os.path.join(base_dir, "static", "icons", "map")
+    icons_dir = os.path.join(base_dir, "Static", "icons", "map")
     icon_web_base = "/static/icons/map"
     os.makedirs(out_dir, exist_ok=True)
 
@@ -73,10 +77,10 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
                 pass
 
     try:
-        data = _load_database(db_path, fallback_db_path)
+        data = _load_database(db_path)
         sites = data.get("sites", [])
         if not sites:
-            return {"status": "error", "message": "No sites found in database.json"}
+            return {"status": "error", "message": "No sites found in database"}
 
         selected_site: Optional[Dict[str, Any]] = None
         if site_name:
@@ -94,6 +98,7 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
         devices = [d for d in all_devices if d.get("site") == site_name]
         if not devices:
             return {"status": "error", "message": f"No devices found for site '{site_name}'"}
+        root_ip = (selected_site.get("root_ip") or "").strip()
 
         id_map = {d.get("id"): d for d in devices if d.get("id")}
         nodes: List[Dict[str, Any]] = []
@@ -105,12 +110,17 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
             "switch": "switch.png",
             "firewall": "firewall.png",
             "ap": "ap.png",
-            "phone": "phone.png",
+            "phone": "host.png",
+            "pc": "host.png",
             "host": "host.png",
             "server": "server.png",
             "nvr": "nvr.png",
             "pda": "pda.png",
-            "unknown": "unknown.png"
+            "finger": "finger.png",
+            "camera": "nvr.png",
+            "printer": "host.png",
+            "other": "host.png",
+            "unknown": "host.png"
         }
 
         for d in devices:
@@ -125,8 +135,9 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
             icon_name = icon_map.get(dtype.lower(), icon_map["unknown"])
             icon_path = os.path.join(icons_dir, icon_name)
             icon_url = f"{icon_web_base}/{icon_name}" if os.path.exists(icon_path) else ""
-            nodes.append({"id": did, "label": label, "title": title, "icon": icon_url, "type": dtype})
-            if d.get("always_show_on_map"):
+            is_root = bool(root_ip and d.get("ip") == root_ip)
+            nodes.append({"id": did, "label": label, "title": title, "icon": icon_url, "type": dtype, "is_root": is_root})
+            if d.get("always_show_on_map") or is_root:
                 connected_ids.add(did)
 
             for c in d.get("connections") or []:
@@ -157,7 +168,13 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
         else:
             return {"status": "error", "message": f"No connected devices found for site '{site_name}'"}
 
-        positions = _simple_positions(nodes)
+        try:
+            spacing_val = float(spacing)
+        except Exception:
+            spacing_val = 1.0
+        spacing_val = max(0.3, min(1.4, spacing_val))
+
+        positions = _simple_positions(nodes, spacing_val)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_site = "".join(ch for ch in (site_name or "site") if ch.isalnum() or ch in ("-", "_")).strip() or "site"
@@ -176,8 +193,9 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
     #topbar {{ padding: 12px 16px; border-bottom: 1px solid #1e3147; background: #13263b; }}
     #network {{ height: calc(100% - 54px); background: radial-gradient(circle at 20% 20%, #123, #0b1826); position: relative; overflow: hidden; }}
     .muted {{ color: #9fb3c8; font-size: 13px; }}
-    .node-label {{ fill: #e8edf2; font-size: 12px; pointer-events: none; }}
+    .node-label {{ fill: #e8edf2; font-size: 11px; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }}
     .node-circle {{ stroke: #c1ddff; stroke-width: 1; }}
+    .node-circle.root {{ stroke: #f59e0b; stroke-width: 4; }}
     .node-circle.selected {{ stroke: #ffffff; stroke-width: 2; }}
     .node-icon {{ pointer-events: none; }}
     .edge {{ stroke: #5c7ea8; opacity: 0.7; }}
@@ -214,6 +232,7 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
       ap: '#FFFFFF',
       firewall: '#D8B4FE',
       nvr: '#A7F3D0',
+      finger: '#FDE68A',
       server: '#FBCFE8'
     }};
 
@@ -222,11 +241,12 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
 
     // Layout and physics parameters
     const params = {{
-      repulsion: 18000,
-      spring: 0.015,
-      restLength: 180,
-      damping: 0.85,
-      maxStep: 12
+      repulsion: {90000} * {spacing_val},
+      spring: {0.012} * (1 / {spacing_val}),
+      restLength: {320} * {spacing_val},
+      damping: 0.88,
+      maxStep: 12,
+      gravity: {0.0007} * (1 / {spacing_val})
     }};
 
     let nodePos = Object.fromEntries(nodes.map(n => [n.id, {{ ...basePositions[n.id] }}]));
@@ -251,6 +271,20 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
     }}
 
     function applyForces() {{
+      const center = {{ x: 0, y: 0 }};
+      let count = 0;
+      nodes.forEach(n => {{
+        const p = nodePos[n.id];
+        if (!p) return;
+        center.x += p.x;
+        center.y += p.y;
+        count += 1;
+      }});
+      if (count > 0) {{
+        center.x /= count;
+        center.y /= count;
+      }}
+
       // Repulsion
       for (let i = 0; i < nodes.length; i++) {{
         for (let j = i + 1; j < nodes.length; j++) {{
@@ -285,10 +319,19 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
         velocity[e.to].y -= force * normY;
       }});
 
-      // Integrate
-      const rect = svg.getBoundingClientRect();
-      const minX = 30, minY = 30, maxX = rect.width - 30, maxY = rect.height - 30;
+      // Gravity toward center (keeps islands nearby)
+      if (count > 0) {{
+        nodes.forEach(n => {{
+          const p = nodePos[n.id];
+          if (!p) return;
+          const dx = center.x - p.x;
+          const dy = center.y - p.y;
+          velocity[n.id].x += dx * params.gravity;
+          velocity[n.id].y += dy * params.gravity;
+        }});
+      }}
 
+      // Integrate (no hard clamping; auto-fit handles view)
       nodes.forEach(n => {{
         if (draggingId === n.id) return; // don't move while dragging
         const v = velocity[n.id];
@@ -297,10 +340,11 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
         v.x = Math.max(Math.min(v.x, params.maxStep), -params.maxStep);
         v.y = Math.max(Math.min(v.y, params.maxStep), -params.maxStep);
         const p = nodePos[n.id];
-        p.x = Math.min(Math.max(minX, p.x + v.x), maxX);
-        p.y = Math.min(Math.max(minY, p.y + v.y), maxY);
+        p.x = p.x + v.x;
+        p.y = p.y + v.y;
       }});
     }}
+
 
     function draw() {{
       svg.innerHTML = '';
@@ -353,7 +397,8 @@ def generate_visual_map(site_name: str | None = None) -> Dict[str, Any]:
         circle.setAttribute('cx', p.x);
         circle.setAttribute('cy', p.y);
         circle.setAttribute('r', 14);
-        circle.setAttribute('class', 'node-circle' + (n.id === selectedId ? ' selected' : ''));
+        const rootClass = n.is_root ? ' root' : '';
+        circle.setAttribute('class', 'node-circle' + rootClass + (n.id === selectedId ? ' selected' : ''));
         const dtype = (n.type || '').toLowerCase();
         const baseColor = typeColors[dtype] || typeColors.unknown;
         circle.setAttribute('fill', n.id === selectedId ? '#f5b642' : baseColor);
