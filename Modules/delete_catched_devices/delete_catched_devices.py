@@ -7,9 +7,15 @@ and prunes connections pointing to removed devices.
 """
 
 import json
-import portalocker
 import sys
+import os
 from datetime import datetime
+
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DIR = os.path.abspath(os.path.join(MODULE_DIR, "..", "_shared"))
+if SHARED_DIR not in sys.path:
+    sys.path.insert(0, SHARED_DIR)
+from sqlite_store import read_json_store, write_json_store
 
 
 def main():
@@ -34,11 +40,9 @@ def main():
         print(json.dumps({"status": "error", "message": "Missing database_path"}))
         return
 
-    try:
-        with portalocker.Lock(db_path, "r", timeout=5, encoding="utf-8") as handle:
-            data = json.load(handle)
-    except Exception as exc:
-        print(json.dumps({"status": "error", "message": f"Failed to read database: {exc}"}))
+    data = read_json_store(db_path, "devices")
+    if data is None:
+        print(json.dumps({"status": "error", "message": "Failed to read database"}))
         return
 
     devices = data.get("devices", [])
@@ -71,10 +75,9 @@ def main():
     data.setdefault("meta", {})["last_modified"] = datetime.now().isoformat()
 
     try:
-        with portalocker.Lock(db_path, "w", timeout=5, encoding="utf-8") as handle:
-            json.dump(data, handle, indent=2)
-    except Exception as exc:
-        print(json.dumps({"status": "error", "message": f"Failed to write database: {exc}"}))
+        write_json_store(db_path, "devices", data)
+    except Exception:
+        print(json.dumps({"status": "error", "message": "Failed to write database"}))
         return
 
     print(json.dumps({

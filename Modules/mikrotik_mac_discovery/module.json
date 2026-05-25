@@ -12,8 +12,12 @@
       "required": false,
       "label": "Router Device (optional)",
       "description": "Select a MikroTik/router device from this site.",
-      "device_types": ["server"],
-      "device_name_contains": ["mikrotik"]
+      "device_types": [
+        "server"
+      ],
+      "device_name_contains": [
+        "mikrotik"
+      ]
     },
     {
       "name": "router_ip",
@@ -38,6 +42,16 @@
       "placeholder": "••••••"
     },
     {
+      "name": "ssh_port",
+      "type": "number",
+      "required": false,
+      "default": 22,
+      "label": "SSH Port",
+      "description": "SSH port for the MikroTik device (default 22).",
+      "min": 1,
+      "max": 65535
+    },
+    {
       "name": "interface",
       "type": "text",
       "required": false,
@@ -58,7 +72,10 @@
       "type": "select",
       "required": false,
       "default": "true",
-      "options": ["false", "true"],
+      "options": [
+        "false",
+        "true"
+      ],
       "label": "Use DHCP Hostname",
       "description": "If enabled, use DHCP lease hostnames when available (replaces truncated NETBIOS)."
     },
@@ -86,7 +103,10 @@
       "type": "select",
       "required": false,
       "default": "false",
-      "options": ["false", "true"],
+      "options": [
+        "false",
+        "true"
+      ],
       "label": "Replace on IP Match",
       "description": "If an IP already exists with a different MAC, replace that device with the new MAC/vendor."
     },
@@ -95,7 +115,10 @@
       "type": "select",
       "required": false,
       "default": "false",
-      "options": ["false", "true"],
+      "options": [
+        "false",
+        "true"
+      ],
       "label": "Trace Output",
       "description": "Print raw RouterOS scan output to the server console."
     },

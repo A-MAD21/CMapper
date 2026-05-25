@@ -13,7 +13,7 @@ def main():
         config = json.load(f)
     
     site_name = config.get("site_name", "")
-    db_path = config.get("database_path", "database.json")
+    db_path = config.get("database_path", "")
     
     # Check for existing map
     map_file = f"{site_name}_map.html"

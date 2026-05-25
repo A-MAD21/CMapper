@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import ipaddress
 import json
-import portalocker
 import os
 import re
 import subprocess
@@ -22,6 +21,10 @@ from typing import Dict, Any, List, Optional, Tuple
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUI_FILE = os.path.join(MODULE_DIR, "oui_ranges.txt")
+SHARED_DIR = os.path.abspath(os.path.join(MODULE_DIR, "..", "_shared"))
+if SHARED_DIR not in sys.path:
+    sys.path.insert(0, SHARED_DIR)
+from sqlite_store import read_json_store, write_json_store
 
 def is_mac_name(name: str) -> bool:
     if not name:
@@ -127,7 +130,7 @@ def _find_executable(names: List[str]) -> Optional[str]:
     return None
 
 
-def _run_paramiko(router_ip: str, username: str, password: str, cmd: str, timeout: int) -> Optional[subprocess.CompletedProcess]:
+def _run_paramiko(router_ip: str, username: str, password: str, cmd: str, timeout: int, port: int) -> Optional[subprocess.CompletedProcess]:
     try:
         import paramiko
     except Exception:
@@ -137,6 +140,7 @@ def _run_paramiko(router_ip: str, username: str, password: str, cmd: str, timeou
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(
         router_ip,
+        port=port,
         username=username,
         password=password,
         timeout=10,
@@ -151,12 +155,12 @@ def _run_paramiko(router_ip: str, username: str, password: str, cmd: str, timeou
     return subprocess.CompletedProcess(args=["paramiko", cmd], returncode=exit_status, stdout=out_text, stderr=err_text)
 
 
-def run_ssh_command(router_ip: str, username: str, password: str, cmd: str, timeout: int = 30) -> subprocess.CompletedProcess:
+def run_ssh_command(router_ip: str, username: str, password: str, cmd: str, timeout: int = 30, port: int = 22) -> subprocess.CompletedProcess:
     """
     Prefer plink on Windows (supports -pw), else sshpass, else ssh with keys.
     If no password-capable client is available, fail fast with a clear error.
     """
-    paramiko_result = _run_paramiko(router_ip, username, password, cmd, timeout)
+    paramiko_result = _run_paramiko(router_ip, username, password, cmd, timeout, port)
     if paramiko_result is not None:
         return paramiko_result
 
@@ -164,14 +168,14 @@ def run_ssh_command(router_ip: str, username: str, password: str, cmd: str, time
         plink_bin = os.environ.get("PLINK_BIN") or _find_executable(["plink.exe", "plink"])
         if plink_bin:
             full_cmd = [
-                plink_bin, "-ssh", "-batch", "-pw", password,
+                plink_bin, "-ssh", "-batch", "-P", str(port), "-pw", password,
                 f"{username}@{router_ip}", cmd
             ]
             return subprocess.run(full_cmd, capture_output=True, text=True, timeout=timeout)
 
     sshpass_bin = os.environ.get("SSHPASS_BIN") or _find_executable(["sshpass"])
     if sshpass_bin:
-        ssh_base = ["ssh", "-o", "StrictHostKeyChecking=no", f"{username}@{router_ip}", cmd]
+        ssh_base = ["ssh", "-p", str(port), "-o", "StrictHostKeyChecking=no", f"{username}@{router_ip}", cmd]
         full_cmd = [sshpass_bin, "-p", password, *ssh_base]
         return subprocess.run(full_cmd, capture_output=True, text=True, timeout=timeout)
 
@@ -181,6 +185,7 @@ def run_ssh_command(router_ip: str, username: str, password: str, cmd: str, time
         raise RuntimeError("No SSH client found. Install OpenSSH/PuTTY or add paramiko to Python environment.")
     full_cmd = [
         ssh_bin,
+        "-p", str(port),
         "-o", "BatchMode=yes",
         "-o", "ConnectTimeout=10",
         "-o", "StrictHostKeyChecking=no",
@@ -330,6 +335,10 @@ def main() -> None:
     router_device_id = params.get("router_device_id")
     username = params.get("username")
     password = params.get("password")
+    try:
+        ssh_port = int(params.get("ssh_port") or 22)
+    except Exception:
+        ssh_port = 22
     interface = (params.get("interface") or "").strip() or None
     address_range = params.get("address_range")
     duration = int(params.get("scan_duration_s", 30) or 30)
@@ -352,22 +361,16 @@ def main() -> None:
 
     if address_range and not interface:
         interface = "ether1"
-    if not router_ip and router_device_id and db_path:
-        try:
-            with portalocker.Lock(db_path, "r", timeout=5, encoding="utf-8") as f:
-                data = json.load(f)
+    if db_path:
+        data = read_json_store(db_path, "devices") or {}
+        if not router_ip and router_device_id:
             for dev in data.get("devices", []):
                 if dev.get("id") == router_device_id:
                     router_ip = dev.get("ip")
                     if not interface:
                         interface = dev.get("interface") or interface
                     break
-        except Exception:
-            pass
-    if not router_ip and db_path and site_name:
-        try:
-            with portalocker.Lock(db_path, "r", timeout=5, encoding="utf-8") as f:
-                data = json.load(f)
+        if not router_ip and site_name:
             for dev in data.get("devices", []):
                 if dev.get("site") != site_name:
                     continue
@@ -379,8 +382,6 @@ def main() -> None:
                     router_ip = dev.get("ip")
                     if router_ip:
                         break
-        except Exception:
-            pass
     if not router_ip or not username or password is None:
         print(json.dumps({"status": "error", "message": "Missing router_ip/username/password"}))
         return
@@ -421,7 +422,7 @@ def main() -> None:
 
     def parse_ip_address_ranges(iface_filter: Optional[str]) -> List[str]:
         try:
-            result = run_ssh_command(router_ip, username, password, "ip address print", timeout=20)
+            result = run_ssh_command(router_ip, username, password, "ip address print", timeout=20, port=ssh_port)
         except Exception:
             return []
         output = (result.stdout or "") + "\n" + (result.stderr or "")
@@ -466,7 +467,7 @@ def main() -> None:
 
     def parse_interface_subnets() -> Dict[str, List[str]]:
         try:
-            result = run_ssh_command(router_ip, username, password, "ip address print", timeout=20)
+            result = run_ssh_command(router_ip, username, password, "ip address print", timeout=20, port=ssh_port)
         except Exception:
             return {}
         output = (result.stdout or "") + "\n" + (result.stderr or "")
@@ -495,7 +496,7 @@ def main() -> None:
 
     def parse_ip_pool_ranges() -> List[str]:
         try:
-            result = run_ssh_command(router_ip, username, password, "ip pool print", timeout=20)
+            result = run_ssh_command(router_ip, username, password, "ip pool print", timeout=20, port=ssh_port)
         except Exception:
             return []
         output = (result.stdout or "") + "\n" + (result.stderr or "")
@@ -530,7 +531,7 @@ def main() -> None:
 
     def parse_ip_pool_map() -> Dict[str, List[str]]:
         try:
-            result = run_ssh_command(router_ip, username, password, "ip pool print detail without-paging", timeout=20)
+            result = run_ssh_command(router_ip, username, password, "ip pool print detail without-paging", timeout=20, port=ssh_port)
         except Exception:
             return {}
         output = (result.stdout or "") + "\n" + (result.stderr or "")
@@ -547,7 +548,7 @@ def main() -> None:
 
     def parse_dhcp_servers() -> List[Dict[str, str]]:
         try:
-            result = run_ssh_command(router_ip, username, password, "ip dhcp-server print", timeout=20)
+            result = run_ssh_command(router_ip, username, password, "ip dhcp-server print", timeout=20, port=ssh_port)
         except Exception:
             return []
         output = (result.stdout or "") + "\n" + (result.stderr or "")
@@ -598,7 +599,7 @@ def main() -> None:
         lease_pairs: set[tuple[str, str]] = set()
         try:
             detail_cmd = "ip dhcp-server lease print detail without-paging"
-            result = run_ssh_command(router_ip, username, password, detail_cmd, timeout=30)
+            result = run_ssh_command(router_ip, username, password, detail_cmd, timeout=30, port=ssh_port)
         except Exception:
             result = None
         if result and result.returncode == 0:
@@ -647,7 +648,7 @@ def main() -> None:
                 }
 
         try:
-            result = run_ssh_command(router_ip, username, password, "ip dhcp-server lease print", timeout=30)
+            result = run_ssh_command(router_ip, username, password, "ip dhcp-server lease print", timeout=30, port=ssh_port)
         except Exception:
             return {
                 "by_ip": hostnames_by_ip,
@@ -809,7 +810,7 @@ def main() -> None:
                     include_interface=attempt["include_interface"]
                 )
                 try:
-                    result = run_ssh_command(router_ip, username, password, combined_cmd, timeout=duration + 15)
+                    result = run_ssh_command(router_ip, username, password, combined_cmd, timeout=duration + 15, port=ssh_port)
                 except subprocess.TimeoutExpired as exc:
                     print(json.dumps({
                         "status": "error",
@@ -913,11 +914,9 @@ def main() -> None:
     # Merge into devices.db
     devices_added = 0
     devices_updated = 0
-    try:
-        with portalocker.Lock(db_path, "r", timeout=5, encoding="utf-8") as f:
-            database = json.load(f)
-    except Exception as e:
-        print(json.dumps({"status": "error", "message": f"Failed to read database: {e}"}))
+    database = read_json_store(db_path, "devices")
+    if database is None:
+        print(json.dumps({"status": "error", "message": "Failed to read database"}))
         return
 
     now = datetime.now().isoformat()
@@ -996,10 +995,9 @@ def main() -> None:
 
     database.setdefault("meta", {})["last_modified"] = now
     try:
-        with portalocker.Lock(db_path, "w", timeout=5, encoding="utf-8") as f:
-            json.dump(database, f, indent=2)
-    except Exception as e:
-        print(json.dumps({"status": "error", "message": f"Failed to write database: {e}"}))
+        write_json_store(db_path, "devices", database)
+    except Exception:
+        print(json.dumps({"status": "error", "message": "Failed to write database"}))
         return
 
     result_payload = {
