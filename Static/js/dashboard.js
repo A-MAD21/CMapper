@@ -942,6 +942,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         document.getElementById('agentDiscoveryBtn')?.addEventListener('click', () => {
             this.runAgentDiscoveryForSite();
         });
+        document.getElementById('domainLookupBtn')?.addEventListener('click', () => {
+            this.runDomainLookup();
+        });
         document.getElementById('addDeviceModuleBtn')?.addEventListener('click', () => {
             this.runAddDeviceModule();
         });
@@ -1415,10 +1418,8 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 const uncompletedMaps = this.stats.uncompleted_maps || [];
                 const catchedSites = this.stats.catched_sites || [];
                 const catchedTotal = this.stats.catched_total || 0;
-                const coveragePct = this.stats.agent_coverage_pct || 0;
-                const sitesWithAgents = this.stats.sites_with_agents || 0;
-                const agentsTotal = this.stats.agents_total || 0;
-                const agentsOnline = this.stats.agents_online || 0;
+                const pcNoDomainSites = this.stats.pc_no_domain_sites || [];
+                const pcNoDomainTotal = this.stats.pc_no_domain_total || 0;
 
                 const listItems = (items, emptyText) => {
                     if (!items.length) {
@@ -1431,12 +1432,15 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                     if (!items.length) {
                         return `<div style="color: var(--text-secondary); font-size: 12px;">${emptyText}</div>`;
                     }
+                    const maxValue = Math.max(...items.map(item => Number(item[valueKey] || 0)), 1);
                     return `
                         <div class="chart-list">
                             ${items.map(item => {
                                 const label = item[key] || '';
                                 const value = Number(item[valueKey] || 0);
-                                const pct = Math.min(100, Math.max(0, value));
+                                const pct = valueKey === 'rate'
+                                    ? Math.min(100, Math.max(0, value))
+                                    : Math.min(100, Math.max(0, (value / maxValue) * 100));
                                 return `
                                     <div class="chart-row">
                                         <div>${label}</div>
@@ -1506,20 +1510,17 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                             </div>
                             <strong>${catchedTotal}</strong>
                         </div>
-                        ${barList(catchedSites.map(item => ({ site: item.site, rate: item.count })), 'site', 'rate', 'No catched IPs.', 'linear-gradient(90deg, #38BDF8, #10B981)')}
+                        ${barList(catchedSites.map(item => ({ site: item.site, count: item.count })), 'site', 'count', 'No catched IPs.', 'linear-gradient(90deg, #38BDF8, #10B981)')}
                     </div>
                     <div class="chart-card">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
-                                <div class="chart-title">Agent Coverage</div>
-                                <div class="chart-subtitle">${sitesWithAgents}/${this.stats.total_sites || 0} sites</div>
+                                <div class="chart-title">PCs With No Domain</div>
+                                <div class="chart-subtitle">Sites with maximum PC/domain gaps (top 10)</div>
                             </div>
-                            <strong>${coveragePct}%</strong>
+                            <strong>${pcNoDomainTotal}</strong>
                         </div>
-                        <div class="chart-bar" style="margin-top: 12px;">
-                            <span style="width:${coveragePct}%; background: linear-gradient(90deg, #10B981, #38BDF8);"></span>
-                        </div>
-                        <div class="chart-subtitle" style="margin-top: 8px;">Agents online: ${agentsOnline}/${agentsTotal} (last ${onlineMinutes}m)</div>
+                        ${barList(pcNoDomainSites.map(item => ({ site: item.site, count: item.count })), 'site', 'count', 'All PCs have domain data.', 'linear-gradient(90deg, #8B5CF6, #38BDF8)')}
                     </div>
                 `;
             }
@@ -1891,6 +1892,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                                 ${device.type || 'unknown'}
                             </span>
                         </td>
+                        <td>${device.domain || 'N/A'}</td>
                         <td>${device.discovered_at ? this.formatTime(device.discovered_at) : 'N/A'}</td>
                         <td>${device.last_seen ? this.formatTime(device.last_seen) : 'Never'}</td>
                         <td>
@@ -2172,6 +2174,17 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         }
         this.currentSite = siteName;
         this.runModule('mikrotik_mac_discovery');
+    }
+
+    runDomainLookup() {
+        const siteFilter = document.getElementById('deviceSiteFilter');
+        const siteName = siteFilter ? siteFilter.value : '';
+        if (!siteName) {
+            this.showError('Select a site first');
+            return;
+        }
+        this.currentSite = siteName;
+        this.runModule('domain_lookup');
     }
 
     runAddDeviceModule() {
@@ -2977,13 +2990,12 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
     openExportDevices() {
         const siteSelect = document.getElementById('deviceSiteFilter');
         const selectedSite = siteSelect ? siteSelect.value : '';
-        if (!selectedSite) {
-            this.showError('Select a site in the Devices tab to export devices.');
-            return;
-        }
         this.currentSite = selectedSite;
         this.updateCurrentSiteDisplay();
-        this.runModule('export_devices');
+        this.runModule('export_devices', {
+            site_scope: selectedSite ? 'current' : 'all',
+            selected_only: this.selectedDeviceIds.size > 0
+        });
     }
 
     updateSettingsTab() {
@@ -3070,8 +3082,8 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
 
     // ==================== MODULE SYSTEM ====================
 
-    async runModule(moduleId) {
-        if (!this.currentSite) {
+    async runModule(moduleId, prefill = {}) {
+        if (!this.currentSite && moduleId !== 'export_devices') {
             this.showError('Please select a site first');
             return;
         }
@@ -3083,7 +3095,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         }
 
         // Show module form
-        this.showModuleForm(module);
+        this.showModuleForm(module, prefill);
     }
 
     showModuleForm(module, prefill = {}) {
@@ -3239,6 +3251,18 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                             </select>
                         </div>
                     `;
+                } else if (input.type === 'multi_select') {
+                    const defaultValues = Array.isArray(input.default) ? input.default : (input.default ? [input.default] : []);
+                    formHTML += `
+                        <div class="form-group">
+                            <label for="${idPrefix}${input.name}">${input.label} ${input.required ? '*' : ''}</label>
+                            <select id="${idPrefix}${input.name}" multiple size="${Math.min(Math.max((input.options || []).length, 4), 8)}" ${input.required ? 'required' : ''}>
+                                ${(input.options || []).map(opt =>
+                                    `<option value="${this.escapeHtml(opt)}" ${defaultValues.includes(opt) ? 'selected' : ''}>${this.escapeHtml(opt)}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    `;
                 } else if (input.type === 'device_select') {
                     const siteDevices = this.getDevicesForSite(siteName, input);
                     const options = siteDevices.map(d => {
@@ -3335,6 +3359,15 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                                       rows="4">${input.default || ''}</textarea>
                         </div>
                     `;
+                } else if (input.type === 'info') {
+                    formHTML += `
+                        <div class="form-group">
+                            <label>${this.escapeHtml(input.label || 'Note')}</label>
+                            <div style="padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-secondary); background: rgba(255,255,255,0.04);">
+                                ${this.escapeHtml(input.description || '')}
+                            </div>
+                        </div>
+                    `;
                 } else {
                     const inputType = (input.type === 'credential' || input.type === 'password') ? 'password' : 'text';
                     formHTML += `
@@ -3427,6 +3460,10 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             }
             if (element.type === 'checkbox') {
                 element.checked = Boolean(value);
+            } else if (element.multiple && Array.isArray(value)) {
+                Array.from(element.options).forEach(option => {
+                    option.selected = value.includes(option.value);
+                });
             } else {
                 element.value = value;
             }
@@ -3487,6 +3524,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             site_name: this.currentSite,
             parameters: inputs
         };
+        if (module.id === 'export_devices') {
+            config.parameters.selected_device_ids = Array.from(this.selectedDeviceIds || []);
+        }
         
         // Show status display
         statusDisplay.style.display = 'block';
@@ -3705,12 +3745,14 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             }
             const element = document.getElementById(`${idPrefix}${input.name}`);
             if (element) {
-                const value = element.type === 'checkbox' ? element.checked : element.value;
+                const value = element.type === 'checkbox'
+                    ? element.checked
+                    : (element.multiple ? Array.from(element.selectedOptions).map(option => option.value) : element.value);
                 if (input.required && !value && credentialProfile && credentialFields.has(input.name)) {
                     element.style.borderColor = '';
                     return;
                 }
-                if (input.required && !value) {
+                if (input.required && (!value || (Array.isArray(value) && value.length === 0))) {
                     isValid = false;
                     element.style.borderColor = 'var(--error)';
                 } else {
@@ -4077,6 +4119,8 @@ selectSite(siteName) {
         document.getElementById('editDeviceName').value = device.name || '';
         document.getElementById('editDeviceIP').value = device.ip || '';
         document.getElementById('editDeviceVlan').value = device.vlan || '';
+        document.getElementById('editDeviceDomain').value = device.domain || '';
+        document.getElementById('editDeviceDomainName').value = device.domain_name || '';
         document.getElementById('editDeviceMac').value = device.mac || '';
         document.getElementById('editDeviceType').value = device.type || 'router';
         document.getElementById('editDeviceNotes').value = device.notes || '';
@@ -4108,6 +4152,8 @@ selectSite(siteName) {
             name: document.getElementById('editDeviceName').value.trim(),
             ip: document.getElementById('editDeviceIP').value.trim(),
             vlan: document.getElementById('editDeviceVlan').value.trim(),
+            domain: document.getElementById('editDeviceDomain').value.trim(),
+            domain_name: document.getElementById('editDeviceDomainName').value.trim(),
             mac: document.getElementById('editDeviceMac').value.trim(),
             type: document.getElementById('editDeviceType').value,
             os: document.getElementById('editDeviceOS').value.trim(),

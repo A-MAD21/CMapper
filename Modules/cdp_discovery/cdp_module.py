@@ -374,6 +374,8 @@ def update_or_add_device(database, site_name, device_info, credentials_used):
     # Check if device already exists (by IP in same site)
     for i, device in enumerate(devices):
         if device.get("ip") == device_info["ip"] and device.get("site") == site_name:
+            if device.get("locked"):
+                return device["id"]
             # Update existing device
             for key, value in device_info.items():
                 if key not in ["id", "site", "discovered_at", "discovered_by"]:

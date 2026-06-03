@@ -47,6 +47,7 @@ def trace_target(
     username: str,
     password: str,
     port: int,
+    telnet_port: int,
     max_hops: int,
 ) -> Tuple[Optional[list[Dict[str, Any]]], str]:
     target_mac = mac_search.normalize_mac(str(target.get("mac") or ""))
@@ -63,9 +64,11 @@ def trace_target(
         visited.add(current_ip)
         devices = [device for device in devices_data.get("devices", []) if device.get("site") == site]
         inventory_switch = mac_search.device_by_ip(devices, current_ip) or {}
+        expected_name = str(inventory_switch.get("name") or "").strip()
+        switch_label = f"{expected_name} ({current_ip})" if expected_name else current_ip
         session = None
         try:
-            session = mac_search.CiscoSession(current_ip, username, password, port)
+            session = mac_search.CiscoSession(current_ip, username, password, port, telnet_port)
             discovered_name = session.hostname()
             switch_name = (
                 discovered_name
@@ -86,6 +89,7 @@ def trace_target(
                 "vlan": found["vlan"],
                 "entry_type": found["entry_type"],
                 "trunk": is_trunk,
+                "transport": session.transport_label,
             }
             trace.append(row)
             if not is_trunk:
@@ -106,9 +110,9 @@ def trace_target(
             current_ip = next_ip
         except Exception as exc:
             message = str(exc)[:160]
-            if "Authentication failed" in message:
-                return None, "authentication failed"
-            return None, message or "SSH query failed"
+            if "authentication failed" in message.lower():
+                return None, f"authentication failed on {switch_label}"
+            return None, message or "switch query failed"
         finally:
             if session:
                 session.close()
@@ -123,6 +127,7 @@ def trace_from_known_switches(
     username: str,
     password: str,
     port: int,
+    telnet_port: int,
     max_hops: int,
 ) -> Tuple[Optional[list[Dict[str, Any]]], str, int]:
     site_switches = [
@@ -147,12 +152,14 @@ def trace_from_known_switches(
             username,
             password,
             port,
+            telnet_port,
             max_hops,
         )
         if trace:
             return trace, "", attempted
-        if error == "authentication failed":
-            return None, error, attempted
+        if error.startswith("authentication failed on "):
+            last_error = error
+            continue
         last_error = error
     return None, f"not found across {attempted} known switch(es); last result: {last_error}", attempted
 
@@ -180,6 +187,7 @@ def main() -> None:
     username = str(params.get("username") or "").strip()
     password = str(params.get("password") or "")
     port = int(params.get("ssh_port") or 22)
+    telnet_port = int(params.get("telnet_port") or 23)
     max_hops = max(1, min(int(params.get("max_hops") or 10), 30))
 
     if not start_ip:
@@ -213,14 +221,11 @@ def main() -> None:
     total_connections = 0
     for index, target in enumerate(with_mac, 1):
         trace, error, probed = trace_from_known_switches(
-            target, start_ip, data, site, username, password, port, max_hops
+            target, start_ip, data, site, username, password, port, telnet_port, max_hops
         )
         if not trace:
             failed.append({"id": target.get("id"), "name": target.get("name"), "reason": error})
             log(log_file, f"{index}. {target.get('name') or target.get('mac')}: not mapped ({error})")
-            if error == "authentication failed":
-                log(log_file, "Stopped: SSH credentials were rejected.")
-                break
             continue
         _record, links = mac_search.save_trace(
             db_path,
@@ -236,7 +241,7 @@ def main() -> None:
         final = trace[-1]
         location = (
             f"{final['switch_name']} ({final['switch_ip']}) "
-            f"Port {mac_search.display_port(final['port'])}"
+            f"Port {mac_search.display_port(final['port'])} via {final.get('transport', 'SSH')}"
         )
         probe_label = f" [searched {probed} switch(es)]" if probed > 1 else ""
         log(log_file, f"{index}. {target.get('name') or target.get('mac')} -> {location}{probe_label}")

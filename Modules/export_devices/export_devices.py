@@ -37,6 +37,59 @@ def parse_device_types(raw: str) -> List[str]:
     return [entry.strip().lower() for entry in raw.split(",") if entry.strip()]
 
 
+EXPORT_COLUMNS = {
+    "name": "Name",
+    "ip": "IP",
+    "mac": "MAC",
+    "site": "Site",
+    "type": "Type",
+    "domain": "Domain",
+    "domain_name": "Domain Name",
+    "vendor": "Vendor",
+    "platform": "Platform",
+    "model": "Model",
+    "os": "OS",
+    "vlan": "VLAN",
+    "status": "Status",
+    "reachable": "Reachable",
+    "discovered_by": "Discovered By",
+    "discovered_at": "Discovered At",
+    "last_seen": "Last Seen",
+    "last_modified": "Last Modified",
+    "parent_switch_name": "Parent Switch",
+    "parent_switch_ip": "Parent Switch IP",
+    "parent_switch_port": "Parent Switch Port",
+    "notes": "Notes",
+}
+
+DEFAULT_COLUMNS = [
+    "name",
+    "ip",
+    "mac",
+    "site",
+    "type",
+    "domain",
+    "vendor",
+    "platform",
+    "last_seen",
+    "last_modified",
+]
+
+
+def parse_columns(raw: Any) -> List[str]:
+    if isinstance(raw, list):
+        candidates = [str(entry).strip() for entry in raw]
+    elif isinstance(raw, str) and raw.strip():
+        candidates = [entry.strip() for entry in raw.split(",")]
+    else:
+        candidates = DEFAULT_COLUMNS
+    columns = []
+    for column in candidates:
+        if column in EXPORT_COLUMNS and column not in columns:
+            columns.append(column)
+    return columns or DEFAULT_COLUMNS
+
+
 def parse_ip_range(raw: str) -> Optional[Iterable[str]]:
     if not raw:
         return None
@@ -66,6 +119,14 @@ def match_contains(value: str, needle: str) -> bool:
     return needle.lower() in (value or "").lower()
 
 
+def parse_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print(json.dumps({"status": "error", "message": "Config file required"}))
@@ -87,6 +148,10 @@ def main() -> None:
     vendor_contains = params.get("vendor_contains", "")
     platform_contains = params.get("platform_contains", "")
     filename = params.get("filename") or ""
+    columns = parse_columns(params.get("columns"))
+    selected_only = parse_bool(params.get("selected_only"))
+    selected_device_ids = set(params.get("selected_device_ids") or [])
+    selected_only_active = selected_only and bool(selected_device_ids)
 
     ip_range = parse_ip_range(ip_range_raw)
     if ip_range_raw and ip_range is None:
@@ -103,6 +168,9 @@ def main() -> None:
 
     rows = []
     for device in devices:
+        if selected_only_active:
+            if device.get("id") not in selected_device_ids:
+                continue
         if site_scope != "all":
             if site_name and device.get("site") != site_name:
                 continue
@@ -124,27 +192,10 @@ def main() -> None:
 
     output = StringIO()
     writer = csv.writer(output)
-    include_site = site_scope == "all"
-    header = ["name", "ip", "mac", "type", "vendor", "platform"]
-    if include_site:
-        header.append("site")
-    header.extend(["last_seen", "last_modified"])
+    header = [EXPORT_COLUMNS[column] for column in columns]
     writer.writerow(header)
     for device in rows:
-        row = [
-            device.get("name", ""),
-            device.get("ip", ""),
-            device.get("mac", ""),
-            device.get("type", ""),
-            device.get("vendor", ""),
-            device.get("platform", "")
-        ]
-        if include_site:
-            row.append(device.get("site", ""))
-        row.extend([
-            device.get("last_seen", ""),
-            device.get("last_modified", "")
-        ])
+        row = [device.get(column, "") for column in columns]
         writer.writerow(row)
 
     content = output.getvalue().encode("utf-8")
@@ -160,6 +211,7 @@ def main() -> None:
     print(json.dumps({
         "status": "success",
         "count": len(rows),
+        "columns": columns,
         "export": {
             "filename": filename,
             "content_base64": encoded

@@ -53,7 +53,7 @@ def main():
             kept_devices.append(device)
             continue
         name = (device.get("name") or "").strip()
-        if name.startswith("Catched-"):
+        if name.startswith("Catched-") and not device.get("locked"):
             removed_ids.add(device.get("id"))
             continue
         kept_devices.append(device)
@@ -63,6 +63,8 @@ def main():
         now = datetime.now().isoformat()
         for device in kept_devices:
             if device.get("site") != site_name:
+                continue
+            if device.get("locked"):
                 continue
             connections = device.get("connections") or []
             new_conns = [c for c in connections if c.get("remote_device") not in removed_ids]

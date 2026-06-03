@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import socket
 import sys
 import time
 import uuid
@@ -63,10 +64,13 @@ def display_port(value: str) -> str:
 
 
 class CiscoSession:
-    def __init__(self, host: str, username: str, password: str, port: int) -> None:
+    def __init__(self, host: str, username: str, password: str, port: int, telnet_port: int = 23) -> None:
         self.host = host
+        self.kind = ""
         self.connection = None
         self.channel = None
+        self.socket = None
+        errors = []
         try:
             from netmiko import ConnectHandler
             self.connection = ConnectHandler(
@@ -82,30 +86,123 @@ class CiscoSession:
             return
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as exc:
+            errors.append(f"SSH-Netmiko: {str(exc)[:120]}")
 
-        warnings.filterwarnings("ignore", message=r"TripleDES has been moved.*")
-        import paramiko
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(
-            hostname=host,
-            port=port,
-            username=username,
-            password=password,
-            timeout=15,
-            look_for_keys=False,
-            allow_agent=False,
-        )
-        self.connection = client
-        self.channel = client.invoke_shell()
-        time.sleep(0.6)
-        self._read_available()
-        self.channel.send("terminal length 0\n")
-        time.sleep(0.3)
-        self._read_available()
-        self.kind = "paramiko"
+        try:
+            warnings.filterwarnings("ignore", message=r"TripleDES has been moved.*")
+            import paramiko
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(
+                hostname=host,
+                port=port,
+                username=username,
+                password=password,
+                timeout=15,
+                look_for_keys=False,
+                allow_agent=False,
+            )
+            self.connection = client
+            self.channel = client.invoke_shell()
+            time.sleep(0.6)
+            self._read_available()
+            self.channel.send("terminal length 0\n")
+            time.sleep(0.3)
+            self._read_available()
+            self.kind = "paramiko"
+            return
+        except Exception as exc:
+            errors.append(f"SSH: {str(exc)[:120]}")
+            try:
+                client.close()
+            except Exception:
+                pass
+
+        try:
+            self._connect_telnet(username, password, telnet_port)
+            self.kind = "telnet"
+            return
+        except Exception as exc:
+            errors.append(f"Telnet: {str(exc)[:120]}")
+            self.close()
+            raise RuntimeError("; ".join(errors)) from exc
+
+    @property
+    def transport_label(self) -> str:
+        return "Telnet" if self.kind == "telnet" else "SSH"
+
+    def _telnet_decode(self, data: bytes) -> str:
+        clean = bytearray()
+        index = 0
+        while index < len(data):
+            value = data[index]
+            if value != 255:
+                clean.append(value)
+                index += 1
+                continue
+            if index + 1 >= len(data):
+                break
+            command = data[index + 1]
+            if command == 255:
+                clean.append(255)
+                index += 2
+            elif command in (251, 252, 253, 254) and index + 2 < len(data):
+                option = data[index + 2]
+                if command == 251:
+                    self.socket.sendall(bytes((255, 254, option)))
+                elif command == 253:
+                    self.socket.sendall(bytes((255, 252, option)))
+                index += 3
+            elif command == 250:
+                end = data.find(bytes((255, 240)), index + 2)
+                index = len(data) if end == -1 else end + 2
+            else:
+                index += 2
+        return clean.decode("utf-8", errors="ignore")
+
+    def _telnet_send(self, text: str) -> None:
+        if not self.socket:
+            raise RuntimeError("Telnet socket is not connected")
+        self.socket.sendall((text + "\n").encode("utf-8"))
+
+    def _telnet_read_until(self, pattern: str, timeout: float = 10.0) -> str:
+        if not self.socket:
+            return ""
+        output = ""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if re.search(pattern, output, flags=re.IGNORECASE | re.MULTILINE):
+                break
+            self.socket.settimeout(min(0.5, max(0.1, deadline - time.time())))
+            try:
+                chunk = self.socket.recv(8192)
+            except socket.timeout:
+                continue
+            if not chunk:
+                break
+            output += self._telnet_decode(chunk)
+        return output
+
+    def _connect_telnet(self, username: str, password: str, port: int) -> None:
+        self.socket = socket.create_connection((self.host, port), timeout=15)
+        login_pattern = r"(?:username|login)\s*:|password\s*:|[^\r\n]+[>#]\s*$"
+        output = self._telnet_read_until(login_pattern, timeout=5)
+        if not output:
+            self._telnet_send("")
+            output = self._telnet_read_until(login_pattern, timeout=5)
+        if re.search(r"(?:username|login)\s*:", output, flags=re.IGNORECASE):
+            self._telnet_send(username)
+            output += self._telnet_read_until(r"password\s*:|[^\r\n]+[>#]\s*$", timeout=5)
+        if re.search(r"password\s*:", output, flags=re.IGNORECASE):
+            self._telnet_send(password)
+            output += self._telnet_read_until(r"[^\r\n]+[>#]\s*$|invalid|failed|denied", timeout=8)
+        if re.search(r"invalid|failed|denied", output, flags=re.IGNORECASE):
+            raise RuntimeError("authentication failed")
+        if not re.search(r"[^\r\n]+[>#]\s*$", output, flags=re.MULTILINE):
+            raise RuntimeError("no Cisco prompt after login")
+        self._telnet_send("terminal length 0")
+        self._telnet_read_until(r"[^\r\n]+[>#]\s*$", timeout=5)
 
     def _read_available(self) -> str:
         output = ""
@@ -118,6 +215,9 @@ class CiscoSession:
     def command(self, command: str) -> str:
         if self.kind == "netmiko":
             return self.connection.send_command(command, delay_factor=2, expect_string=r"[#>]")
+        if self.kind == "telnet":
+            self._telnet_send(command)
+            return self._telnet_read_until(r"[^\r\n]+[>#]\s*$", timeout=10)
         self.channel.send(command + "\n")
         output = ""
         deadline = time.time() + 10
@@ -141,9 +241,15 @@ class CiscoSession:
         try:
             if self.kind == "netmiko":
                 self.connection.disconnect()
+            elif self.kind == "telnet":
+                self.socket.close()
             else:
-                self.channel.close()
-                self.connection.close()
+                if self.channel:
+                    self.channel.close()
+                if self.connection:
+                    self.connection.close()
+                if self.socket:
+                    self.socket.close()
         except Exception:
             pass
 
@@ -221,6 +327,8 @@ def ensure_switch(
     devices = devices_data.setdefault("devices", [])
     switch = next((item for item in devices if item.get("site") == site and item.get("ip") == ip), None)
     if switch:
+        if switch.get("locked"):
+            return switch
         if name and (not switch.get("name") or str(switch.get("name")).startswith("Device-")):
             switch["name"] = name
         if not switch.get("type") or switch.get("type") == "unknown":
@@ -266,6 +374,8 @@ def ensure_target(
     site_devices = [item for item in devices if item.get("site") == site]
     target = selected or device_by_mac(site_devices, target_mac)
     if target:
+        if target.get("locked"):
+            return target
         target["mac"] = display_mac(target_mac)
         target["last_modified"] = now
         return target
@@ -366,6 +476,8 @@ def save_trace(
 ) -> Tuple[Dict[str, Any], int]:
     now = datetime.now().isoformat()
     target = ensure_target(devices_data, site, selected_target, target_mac, now, source_module)
+    if target.get("locked"):
+        return target, 0
     switches = [
         ensure_switch(devices_data, site, row["switch_ip"], row["switch_name"], now, source_module, write_notes)
         for row in trace
@@ -439,6 +551,7 @@ def main() -> None:
     username = str(params.get("username") or "").strip()
     password = str(params.get("password") or "")
     port = int(params.get("ssh_port") or 22)
+    telnet_port = int(params.get("telnet_port") or 23)
     max_hops = max(1, min(int(params.get("max_hops") or 10), 30))
     mac_display = cisco_mac(target_mac)
     target_name = (target or {}).get("name") or raw_mac
@@ -459,9 +572,11 @@ def main() -> None:
             break
         visited.add(current_ip)
         inventory_switch = device_by_ip(devices, current_ip) or {}
+        expected_name = str(inventory_switch.get("name") or "").strip()
+        switch_label = f"{expected_name} ({current_ip})" if expected_name else current_ip
         session = None
         try:
-            session = CiscoSession(current_ip, username, password, port)
+            session = CiscoSession(current_ip, username, password, port, telnet_port)
             discovered_name = session.hostname()
             hostname = (
                 discovered_name
@@ -484,10 +599,11 @@ def main() -> None:
                 "vlan": found["vlan"],
                 "entry_type": found["entry_type"],
                 "trunk": is_trunk,
+                "transport": session.transport_label,
             }
             trace.append(row)
             mode = "trunk" if is_trunk else "access"
-            log(log_file, f"{hop}. {hostname} ({current_ip}) Port {display_port(switch_port)} [{mode}]")
+            log(log_file, f"{hop}. {hostname} ({current_ip}) Port {display_port(switch_port)} [{mode}; via {session.transport_label}]")
             if not is_trunk:
                 log(log_file, "")
                 log(log_file, f"Found in: {hostname} ({current_ip}) Port {display_port(switch_port)}")
@@ -530,8 +646,8 @@ def main() -> None:
             current_ip = next_ip
         except Exception as exc:
             message = str(exc)[:240]
-            if "Authentication failed" in message:
-                log(log_file, f"AUTH FAIL: {current_ip} rejected SSH credentials for user {username}")
+            if "authentication failed" in message.lower():
+                log(log_file, f"AUTH FAIL: {switch_label} rejected credentials for user {username} over SSH and Telnet")
             else:
                 log(log_file, f"ERROR: could not query {current_ip}: {message}")
             break

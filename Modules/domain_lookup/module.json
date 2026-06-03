@@ -1,0 +1,75 @@
+{
+  "id": "domain_lookup",
+  "name": "Domain Lookup",
+  "version": "1.0",
+  "description": "Ping selected device types by name and save the DNS domain suffix that resolves them. If a device name contains '/', only the part before '/' is used for DNS lookup.",
+  "author": "System",
+  "entry_point": "domain_lookup.py",
+  "inputs": [
+    {
+      "name": "device_types",
+      "type": "multi_select",
+      "required": true,
+      "default": ["pc"],
+      "options": ["pc", "pda", "server", "ap", "nvr", "finger", "switch", "router", "firewall", "phone", "printer", "unknown", "other", "all"],
+      "label": "Device Types",
+      "description": "Select one or more device types to check in the current site."
+    },
+    {
+      "name": "ping_count",
+      "type": "number",
+      "required": false,
+      "default": 1,
+      "label": "Ping Count",
+      "min": 1,
+      "max": 4
+    },
+    {
+      "name": "timeout_seconds",
+      "type": "number",
+      "required": false,
+      "default": 2,
+      "label": "Timeout Seconds",
+      "min": 1,
+      "max": 10
+    },
+    {
+      "name": "strip_catched_prefix",
+      "type": "checkbox",
+      "required": false,
+      "default": true,
+      "label": "Try without Catched- prefix",
+      "description": "For Catched-* devices, also try the name without Catched-."
+    },
+    {
+      "name": "domain_suffixes",
+      "type": "textarea",
+      "required": false,
+      "default": "okco.ir\ngig.holdings",
+      "label": "Domain Suffixes",
+      "description": "One domain per line. The module tries device, then device.domain for each suffix."
+    },
+    {
+      "name": "slash_note",
+      "type": "info",
+      "required": false,
+      "label": "Slash Handling",
+      "description": "Names with '/' are looked up using only the text before '/'. Do not use '/' inside real hostnames."
+    },
+    {
+      "name": "skip_mac_names",
+      "type": "checkbox",
+      "required": false,
+      "default": true,
+      "label": "Skip MAC-only names",
+      "description": "Skip devices whose name is only a MAC address."
+    }
+  ],
+  "outputs": [
+    {
+      "name": "updated",
+      "type": "number",
+      "description": "Number of devices updated with a domain."
+    }
+  ]
+}

@@ -293,6 +293,10 @@
                                 <i data-feather="cpu"></i>
                                 Agent Discovery
                             </button>
+                            <button class="btn btn-secondary" id="domainLookupBtn">
+                                <i data-feather="globe"></i>
+                                Domain Lookup
+                            </button>
                             <button class="btn btn-secondary" id="addDeviceModuleBtn">
                                 <i data-feather="plus-circle"></i>
                                 Add Device
@@ -311,6 +315,7 @@
                                     <th class="sortable" data-sort-target="devices" data-sort-key="mac">MAC</th>
                                     <th class="sortable" data-sort-target="devices" data-sort-key="site">Site</th>
                                     <th class="sortable" data-sort-target="devices" data-sort-key="type">Type</th>
+                                    <th class="sortable" data-sort-target="devices" data-sort-key="domain">Domain</th>
                                     <th class="sortable" data-sort-target="devices" data-sort-key="discovered_at">Discovered</th>
                                     <th class="sortable" data-sort-target="devices" data-sort-key="last_seen">Last Seen</th>
                                     <th>Actions</th>
@@ -322,6 +327,7 @@
                                     <th><input type="text" class="device-column-search" data-device-filter-key="mac" placeholder="Search"></th>
                                     <th><input type="text" class="device-column-search" data-device-filter-key="site" placeholder="Search"></th>
                                     <th><input type="text" class="device-column-search" data-device-filter-key="type" placeholder="Search"></th>
+                                    <th><input type="text" class="device-column-search" data-device-filter-key="domain" placeholder="Search"></th>
                                     <th><input type="text" class="device-column-search" data-device-filter-key="discovered_at" placeholder="Search"></th>
                                     <th><input type="text" class="device-column-search" data-device-filter-key="last_seen" placeholder="Search"></th>
                                     <th></th>
@@ -986,6 +992,14 @@
                         <div class="form-group">
                             <label for="editDeviceVlan">VLAN</label>
                             <input type="text" id="editDeviceVlan" placeholder="10">
+                        </div>
+                        <div class="form-group">
+                            <label for="editDeviceDomain">Domain</label>
+                            <input type="text" id="editDeviceDomain" placeholder="okco.ir">
+                        </div>
+                        <div class="form-group">
+                            <label for="editDeviceDomainName">Domain Name</label>
+                            <input type="text" id="editDeviceDomainName" placeholder="HOST.okco.ir">
                         </div>
                         <div class="form-group">
                             <label for="editDeviceMac">MAC Address</label>

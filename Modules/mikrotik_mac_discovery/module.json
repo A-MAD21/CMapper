@@ -108,7 +108,7 @@
         "true"
       ],
       "label": "Replace on IP Match",
-      "description": "If an IP already exists with a different MAC, replace that device with the new MAC/vendor."
+      "description": "When true, if an IP already exists with a different MAC, update that existing device with the new scan data. Same-MAC devices still update normally unless Prevent module updates is enabled on the node."
     },
     {
       "name": "trace_output",

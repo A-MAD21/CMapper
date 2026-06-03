@@ -199,6 +199,9 @@ def main() -> None:
                     by_mac[mac] = dev
                 created += 1
             else:
+                if dev.get("locked"):
+                    skipped += 1
+                    continue
                 if name:
                     dev["name"] = name
                 if ip:

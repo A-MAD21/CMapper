@@ -16,11 +16,61 @@
       "description": "Export only the selected site or all sites."
     },
     {
+      "name": "selected_only",
+      "type": "checkbox",
+      "required": false,
+      "default": false,
+      "label": "Only Checked Devices",
+      "description": "When devices are checked in the Devices table, export only those checked rows."
+    },
+    {
       "name": "device_types",
       "type": "text",
       "required": false,
       "label": "Device Types (comma-separated)",
       "placeholder": "pc, server, switch"
+    },
+    {
+      "name": "columns",
+      "type": "multi_select",
+      "required": true,
+      "default": [
+        "name",
+        "ip",
+        "mac",
+        "site",
+        "type",
+        "domain",
+        "vendor",
+        "platform",
+        "last_seen",
+        "last_modified"
+      ],
+      "options": [
+        "name",
+        "ip",
+        "mac",
+        "site",
+        "type",
+        "domain",
+        "domain_name",
+        "vendor",
+        "platform",
+        "model",
+        "os",
+        "vlan",
+        "status",
+        "reachable",
+        "discovered_by",
+        "discovered_at",
+        "last_seen",
+        "last_modified",
+        "parent_switch_name",
+        "parent_switch_ip",
+        "parent_switch_port",
+        "notes"
+      ],
+      "label": "Columns To Export"
     },
     {
       "name": "ip_range",

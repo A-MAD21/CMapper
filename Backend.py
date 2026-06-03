@@ -2120,6 +2120,12 @@ def handle_device(device_id):
             "oui_range_start",
             "oui_range_end",
             "vlan",
+            "domain",
+            "domain_name",
+            "domain_lookup_name",
+            "domain_query",
+            "domain_resolved_ip",
+            "domain_last_checked",
         ]
         for field in updatable_fields:
             if field in update_data:
@@ -3742,7 +3748,6 @@ def get_stats():
     sites = _filter_sites_for_user(data.get("sites", []), user)
     settings = read_settings() or {}
     stale_days = int(settings.get("stale_scan_days") or 7)
-    online_minutes = int(settings.get("agent_online_minutes") or 5)
 
     unknown_devices = len([d for d in devices if (d.get("type") or "").lower() in ("", "unknown")])
 
@@ -3824,27 +3829,17 @@ def get_stats():
     catched_sites = [{"site": k, "count": v} for k, v in catched_by_site.items()]
     catched_sites.sort(key=lambda x: x["count"], reverse=True)
 
-    # Agent coverage + online status
-    agents = settings.get("agents", []) if isinstance(settings, dict) else []
-    sites_with_agents = set()
-    for agent in agents:
-        if isinstance(agent, dict) and agent.get("site"):
-            sites_with_agents.add(agent.get("site"))
-    total_sites = len(sites) or 1
-    coverage_pct = round((len(sites_with_agents) / total_sites) * 100, 1)
-    cutoff_online = datetime.now() - timedelta(minutes=online_minutes)
-    agents_online = 0
-    for agent in agents:
-        if not isinstance(agent, dict):
+    # Sites with the most PC devices missing domain lookup data
+    pc_no_domain_by_site = {}
+    for d in devices:
+        if (d.get("type") or "").lower() != "pc":
             continue
-        last_seen = agent.get("last_seen")
-        if last_seen:
-            try:
-                dt = datetime.fromisoformat(last_seen)
-                if dt >= cutoff_online:
-                    agents_online += 1
-            except Exception:
-                pass
+        if (d.get("domain") or "").strip():
+            continue
+        site = d.get("site") or ""
+        pc_no_domain_by_site[site] = pc_no_domain_by_site.get(site, 0) + 1
+    pc_no_domain_sites = [{"site": k, "count": v} for k, v in pc_no_domain_by_site.items()]
+    pc_no_domain_sites.sort(key=lambda x: x["count"], reverse=True)
 
     stats = {
         "total_sites": len(sites),
@@ -3858,11 +3853,8 @@ def get_stats():
         "uncompleted_maps": uncompleted_maps,
         "catched_sites": catched_sites[:5],
         "catched_total": sum(catched_by_site.values()),
-        "agent_online_minutes": online_minutes,
-        "sites_with_agents": len(sites_with_agents),
-        "agent_coverage_pct": coverage_pct,
-        "agents_total": len(agents),
-        "agents_online": agents_online
+        "pc_no_domain_sites": pc_no_domain_sites[:10],
+        "pc_no_domain_total": sum(pc_no_domain_by_site.values())
     }
 
     return jsonify(stats)

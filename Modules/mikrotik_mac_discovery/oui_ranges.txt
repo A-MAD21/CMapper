@@ -8,13 +8,13 @@ F4:8E:38:00:00:00-F4:8E:38:FF:FF:FF=MikroTik,device_type=router
 00:25:90:00:00:00-00:25:90:FF:FF:FF=Cisco,device_type=switch
 00:1C:7E:00:00:00-00:1C:7E:FF:FF:FF=HP,device_type=printer
 F0:92:1C:00:00:00-F0:92:1C:FF:FF:FF=Server,device_type=server
-64:cb:a3:00:00:00-64:cb:a3:FF:FF:FF=PDA,device_type=pda
-4c:11:54:00:00:00-4c:11:54:FF:FF:FF=PDA,device_type=pda
-b4:29:3d:00:00:00-b4:29:3d:FF:FF:FF=PDA,device_type=pda
-e4:f1:4c:00:00:00-e4:f1:4c:FF:FF:FF=UniviewNVR,device_type=nvr
-e0:63:da:00:00:00-e0:63:da:FF:FF:FF=APUnifi,device_type=ap
-18:c0:4d:00:00:00-18:c0:4d:FF:FF:FF=PC,device_type=pc
-c4:14:3c:00:00:00-c4:14:3c:FF:FF:FF=Cisco,device_type=switch
+64:CB:A3:00:00:00-64:CB:A3:FF:FF:FF=PDA,device_type=pda
+4C:11:54:00:00:00-4C:11:54:FF:FF:FF=PDA,device_type=pda
+B4:29:3D:00:00:00-B4:29:3D:FF:FF:FF=PDA,device_type=pda
+E4:F1:4C:00:00:00-E4:F1:4C:FF:FF:FF=UniviewNVR,device_type=nvr
+E0:63:DA:00:00:00-E0:63:DA:FF:FF:FF=APUnifi,device_type=ap
+18:C0:4D:00:00:00-18:C0:4D:FF:FF:FF=APUnifi,device_type=pc
+C4:14:3C:00:00:00-C4:14:3C:FF:FF:FF=Cisco,device_type=switch
 18:E8:29:00:00:00-18:E8:29:FF:FF:FF=APUbiquiti,device_type=ap
 24:E9:B3:00:00:00-24:E9:B3:FF:FF:FF=Cisco,device_type=switch
 C4:79:05:00:00:00-C4:79:05:FF:FF:FF=UniviewNVR,device_type=nvr
@@ -33,7 +33,7 @@ C0:74:AD:00:00:00-C0:74:AD:FF:FF:FF=GrandStream IPphone,device_type=phone
 2C:4D:54:00:00:00-2C:4D:54:FF:FF:FF=PC,device_type=pc
 2C:56:DC:00:00:00-2C:56:DC:FF:FF:FF=PC,device_type=pc
 4C:75:25:00:00:00-4C:75:25:FF:FF:FF=PDA,device_type=pda
-00:17:61:00:00:00-00:17:61:FF:FF:FF=Finger,device_type=other
+00:17:61:00:00:00-00:17:61:FF:FF:FF=Finger,device_type=finger
 60:45:CB:00:00:00-60:45:CB:FF:FF:FF=PC,device_type=pc
 00:E0:4C:00:00:00-00:E0:4C:FF:FF:FF=PC,device_type=pc
 20:7B:D2:00:00:00-20:7B:D2:FF:FF:FF=PC,device_type=pc
@@ -363,5 +363,10 @@ D2:C2:16:00:00:00-D2:C2:16:FF:FF:FF=Samsung,device_type=phone
 C6:C6:EC:00:00:00-C6:C6:EC:FF:FF:FF=PDA,device_type=pda
 8A:39:8E:00:00:00-8A:39:8E:FF:FF:FF=PDA,device_type=pda
 88:26:3F:00:00:00-88:26:3F:FF:FF:FF=NVR,device_type=nvr
-00:01:F5:00:00:00-00:01:F5:FF:FF:FF=Finger Virgo,device_type=other
 54:78:1A:00:00:00-54:78:1A:FF:FF:FF=Cisco Switch,device_type=switch
+00:01:00:00:00:00-00:01:FF:FF:FF:FF=Finger Virgo,device_type=finger
+A0:AD:9F:00:00:00-A0:AD:9F:FF:FF:FF=PC,device_type=pc
+00:50:BA:00:00:00-00:50:BA:FF:FF:FF=PC,device_type=pc
+CC:15:31:00:00:00-CC:15:31:FF:FF:FF=PC,device_type=pc
+4C:5F:70:00:00:00-4C:5F:70:FF:FF:FF=PC,device_type=pc
+C4:EF:BB:00:00:00-C4:EF:BB:FF:FF:FF=PC,device_type=pc

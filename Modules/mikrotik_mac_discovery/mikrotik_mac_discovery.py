@@ -13,8 +13,11 @@ import ipaddress
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
+import time
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
@@ -35,6 +38,18 @@ def is_mac_name(name: str) -> bool:
     if re.fullmatch(r"[0-9A-Fa-f]{12}", value):
         return True
     return False
+
+
+def is_truncated_name(name: str) -> bool:
+    return bool(name) and name.strip().endswith("...")
+
+
+def parse_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
 @dataclass
@@ -130,37 +145,163 @@ def _find_executable(names: List[str]) -> Optional[str]:
     return None
 
 
-def _run_paramiko(router_ip: str, username: str, password: str, cmd: str, timeout: int, port: int) -> Optional[subprocess.CompletedProcess]:
+def _prompt_returned(text: str) -> bool:
+    cleaned = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", text).rstrip()
+    return bool(re.search(r"(?m)(?:\[[^\]\r\n]+\]\s*)?[>#]\s*$", cleaned))
+
+
+def _scan_output_has_rows(text: str) -> bool:
+    return bool(
+        re.search(r"(?m)^\s*(?:\d+\s+)?address=", text)
+        or re.search(r"(?m)^\s*\d{1,3}(?:\.\d{1,3}){3}\s+", text)
+    )
+
+
+def _routeros_command_error(text: str) -> bool:
+    lowered = (text or "").lower()
+    return (
+        "expected end of command" in lowered
+        or "bad command name" in lowered
+        or "no such item" in lowered
+        or "failure:" in lowered
+        or "syntax error" in lowered
+        or "value-name" in lowered
+    )
+
+
+def _routeros_interface_error(text: str) -> bool:
+    lowered = (text or "").lower()
+    return (
+        "input does not match any value of interface" in lowered
+        or "no such item" in lowered and "interface" in lowered
+        or "value-name" in lowered and "interface" in lowered
+    )
+
+
+def _extract_seen_ips_from_scan(output: str) -> set[str]:
+    seen: set[str] = set()
+    for rec in _parse_detail_records(output):
+        ip = rec.get("address") or rec.get("ip-address") or rec.get("address-range")
+        if ip:
+            seen.add(ip.strip())
+    for raw_line in output.splitlines():
+        if re.search(r"(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", raw_line):
+            for ip in re.findall(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", raw_line):
+                seen.add(ip)
+    return seen
+
+
+def _run_paramiko(router_ip: str, username: str, password: str, cmd: str, timeout: int, port: int, wide_terminal: bool = False) -> Optional[subprocess.CompletedProcess]:
     try:
+        warnings.filterwarnings("ignore", message=r"TripleDES has been moved.*")
         import paramiko
     except Exception:
         return None
 
     client = paramiko.SSHClient()
+    channel = None
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(
-        router_ip,
-        port=port,
-        username=username,
-        password=password,
-        timeout=10,
-        banner_timeout=10,
-        auth_timeout=10
-    )
-    stdin, stdout, stderr = client.exec_command(cmd, timeout=timeout)
-    out_text = stdout.read().decode(errors="ignore")
-    err_text = stderr.read().decode(errors="ignore")
-    exit_status = stdout.channel.recv_exit_status()
-    client.close()
-    return subprocess.CompletedProcess(args=["paramiko", cmd], returncode=exit_status, stdout=out_text, stderr=err_text)
+    try:
+        client.connect(
+            router_ip,
+            port=port,
+            username=username,
+            password=password,
+            timeout=10,
+            banner_timeout=10,
+            auth_timeout=10
+        )
+        if wide_terminal:
+            channel = client.invoke_shell(term="vt100", width=2000, height=1000)
+            channel.settimeout(2)
+            deadline = time.time() + max(timeout, 1)
+            initial_chunks: List[bytes] = []
+            initial_deadline = min(deadline, time.time() + 5)
+            while time.time() < initial_deadline:
+                if channel.recv_ready():
+                    initial_chunks.append(channel.recv(65535))
+                    if _prompt_returned(b"".join(initial_chunks).decode(errors="ignore")):
+                        break
+                time.sleep(0.05)
+            while channel.recv_ready():
+                channel.recv(65535)
+            channel.send(cmd + "\r")
+            sent_at = time.time()
+            last_recv_at = sent_at
+            live_scan_cutoff = sent_at + max(5, min(timeout - 1, 30)) if "tool ip-scan" in cmd and "duration=" not in cmd else None
+            out_chunks: List[bytes] = []
+            while True:
+                if channel.recv_ready():
+                    out_chunks.append(channel.recv(65535))
+                    last_recv_at = time.time()
+                    out_text_so_far = b"".join(out_chunks).decode(errors="ignore")
+                    if _prompt_returned(out_text_so_far) and (_scan_output_has_rows(out_text_so_far) or time.time() - sent_at > 1.0):
+                        break
+                    # Some RouterOS ip-scan variants run as a live view and do
+                    # not return to the prompt unless interrupted. Once rows are
+                    # visible and the output has settled, treat it as complete.
+                    if _scan_output_has_rows(out_text_so_far) and time.time() - last_recv_at > 1.5:
+                        break
+                else:
+                    out_text_so_far = b"".join(out_chunks).decode(errors="ignore")
+                    if _scan_output_has_rows(out_text_so_far) and time.time() - last_recv_at > 1.5:
+                        break
+                    if live_scan_cutoff is not None and time.time() > live_scan_cutoff:
+                        break
+                if live_scan_cutoff is not None and time.time() > live_scan_cutoff:
+                    break
+                if time.time() > deadline:
+                    raise subprocess.TimeoutExpired(cmd=["paramiko", cmd], timeout=timeout)
+                time.sleep(0.05)
+            try:
+                channel.send("\x03")
+                time.sleep(0.1)
+                while channel.recv_ready():
+                    out_chunks.append(channel.recv(65535))
+            except Exception:
+                pass
+            out_text = b"".join(out_chunks).decode(errors="ignore")
+            return subprocess.CompletedProcess(args=["paramiko", cmd], returncode=0, stdout=out_text, stderr="")
+
+        channel = client.get_transport().open_session(timeout=10)
+        channel.settimeout(2)
+        channel.exec_command(cmd)
+        deadline = time.time() + max(timeout, 1)
+        out_chunks: List[bytes] = []
+        err_chunks: List[bytes] = []
+        while True:
+            if channel.recv_ready():
+                out_chunks.append(channel.recv(65535))
+            if channel.recv_stderr_ready():
+                err_chunks.append(channel.recv_stderr(65535))
+            if channel.exit_status_ready():
+                while channel.recv_ready():
+                    out_chunks.append(channel.recv(65535))
+                while channel.recv_stderr_ready():
+                    err_chunks.append(channel.recv_stderr(65535))
+                break
+            if time.time() > deadline:
+                raise subprocess.TimeoutExpired(cmd=["paramiko", cmd], timeout=timeout)
+            time.sleep(0.05)
+        exit_status = channel.recv_exit_status()
+        out_text = b"".join(out_chunks).decode(errors="ignore")
+        err_text = b"".join(err_chunks).decode(errors="ignore")
+        return subprocess.CompletedProcess(args=["paramiko", cmd], returncode=exit_status, stdout=out_text, stderr=err_text)
+    finally:
+        if channel is not None:
+            try:
+                channel.close()
+            except Exception:
+                pass
+        client.close()
 
 
-def run_ssh_command(router_ip: str, username: str, password: str, cmd: str, timeout: int = 30, port: int = 22) -> subprocess.CompletedProcess:
+def run_ssh_command(router_ip: str, username: str, password: str, cmd: str, timeout: int = 30, port: int = 22, wide_terminal: bool = False) -> subprocess.CompletedProcess:
     """
     Prefer plink on Windows (supports -pw), else sshpass, else ssh with keys.
     If no password-capable client is available, fail fast with a clear error.
     """
-    paramiko_result = _run_paramiko(router_ip, username, password, cmd, timeout, port)
+    paramiko_result = _run_paramiko(router_ip, username, password, cmd, timeout, port, wide_terminal=wide_terminal)
     if paramiko_result is not None:
         return paramiko_result
 
@@ -207,7 +348,11 @@ def _parse_detail_records(output: str) -> List[Dict[str, str]]:
                 records.append(current)
                 current = {}
             line = line.split(" ", 1)[1]
-        for token in line.split():
+        try:
+            tokens = shlex.split(line)
+        except ValueError:
+            tokens = line.split()
+        for token in tokens:
             if "=" not in token:
                 continue
             key, value = token.split("=", 1)
@@ -239,6 +384,7 @@ def parse_ip_scan(output: str) -> List[Dict[str, str]]:
     # RouterOS table output fallback
     ip_mac_re = re.compile(r"(?P<ip>\d+\.\d+\.\d+\.\d+)\s+(?P<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})")
     header_seen = False
+    header_columns: Dict[str, int] = {}
     for raw_line in output.splitlines():
         line = raw_line.strip()
         if not line:
@@ -247,23 +393,39 @@ def parse_ip_scan(output: str) -> List[Dict[str, str]]:
             continue
         if "ADDRESS" in line.upper() and "NETBIOS" in line.upper():
             header_seen = True
+            upper = raw_line.upper()
+            header_columns = {
+                "address": upper.find("ADDRESS"),
+                "mac": upper.find("MAC-ADDRESS"),
+                "time": upper.find("TIME"),
+                "dns": upper.find("DNS"),
+                "snmp": upper.find("SNMP"),
+                "netbios": upper.find("NETBIOS")
+            }
             continue
         if line.lower().startswith("address") and not header_seen:
             continue
         if header_seen:
-            parts = line.split()
-            if len(parts) >= 3 and re.match(r"^\d+\.\d+\.\d+\.\d+$", parts[0]):
-                ip = parts[0]
-                mac = parts[1] if re.match(r"^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", parts[1]) else ""
-                netbios = " ".join(parts[3:]).strip() if len(parts) > 3 else ""
-                if mac:
-                    devices.append({
-                        "ip": ip,
-                        "mac": normalize_mac(mac),
-                        "identity": netbios if netbios else mac,
-                        "netbios": netbios,
-                        "interface": None
-                    })
+            ip_match = re.search(r"\d{1,3}(?:\.\d{1,3}){3}", raw_line)
+            if ip_match:
+                ip = ip_match.group(0)
+                mac_match = re.search(r"(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", raw_line)
+                mac = mac_match.group(0) if mac_match else ""
+                netbios = ""
+                netbios_idx = header_columns.get("netbios", -1)
+                if netbios_idx != -1 and len(raw_line) > netbios_idx:
+                    netbios = raw_line[netbios_idx:].strip()
+                elif mac_match:
+                    tail = raw_line[mac_match.end():].strip()
+                    tail_parts = tail.split()
+                    netbios = tail_parts[-1] if len(tail_parts) > 1 else ""
+                devices.append({
+                    "ip": ip,
+                    "mac": normalize_mac(mac) if mac else "",
+                    "identity": netbios if netbios else mac,
+                    "netbios": netbios,
+                    "interface": None
+                })
                 continue
         match = ip_mac_re.search(line)
         if not match:
@@ -345,17 +507,20 @@ def main() -> None:
     note = params.get("note") or None
     site_name = config.get("site_name") or params.get("site_name") or "default"
     db_path = config.get("database_path")
-    trace_output = str(params.get("trace_output", "false")).strip().lower() in ("1", "true", "yes")
-    replace_on_ip = str(params.get("replace_on_ip", "false")).strip().lower() in ("1", "true", "yes")
-    use_dhcp_hostname = str(params.get("use_dhcp_hostname", "true")).strip().lower() in ("1", "true", "yes")
-    catch_ip_thieves = bool(params.get("catch_ip_thieves", False))
+    trace_output = parse_bool(params.get("trace_output"), False)
+    replace_on_ip = parse_bool(params.get("replace_on_ip"), False)
+    use_dhcp_hostname = parse_bool(params.get("use_dhcp_hostname"), True)
+    catch_ip_thieves = parse_bool(params.get("catch_ip_thieves"), False)
 
     if address_range:
-        range_match = re.match(r"^\d{1,3}(?:\.\d{1,3}){3}-\d{1,3}(?:\.\d{1,3}){3}$", address_range.strip())
-        if not range_match:
+        range_value = address_range.strip()
+        valid_range = re.match(r"^\d{1,3}(?:\.\d{1,3}){3}-\d{1,3}(?:\.\d{1,3}){3}$", range_value)
+        valid_single = re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", range_value)
+        valid_cidr = re.match(r"^\d{1,3}(?:\.\d{1,3}){3}/\d{1,2}$", range_value)
+        if not (valid_range or valid_single or valid_cidr):
             print(json.dumps({
                 "status": "error",
-                "message": "Invalid address range format. Use start-end like 10.192.111.1-10.192.111.126."
+                "message": "Invalid address range format. Use a single IP, CIDR, or start-end range like 10.192.111.1-10.192.111.126."
             }))
             return
 
@@ -408,16 +573,21 @@ def main() -> None:
                 return value
         return value
 
-    def build_scan_command(path: str, target_range: str, iface: Optional[str], use_kv: bool = True, use_proplist: bool = True, include_interface: bool = True) -> str:
-        cmd = f"{path} duration={duration}"
-        if use_kv:
-            cmd += " as-value without-paging"
+    def build_scan_command(
+        path: str,
+        target_range: str,
+        iface: Optional[str],
+        include_interface: bool = True,
+        include_duration: bool = False,
+        scan_duration: Optional[int] = None
+    ) -> str:
+        cmd = path
         if target_range:
             cmd += f" address-range={normalize_address_range(target_range)}"
         if include_interface and iface:
             cmd += f" interface={iface}"
-        if use_proplist:
-            cmd += " proplist=address,mac-address,netbios,interface"
+        if include_duration:
+            cmd += f" duration={scan_duration if scan_duration is not None else duration}"
         return cmd
 
     def parse_ip_address_ranges(iface_filter: Optional[str]) -> List[str]:
@@ -485,10 +655,22 @@ def main() -> None:
             iface = parts[-1]
             if "/" not in addr:
                 continue
-            try:
-                network = str(ipaddress.ip_interface(addr).network)
-            except ValueError:
+            network = None
+            if len(parts) >= 3:
+                net_or_mask = parts[1]
+                if re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", net_or_mask):
+                    try:
+                        network = ipaddress.ip_network(f"{addr.split('/')[0]}/{net_or_mask}", strict=False)
+                    except ValueError:
+                        network = None
+            if network is None:
+                try:
+                    network = ipaddress.ip_interface(addr).network
+                except ValueError:
+                    continue
+            if network.prefixlen == 32:
                 continue
+            network = str(network)
             iface_map.setdefault(iface, [])
             if network not in iface_map[iface]:
                 iface_map[iface].append(network)
@@ -500,6 +682,18 @@ def main() -> None:
         except Exception:
             return []
         output = (result.stdout or "") + "\n" + (result.stderr or "")
+        range_re = re.compile(r"\d{1,3}(?:\.\d{1,3}){3}(?:-\d{1,3}(?:\.\d{1,3}){3}|/\d+)?")
+        table_ranges = range_re.findall(output)
+        if table_ranges:
+            cleaned: List[str] = []
+            seen_ranges: set[str] = set()
+            for item in table_ranges:
+                if item in seen_ranges:
+                    continue
+                seen_ranges.add(item)
+                cleaned.append(item)
+            return cleaned
+
         ranges: List[str] = []
         current_ranges = []
         for raw_line in output.splitlines():
@@ -536,14 +730,34 @@ def main() -> None:
             return {}
         output = (result.stdout or "") + "\n" + (result.stderr or "")
         pools: Dict[str, List[str]] = {}
+        range_re = re.compile(r"\d{1,3}(?:\.\d{1,3}){3}(?:-\d{1,3}(?:\.\d{1,3}){3}|/\d+)?")
         for rec in _parse_detail_records(output):
             name = rec.get("name")
             ranges = rec.get("ranges") or rec.get("range") or ""
             if not name or not ranges:
                 continue
-            items = [r.strip() for r in ranges.split(",") if r.strip()]
+            items = range_re.findall(ranges)
             if items:
                 pools[name] = items
+        header = None
+        for line in output.splitlines():
+            if "NAME" in line and "RANGES" in line:
+                header = line
+                break
+        if header:
+            name_idx = header.find("NAME")
+            ranges_idx = header.find("RANGES")
+            for raw_line in output.splitlines():
+                if not raw_line.strip() or raw_line.strip().startswith((";", "Flags:", "#")):
+                    continue
+                if not re.match(r"^\s*\d+", raw_line):
+                    continue
+                name = raw_line[name_idx:ranges_idx].strip() if ranges_idx != -1 else ""
+                name = re.sub(r"^\d+\s+", "", name).strip()
+                ranges_text = raw_line[ranges_idx:].strip() if ranges_idx != -1 else raw_line
+                items = range_re.findall(ranges_text)
+                if name and items:
+                    pools[name] = items
         return pools
 
     def parse_dhcp_servers() -> List[Dict[str, str]]:
@@ -561,18 +775,22 @@ def main() -> None:
         if header:
             name_idx = header.find("NAME")
             iface_idx = header.find("INTERFACE")
+            relay_idx = header.find("RELAY")
             pool_idx = header.find("ADDRESS-POOL")
+            lease_idx = header.find("LEASE-TIME")
             for raw_line in output.splitlines():
                 if not raw_line.strip() or raw_line.strip().startswith(";;;"):
                     continue
                 if raw_line.lstrip().startswith(("Flags:", "#")):
                     continue
-                line = raw_line
-                if line.lstrip()[0].isdigit():
-                    line = line.split(" ", 1)[1]
-                name = line[name_idx:iface_idx].strip() if iface_idx != -1 else line[name_idx:].strip().split()[0]
-                iface = line[iface_idx:pool_idx].strip() if pool_idx != -1 else ""
-                pool = line[pool_idx:].strip() if pool_idx != -1 else ""
+                if not re.match(r"^\s*\d+", raw_line):
+                    continue
+                name = raw_line[name_idx:iface_idx].strip() if iface_idx != -1 else raw_line[name_idx:].strip().split()[0]
+                name = re.sub(r"^\d+\s+", "", name).strip()
+                iface_end = relay_idx if relay_idx != -1 else pool_idx
+                iface = raw_line[iface_idx:iface_end].strip() if iface_idx != -1 and iface_end != -1 else ""
+                pool_end = lease_idx if lease_idx != -1 else len(raw_line)
+                pool = raw_line[pool_idx:pool_end].strip() if pool_idx != -1 else ""
                 if name and iface:
                     servers.append({"name": name, "interface": iface, "pool": pool})
             return servers
@@ -594,6 +812,7 @@ def main() -> None:
     def parse_dhcp_leases() -> Dict[str, Any]:
         hostnames_by_ip: Dict[str, str] = {}
         hostnames_by_mac: Dict[str, str] = {}
+        mac_by_ip: Dict[str, str] = {}
         status_by_ip: Dict[str, str] = {}
         active_ips: set[str] = set()
         lease_pairs: set[tuple[str, str]] = set()
@@ -625,7 +844,9 @@ def main() -> None:
                     active_ips.add(ip)
                 if ip and mac:
                     try:
-                        lease_pairs.add((ip, normalize_mac(mac)))
+                        normalized_mac = normalize_mac(mac)
+                        mac_by_ip[ip] = normalized_mac
+                        lease_pairs.add((ip, normalized_mac))
                     except Exception:
                         pass
                 if mac and name:
@@ -633,7 +854,7 @@ def main() -> None:
                         hostnames_by_mac[normalize_mac(mac)] = name
                     except Exception:
                         pass
-            if hostnames_by_ip or hostnames_by_mac:
+            if hostnames_by_ip or hostnames_by_mac or mac_by_ip:
                 if trace_output:
                     print(
                         f"=== dhcp lease count (detail): ip={len(hostnames_by_ip)} mac={len(hostnames_by_mac)} active={len(active_ips)} pairs={len(lease_pairs)} ===",
@@ -642,6 +863,7 @@ def main() -> None:
                 return {
                     "by_ip": hostnames_by_ip,
                     "by_mac": hostnames_by_mac,
+                    "mac_by_ip": mac_by_ip,
                     "status_by_ip": status_by_ip,
                     "active_ips": active_ips,
                     "lease_pairs": lease_pairs
@@ -653,6 +875,7 @@ def main() -> None:
             return {
                 "by_ip": hostnames_by_ip,
                 "by_mac": hostnames_by_mac,
+                "mac_by_ip": mac_by_ip,
                 "status_by_ip": status_by_ip,
                 "active_ips": active_ips,
                 "lease_pairs": lease_pairs
@@ -670,6 +893,9 @@ def main() -> None:
             addr_idx = header.find("ADDRESS")
             mac_idx = header.find("MAC-ADDRESS")
             host_idx = header.find("HOST-NAME")
+            server_idx = header.find("SERVER")
+            status_idx = header.find("STATUS")
+            last_seen_idx = header.find("LAST-SEEN")
             for raw_line in output.splitlines():
                 if not raw_line.strip() or raw_line.strip().startswith(";;;"):
                     continue
@@ -678,12 +904,40 @@ def main() -> None:
                 if addr_idx >= len(raw_line):
                     continue
                 ip = raw_line[addr_idx:mac_idx].strip() if mac_idx != -1 else raw_line[addr_idx:].strip().split()[0]
-                name = raw_line[host_idx:].strip() if host_idx != -1 else ""
-            if ip and name:
-                hostnames[ip] = name
+                mac_text = raw_line[mac_idx:host_idx].strip() if mac_idx != -1 and host_idx != -1 else ""
+                host_end = server_idx if server_idx != -1 else status_idx
+                name = raw_line[host_idx:host_end].strip() if host_idx != -1 and host_end != -1 else ""
+                status_end = last_seen_idx if last_seen_idx != -1 else len(raw_line)
+                status = raw_line[status_idx:status_end].strip().lower() if status_idx != -1 else ""
+                if ip and name:
+                    hostnames_by_ip[ip] = name
+                if ip and status:
+                    status_by_ip[ip] = status
+                    if status == "bound":
+                        active_ips.add(ip)
+                if ip and mac_text:
+                    try:
+                        normalized_mac = normalize_mac(mac_text)
+                        mac_by_ip[ip] = normalized_mac
+                        lease_pairs.add((ip, normalized_mac))
+                        if name:
+                            hostnames_by_mac[normalized_mac] = name
+                    except Exception:
+                        pass
             if trace_output:
-                print(f"=== dhcp lease count (table): {len(hostnames)} ===", file=sys.stderr)
-            return hostnames
+                print(
+                    f"=== dhcp lease count (table): ip={len(hostnames_by_ip)} mac_by_ip={len(mac_by_ip)} "
+                    f"active={len(active_ips)} pairs={len(lease_pairs)} ===",
+                    file=sys.stderr
+                )
+            return {
+                "by_ip": hostnames_by_ip,
+                "by_mac": hostnames_by_mac,
+                "mac_by_ip": mac_by_ip,
+                "status_by_ip": status_by_ip,
+                "active_ips": active_ips,
+                "lease_pairs": lease_pairs
+            }
 
         ip_re = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
         for raw_line in output.splitlines():
@@ -709,6 +963,7 @@ def main() -> None:
         return {
             "by_ip": hostnames_by_ip,
             "by_mac": hostnames_by_mac,
+            "mac_by_ip": mac_by_ip,
             "status_by_ip": status_by_ip,
             "active_ips": active_ips,
             "lease_pairs": lease_pairs
@@ -719,6 +974,19 @@ def main() -> None:
             return [{"interface": interface, "range": address_range}]
 
         targets: List[Dict[str, str]] = []
+        seen_targets: set[tuple[str, str]] = set()
+
+        def add_target(iface: Optional[str], target_range: str) -> None:
+            iface = (iface or interface or "ether1").strip()
+            target_range = (target_range or "").strip()
+            if not iface or not target_range:
+                return
+            key = (iface, target_range)
+            if key in seen_targets:
+                return
+            seen_targets.add(key)
+            targets.append({"interface": iface, "range": target_range})
+
         dhcp_servers = parse_dhcp_servers()
         pool_map = parse_ip_pool_map()
         iface_subnets = parse_interface_subnets()
@@ -730,45 +998,53 @@ def main() -> None:
                     continue
                 if interface and iface != interface:
                     continue
-                # Prefer full interface subnet(s)
-                subnets = iface_subnets.get(iface, [])
-                if subnets:
-                    for net in subnets:
-                        targets.append({"interface": iface, "range": net})
+                iface_nets = iface_subnets.get(iface, [])
+                if iface_nets:
+                    for net in iface_nets:
+                        add_target(iface, net)
                     continue
-                # Fallback to DHCP pool ranges
                 if pool:
                     ranges = pool_map.get(pool, [])
                     for r in ranges:
-                        targets.append({"interface": iface, "range": r})
-            if targets:
-                return targets
+                        add_target(iface, r)
 
-        # Fallback: use interface subnets directly
+        # Scan the interface network, not only the DHCP pool. Static devices
+        # outside the lease pool still need last_seen refreshed when ip-scan
+        # sees them. DHCP lease names remain available as a naming fallback.
+        if targets:
+            return targets
+
         if interface:
             for net in iface_subnets.get(interface, []):
-                targets.append({"interface": interface, "range": net})
-            if targets:
-                return targets
+                add_target(interface, net)
         else:
             for iface, nets in iface_subnets.items():
                 for net in nets:
-                    targets.append({"interface": iface, "range": net})
-            if targets:
-                return targets
+                    add_target(iface, net)
+        if targets:
+            return targets
 
         # Last resort: ip address print filtered or pool ranges without interface mapping
         addr_ranges = parse_ip_address_ranges(interface)
         if addr_ranges:
             return [{"interface": interface or "ether1", "range": r} for r in addr_ranges]
-        return [{"interface": interface or "ether1", "range": r} for r in parse_ip_pool_ranges()]
+        pool_ranges = parse_ip_pool_ranges()
+        if pool_ranges:
+            return [{"interface": interface or "ether1", "range": r} for r in pool_ranges]
+        try:
+            fallback_network = str(ipaddress.ip_interface(f"{router_ip}/24").network)
+            return [{"interface": interface or "ether1", "range": fallback_network}]
+        except Exception:
+            return []
 
     devices: List[Dict[str, str]] = []
     seen_devices: set[tuple[str, str, str]] = set()
+    seen_ips: set[str] = set()
     scan_paths = ["tool ip-scan"]
     dhcp_hostnames = parse_dhcp_leases() if use_dhcp_hostname else {
         "by_ip": {},
         "by_mac": {},
+        "mac_by_ip": {},
         "status_by_ip": {},
         "active_ips": set(),
         "lease_pairs": set()
@@ -785,6 +1061,7 @@ def main() -> None:
         print(json.dumps({"status": "error", "message": "No address ranges found for scan."}))
         return
     scan_errors: List[str] = []
+
     for path in scan_paths:
         for target in scan_targets:
             target_range = target.get("range") or ""
@@ -792,10 +1069,8 @@ def main() -> None:
             if not target_iface:
                 continue
             attempts = [
-                {"use_kv": True, "use_proplist": True, "include_interface": True},
-                {"use_kv": False, "use_proplist": True, "include_interface": True},
-                {"use_kv": False, "use_proplist": False, "include_interface": True},
-                {"use_kv": False, "use_proplist": False, "include_interface": False},
+                {"include_interface": True, "include_duration": True},
+                {"include_interface": True, "include_duration": False},
             ]
             result = None
             output = ""
@@ -805,18 +1080,17 @@ def main() -> None:
                     path,
                     target_range,
                     target_iface,
-                    use_kv=attempt["use_kv"],
-                    use_proplist=attempt["use_proplist"],
-                    include_interface=attempt["include_interface"]
+                    include_interface=attempt["include_interface"],
+                    include_duration=attempt["include_duration"]
                 )
                 try:
-                    result = run_ssh_command(router_ip, username, password, combined_cmd, timeout=duration + 15, port=ssh_port)
+                    result = run_ssh_command(router_ip, username, password, combined_cmd, timeout=duration + 15, port=ssh_port, wide_terminal=True)
+                    output = (result.stdout or "") + "\n" + (result.stderr or "")
+                    if result.returncode == 0 and not _routeros_command_error(output) and not _scan_output_has_rows(output):
+                        result = run_ssh_command(router_ip, username, password, combined_cmd, timeout=duration + 15, port=ssh_port)
                 except subprocess.TimeoutExpired as exc:
-                    print(json.dumps({
-                        "status": "error",
-                        "message": f"SSH command timed out after {exc.timeout}s. Ensure password auth works (install PuTTY/plink or set SSH keys)."
-                    }))
-                    return
+                    output = f"SSH command timed out after {exc.timeout}s while running: {combined_cmd}"
+                    result = subprocess.CompletedProcess(args=["paramiko", combined_cmd], returncode=124, stdout="", stderr=output)
                 except RuntimeError as exc:
                     print(json.dumps({"status": "error", "message": str(exc)}))
                     return
@@ -825,7 +1099,7 @@ def main() -> None:
                 if trace_output:
                     print(f"=== ip-scan command ===\n{combined_cmd}", file=sys.stderr)
                     print(f"=== ip-scan output ({path}) ===\n{output}", file=sys.stderr)
-                if result.returncode == 0:
+                if result.returncode == 0 and not _routeros_command_error(output):
                     break
                 if ("Permission denied" in output or "Authentication failed" in output):
                     print(json.dumps({
@@ -833,40 +1107,47 @@ def main() -> None:
                         "message": "SSH authentication failed. Use correct credentials or install PuTTY/plink on Windows."
                     }))
                     return
-                # If interface is invalid, retry without it
-                if "value-name" in output and attempt["include_interface"]:
+                if _routeros_interface_error(output) and attempt["include_interface"]:
+                    attempts.append({"include_interface": False, "include_duration": attempt["include_duration"]})
                     continue
-                # Try next attempt for unsupported params
-                if ("expected end of command" in output or "unknown parameter" in output):
+                if _routeros_command_error(output):
                     continue
-            if result is None or result.returncode != 0:
+            if result is None or result.returncode != 0 or _routeros_command_error(output):
                 err_text = output.strip()
                 if err_text:
                     scan_errors.append(err_text[:1000])
+                continue
             dhcp_hits = 0
+            seen_ips.update(_extract_seen_ips_from_scan(output))
             for item in parse_ip_scan(output):
-                ip_key = (item.get("ip") or "").strip()
-                mac_key = normalize_mac(item.get("mac") or "") if item.get("mac") else ""
-                iface_key = (item.get("interface") or target_iface or "").strip()
-                dedupe_key = (ip_key, mac_key, iface_key)
-                if ip_key or mac_key:
-                    if dedupe_key in seen_devices:
-                        continue
-                    seen_devices.add(dedupe_key)
                 if not item.get("interface") and target_iface:
                     item["interface"] = target_iface
                 ip = item.get("ip")
                 mac = item.get("mac")
+                if ip:
+                    seen_ips.add(ip)
+                if ip and not mac:
+                    lease_mac = dhcp_hostnames.get("mac_by_ip", {}).get(ip)
+                    if lease_mac:
+                        item["mac"] = lease_mac
+                        item["identity"] = item.get("identity") or lease_mac
+                        mac = lease_mac
+                ip_key = (item.get("ip") or "").strip()
+                mac_key = normalize_mac(item.get("mac") or "") if item.get("mac") else ""
+                iface_key = (item.get("interface") or target_iface or "").strip()
+                dedupe_key = ("mac", mac_key, iface_key) if mac_key else ("ip", ip_key, iface_key)
+                if ip_key or mac_key:
+                    if dedupe_key in seen_devices:
+                        continue
+                    seen_devices.add(dedupe_key)
                 ip_match = dhcp_hostnames.get("by_ip", {}).get(ip) if ip else None
                 mac_key = normalize_mac(mac) if mac else None
                 mac_match = dhcp_hostnames.get("by_mac", {}).get(mac_key) if mac_key else None
-                if ip_match:
-                    item["dhcp_hostname"] = ip_match
-                    dhcp_hits += 1
-                elif mac_match:
-                    item["dhcp_hostname"] = mac_match
-                    dhcp_hits += 1
-                elif catch_ip_thieves and ip:
+                scan_label = (item.get("netbios") or item.get("identity") or "").strip()
+                scan_has_real_name = bool(scan_label) and not is_mac_name(scan_label)
+                scan_is_truncated = is_truncated_name(scan_label)
+                is_catch_ip_thief = False
+                if catch_ip_thieves and ip and not ip_match:
                     active_ips = dhcp_hostnames.get("active_ips", set())
                     lease_pairs = dhcp_hostnames.get("lease_pairs", set())
                     lease_match = False
@@ -875,8 +1156,15 @@ def main() -> None:
                             lease_match = (ip, normalize_mac(mac)) in lease_pairs
                         except Exception:
                             lease_match = False
-                    if ip not in active_ips and not lease_match:
-                        item["catch_ip_thief"] = True
+                    is_catch_ip_thief = ip not in active_ips and not lease_match
+                if ip_match and (not scan_has_real_name or scan_is_truncated):
+                    item["dhcp_hostname"] = ip_match
+                    dhcp_hits += 1
+                elif mac_match and not scan_has_real_name and not is_catch_ip_thief:
+                    item["dhcp_hostname"] = mac_match
+                    dhcp_hits += 1
+                if is_catch_ip_thief:
+                    item["catch_ip_thief"] = True
                 devices.append(item)
             if trace_output and use_dhcp_hostname:
                 print(f"=== dhcp hostname matches: {dhcp_hits} ===", file=sys.stderr)
@@ -926,53 +1214,101 @@ def main() -> None:
     def safe_site(site: str) -> str:
         return "".join(ch if ch.isalnum() else "_" for ch in site.lower())
 
+    def locked_collision(rec: DeviceRecord) -> Optional[Dict[str, Any]]:
+        rec_mac = (rec.mac or "").lower()
+        for device in database["devices"]:
+            if device.get("site") != site_name or not device.get("locked"):
+                continue
+            if rec_mac and (device.get("mac") or "").lower() == rec_mac:
+                return device
+            if rec.ip and device.get("ip") == rec.ip:
+                return device
+        return None
+
+    def preferred_name_for_record(rec: DeviceRecord, dtype: str, existing_name: str = "") -> str:
+        if rec.dhcp_name and not rec.catch_ip_thief:
+            return rec.dhcp_name
+        if rec.catch_ip_thief and dtype in ("pc", "pda", "unknown", ""):
+            if not is_truncated_name(rec.scan_name):
+                return f"Catched-{rec.scan_name}"
+            return existing_name or rec.mac
+        if dtype in ("pc", "pda"):
+            if rec.name and not is_truncated_name(rec.name):
+                return rec.name
+            return existing_name
+        if dtype not in ("pc", "pda", "unknown", "") and existing_name.startswith("Catched-"):
+            return existing_name[len("Catched-"):]
+        return existing_name or rec.name
+
+    touched_device_ids: set[str] = set()
     for rec in records:
         mac_id = f"dev_mac_{rec.mac.replace(':', '').lower()}"
         device_id = f"{mac_id}_{safe_site(site_name)}"
+        if locked_collision(rec):
+            continue
         existing = next(
             (d for d in database["devices"] if d.get("mac", "").lower() == rec.mac.lower() and d.get("site") == site_name),
             None
         )
+        matched_by_mac = existing is not None
         if not existing and replace_on_ip and rec.ip:
             existing = next(
                 (d for d in database["devices"] if d.get("ip") == rec.ip and d.get("site") == site_name),
                 None
-            )
+        )
 
         if existing:
+            if existing.get("locked"):
+                continue
+            touched_device_ids.add(existing.get("id") or "")
             existing_name = existing.get("name") or ""
             dtype = (existing.get("type") or "").strip().lower()
-            if rec.dhcp_name:
-                existing["name"] = rec.dhcp_name
+            changed = False
+            if matched_by_mac or replace_on_ip:
+                new_name = preferred_name_for_record(rec, dtype, existing_name)
+                if new_name and existing.get("name") != new_name:
+                    existing["name"] = new_name
+                    changed = True
+                updates = {
+                    "ip": rec.ip or existing.get("ip"),
+                    "vendor": rec.vendor or existing.get("vendor"),
+                    "mac": rec.mac,
+                    "oui": rec.oui or existing.get("oui"),
+                    "discovered_by": "mikrotik_mac_discovery"
+                }
             else:
-                if dtype not in ("pc", "pda", "unknown", "") and existing_name.startswith("Catched-"):
-                    existing["name"] = existing_name[len("Catched-"):]
-                    existing_name = existing.get("name") or ""
-                if rec.catch_ip_thief and dtype in ("pc", "pda", "unknown", ""):
-                    thief_name = f"Catched-{rec.scan_name}"
-                    existing["name"] = thief_name
-                elif dtype in ("pc", "pda"):
-                    if rec.name:
-                        existing["name"] = rec.name
-                else:
-                    if not existing_name:
-                        existing["name"] = rec.name
-            existing["ip"] = rec.ip or existing.get("ip")
-            existing["vendor"] = rec.vendor or existing.get("vendor")
-            existing["mac"] = rec.mac
-            existing["oui"] = rec.oui or existing.get("oui")
-            existing["discovered_by"] = "mikrotik_mac_discovery"
-            if note:
+                updates = {}
+                if not existing.get("ip") and rec.ip:
+                    updates["ip"] = rec.ip
+                if not existing.get("vendor") and rec.vendor:
+                    updates["vendor"] = rec.vendor
+                if not existing.get("mac") and rec.mac:
+                    updates["mac"] = rec.mac
+                if not existing.get("oui") and rec.oui:
+                    updates["oui"] = rec.oui
+                if not existing.get("discovered_by"):
+                    updates["discovered_by"] = "mikrotik_mac_discovery"
+                if not existing_name:
+                    new_name = preferred_name_for_record(rec, dtype, existing_name)
+                    if new_name:
+                        updates["name"] = new_name
+            for key, value in updates.items():
+                if value is not None and existing.get(key) != value:
+                    existing[key] = value
+                    changed = True
+            if note and replace_on_ip:
                 existing["notes"] = f"{existing.get('notes', '')} {note}".strip()
+                changed = True
             existing["last_seen"] = now
-            existing["last_modified"] = now
+            if changed:
+                existing["last_modified"] = now
             devices_updated += 1
         else:
             name_value = rec.name
-            if rec.dhcp_name:
+            if rec.dhcp_name and not rec.catch_ip_thief:
                 name_value = rec.dhcp_name
             elif rec.catch_ip_thief:
-                name_value = f"Catched-{rec.scan_name}"
+                name_value = f"Catched-{rec.scan_name}" if not is_truncated_name(rec.scan_name) else rec.mac
             database["devices"].append({
                 "id": device_id,
                 "site": site_name,
@@ -991,7 +1327,25 @@ def main() -> None:
                 "last_modified": now,
                 "notes": note or ""
             })
+            touched_device_ids.add(device_id)
             devices_added += 1
+
+    availability_updated = 0
+    if seen_ips:
+        for device in database.get("devices", []):
+            if device.get("site") != site_name:
+                continue
+            if device.get("locked"):
+                continue
+            device_id_existing = device.get("id") or ""
+            if device_id_existing in touched_device_ids:
+                continue
+            if (device.get("ip") or "").strip() not in seen_ips:
+                continue
+            device["last_seen"] = now
+            touched_device_ids.add(device_id_existing)
+            availability_updated += 1
+        devices_updated += availability_updated
 
     database.setdefault("meta", {})["last_modified"] = now
     try:
@@ -1006,6 +1360,7 @@ def main() -> None:
         "devices_found": len(records),
         "devices_added": devices_added,
         "devices_updated": devices_updated,
+        "availability_updated": availability_updated,
         "devices": [r.to_output() for r in records],
         "ran_at": datetime.now().isoformat()
     }

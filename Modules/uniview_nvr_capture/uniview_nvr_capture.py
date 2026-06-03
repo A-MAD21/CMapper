@@ -476,6 +476,8 @@ def _find_or_create_switch(data: Dict[str, Any], site: str, cdp: Dict[str, Any],
             match_reason = "name"
             break
     if match:
+        if match.get("locked"):
+            return match
         updated = False
         if has_name and match.get("name") != switch_name:
             match["name"] = switch_name
@@ -999,6 +1001,9 @@ def main() -> None:
                             dev_rec = d
                             break
                     if dev_rec:
+                        if dev_rec.get("locked"):
+                            failures.append({"ip": ip, "name": name, "reason": "locked"})
+                            continue
                         dev_rec["type"] = "nvr"
                         if name:
                             dev_rec["name"] = name

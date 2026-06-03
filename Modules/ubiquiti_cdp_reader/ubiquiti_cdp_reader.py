@@ -13,6 +13,7 @@ import os
 import re
 import sys
 import uuid
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Dict, Any, Optional, Tuple
@@ -46,26 +47,36 @@ def normalize_mac(mac: str) -> str:
 
 def run_paramiko_cmd(host: str, username: str, password: str, cmd: str, timeout: int) -> Tuple[int, str, str]:
     try:
+        warnings.filterwarnings("ignore", message=r"TripleDES has been moved.*")
         import paramiko
     except Exception as exc:
         raise RuntimeError("paramiko is required for SSH") from exc
 
     client = paramiko.SSHClient()
+    stdin = stdout = stderr = None
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(
-        host,
-        username=username,
-        password=password,
-        timeout=10,
-        banner_timeout=10,
-        auth_timeout=10
-    )
-    stdin, stdout, stderr = client.exec_command(cmd, timeout=timeout)
-    out_text = stdout.read().decode(errors="ignore")
-    err_text = stderr.read().decode(errors="ignore")
-    exit_status = stdout.channel.recv_exit_status()
-    client.close()
-    return exit_status, out_text, err_text
+    try:
+        client.connect(
+            host,
+            username=username,
+            password=password,
+            timeout=10,
+            banner_timeout=10,
+            auth_timeout=10
+        )
+        stdin, stdout, stderr = client.exec_command(cmd, timeout=timeout)
+        out_text = stdout.read().decode(errors="ignore")
+        err_text = stderr.read().decode(errors="ignore")
+        exit_status = stdout.channel.recv_exit_status()
+        return exit_status, out_text, err_text
+    finally:
+        for stream in (stdin, stdout, stderr):
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception:
+                    pass
+        client.close()
 
 
 def _append_log(path: Optional[str], message: str) -> None:
@@ -282,6 +293,8 @@ def _find_or_create_switch(
         if device.get("site") != site_name:
             continue
         if switch_ip and device.get("ip") == switch_ip:
+            if device.get("locked"):
+                return device
             if override_existing:
                 device["name"] = switch_name or device.get("name")
                 if switch_ip:
@@ -292,6 +305,8 @@ def _find_or_create_switch(
                 device["last_modified"] = now
             return device
         if switch_name and (device.get("name") == switch_name or device.get("id") == switch_name):
+            if device.get("locked"):
+                return device
             if override_existing:
                 if switch_ip:
                     device["ip"] = switch_ip
@@ -386,6 +401,7 @@ def main() -> None:
     interface = params.get("interface") or "eth0"
     capture_seconds = int(params.get("capture_seconds", 12) or 12)
     batch_size = int(params.get("batch_size", 30) or 30)
+    concurrency = max(1, min(int(params.get("concurrency", 3) or 3), 60))
     trace_output = str(params.get("trace_output", "false")).strip().lower() in ("1", "true", "yes")
     override_existing = str(params.get("override_existing_switch", "false")).strip().lower() in ("1", "true", "yes")
     targets = params.get("targets") or {}
@@ -492,6 +508,8 @@ def main() -> None:
     def process_device(dev: Dict[str, Any]) -> Tuple[str, Optional[str], bool, str]:
         host = dev.get("ip")
         name = dev.get("name") or dev.get("id") or host or "unknown"
+        if dev.get("locked"):
+            return name, host, False, "locked"
         if not host:
             return name, None, False, "missing_ip"
         try:
@@ -508,7 +526,8 @@ def main() -> None:
             if trace_output and info_text:
                 _append_log(log_file, f"INFO {host}:\n{info_text[:1200]}")
             code, out, err = run_paramiko_cmd(host, username, password, cmd, timeout=capture_seconds + 5)
-        except Exception:
+        except Exception as exc:
+            _append_log(log_file, f"SSH ERROR {host}: {type(exc).__name__}: {str(exc)[:180]}")
             return name, host, False, "ssh_failed"
         hostname = ap_info.get("hostname")
         if hostname:
@@ -597,13 +616,13 @@ def main() -> None:
         return name, host, True, "ok"
 
     total = len(devices)
-    _append_log(log_file, f"Starting CDP capture for {total} devices (batch size {batch_size}).")
+    _append_log(log_file, f"Starting CDP capture for {total} devices (batch size {batch_size}, parallel SSH {concurrency}).")
     ok_list = []
     fail_list = []
     for start in range(0, total, batch_size):
         batch = devices[start:start + batch_size]
         _append_log(log_file, f"Batch {start + 1}-{start + len(batch)} starting...")
-        with ThreadPoolExecutor(max_workers=batch_size) as pool:
+        with ThreadPoolExecutor(max_workers=min(concurrency, len(batch))) as pool:
             future_map = {pool.submit(process_device, dev): dev for dev in batch}
             for future in as_completed(future_map):
                 name, host, ok, reason = future.result()
