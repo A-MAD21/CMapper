@@ -524,9 +524,13 @@
                         <h2>Network Topology Map</h2>
                         <div class="header-actions">
                             <div class="site-selector">
-                                <select id="mapSiteSelect">
-                                    <option value="">Select Site</option>
-                                </select>
+                                <div class="map-site-combobox" id="mapSiteCombo">
+                                    <input type="text" id="mapSiteSelect" placeholder="Search/select site" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="mapSiteDropdown">
+                                    <button type="button" class="map-site-toggle" id="mapSiteToggle" aria-label="Show sites">
+                                        <i data-feather="chevron-down"></i>
+                                    </button>
+                                    <div class="map-site-dropdown" id="mapSiteDropdown" hidden></div>
+                                </div>
                             </div>
                             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                                 <button class="btn btn-primary" id="showTextMapBtn">
@@ -701,7 +705,7 @@
                         </div>
                         <div class="form-group">
                             <label for="agentServerUrl">Agent Server URL</label>
-                            <input type="text" id="agentServerUrl" placeholder="http://127.0.0.1:5000">
+                            <input type="text" id="agentServerUrl" placeholder="https://server.example.local">
                         </div>
                         <div class="form-group" style="margin-top: 12px;">
                             <h3>My Password</h3>
@@ -816,6 +820,55 @@
                             </div>
                             <p style="color: var(--text-secondary); font-size: 0.9em;">
                                 Export/import includes devices and settings (ZIP).
+                            </p>
+                        </div>
+                        <div id="auditLogsSection" style="margin-top: 12px;">
+                            <div class="form-group">
+                                <h3>Audit Logs</h3>
+                            </div>
+                            <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr 1fr auto auto; gap: 10px; align-items: end;">
+                                <div>
+                                    <label for="auditLogDay">Day</label>
+                                    <select id="auditLogDay"></select>
+                                </div>
+                                <div>
+                                    <label for="auditLogEvent">Event</label>
+                                    <input type="text" id="auditLogEvent" placeholder="module_start">
+                                </div>
+                                <div>
+                                    <label for="auditLogSearch">Search</label>
+                                    <input type="text" id="auditLogSearch" placeholder="username, IP, module">
+                                </div>
+                                <button class="btn btn-primary" type="button" id="auditLogRefreshBtn">
+                                    Refresh
+                                </button>
+                                <button class="btn btn-secondary" type="button" id="auditLogDownloadBtn">
+                                    Download
+                                </button>
+                            </div>
+                            <div class="table-container" style="max-height: 420px; overflow: auto;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Event</th>
+                                            <th>User</th>
+                                            <th>IP</th>
+                                            <th>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="auditLogsTableBody">
+                                        <tr><td colspan="5">No audit log loaded</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="form-group" style="display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 10px;">
+                                <button class="btn btn-secondary" type="button" id="auditLogPrevBtn">Previous</button>
+                                <span id="auditLogPageInfo" style="color: var(--text-secondary); font-size: 0.9em;">Page 1 / 1</span>
+                                <button class="btn btn-secondary" type="button" id="auditLogNextBtn">Next</button>
+                            </div>
+                            <p id="auditLogsMeta" style="color: var(--text-secondary); font-size: 0.9em;">
+                                Audit logs are kept for 14 days.
                             </p>
                         </div>
                         <div id="moduleCredentialsSection" style="margin-top: 12px;">
@@ -1134,7 +1187,7 @@
                         </div>
                         <div class="form-group">
                             <label for="agentServerHost">Server URL or Host (optional)</label>
-                            <input type="text" id="agentServerHost" placeholder="http://10.192.92.10:5000">
+                            <input type="text" id="agentServerHost" placeholder="https://10.192.92.10">
                         </div>
                         <div class="form-group">
                             <label class="checkbox-label">

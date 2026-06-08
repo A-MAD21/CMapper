@@ -1,0 +1,33 @@
+# CMapper web UI/API allowlist.
+#
+# Leave this file empty/comment-only to allow every web client.
+# Add one client IP or CIDR subnet per line to restrict browser/API access.
+#
+# Examples:
+# 127.0.0.1
+# 10.192.3.156
+# 10.192.3.0/24
+#
+# This file affects only incoming web requests to CMapper.
+# It does not affect outgoing module connections to switches, APs, MikroTik,
+# NVRs, or other network devices.
+#jafari.bahare
+10.192.84.123
+#seify.amir
+10.192.84.114
+#seify.amir2
+172.18.0.45
+#kordestani
+172.18.1.141
+#mahmoudian
+#172.18.0.111
+#abdi
+172.18.1.49
+#ghaem
+172.18.1.155
+#jolani
+172.18.0.121
+#nikbakht
+172.18.0.220
+#arshi
+172.18.1.241

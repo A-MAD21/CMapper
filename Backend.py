@@ -3,15 +3,18 @@
 Network Discovery Platform - COMPLETE WORKING BACKEND
 """
 
-from flask import Flask, render_template, jsonify, request, send_file, session, g
+from flask import Flask, render_template, jsonify, request, send_file, session, g, has_request_context
 from functools import wraps
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 import json
 import csv
+import ipaddress
 import os
 import glob
 import threading
 import time
+import re
 import subprocess
 import sys
 import uuid
@@ -44,6 +47,9 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "Templates")
 STATIC_DIR = os.path.join(BASE_DIR, "Static")
 OUI_RANGES_FILE = os.path.join(MODULES_DIR, "mikrotik_mac_discovery", "oui_ranges.txt")
 OUI_DEVICE_TYPES_FILE = os.path.join(MODULES_DIR, "enforce_oui_table", "oui_device_types.txt")
+ALLOWED_WEB_IPS_FILE = os.path.join(BASE_DIR, "allowed_web_ips.txt")
+AUDIT_LOG_DIR = os.path.join(BASE_DIR, "audit_logs")
+AUDIT_LOG_RETENTION_DAYS = 14
 
 GENERATED_MAPS_DIR = os.path.join(BASE_DIR, "generated_maps")
 AGENT_CONFIG_DIR = os.path.join(BASE_DIR, "share", "agent_configs")
@@ -53,6 +59,7 @@ AGENT_SCAN_DIR = os.path.join(BASE_DIR, "share", "agent_scans")
 os.makedirs(GENERATED_MAPS_DIR, exist_ok=True)
 os.makedirs(AGENT_CONFIG_DIR, exist_ok=True)
 os.makedirs(AGENT_SCAN_DIR, exist_ok=True)
+os.makedirs(AUDIT_LOG_DIR, exist_ok=True)
 
 
 
@@ -79,11 +86,125 @@ app = Flask(
     static_folder=STATIC_DIR,
     static_url_path="/static",
 )
+
+
+def _env_flag(name: str, default: str = "0") -> bool:
+    return os.getenv(name, default).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _https_required() -> bool:
+    return _env_flag("HTTPS_REQUIRED", "1")
+
+
+def _direct_https_enabled() -> bool:
+    return _env_flag("USE_SSL", "1")
+
+
+def _behind_https_proxy() -> bool:
+    return _env_flag("BEHIND_HTTPS_PROXY", "0")
+
+
+def _default_agent_server_url() -> str:
+    return os.getenv("AGENT_SERVER_URL", "https://127.0.0.1:5000")
+
+
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-change-me")
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = os.getenv("USE_SSL", "0") == "1"
+app.config["SESSION_COOKIE_SECURE"] = _https_required() or _direct_https_enabled() or _behind_https_proxy()
+app.config["PREFERRED_URL_SCHEME"] = "https" if app.config["SESSION_COOKIE_SECURE"] else "http"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
+if _env_flag("TRUST_PROXY_HEADERS", "0") or _behind_https_proxy():
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
+
+
+@app.after_request
+def _apply_security_headers(response):
+    if request.is_secure or app.config.get("SESSION_COOKIE_SECURE"):
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    return response
+
+
+_allowed_web_ip_cache = {"mtime": None, "entries": None}
+
+
+def _parse_allowed_web_ips_file():
+    try:
+        stat = os.stat(ALLOWED_WEB_IPS_FILE)
+    except FileNotFoundError:
+        return []
+    except Exception as exc:
+        print(f"[WEB-IP-ALLOWLIST] Could not stat {ALLOWED_WEB_IPS_FILE}: {exc}", file=sys.stderr)
+        return []
+
+    if _allowed_web_ip_cache.get("mtime") == stat.st_mtime:
+        return _allowed_web_ip_cache.get("entries") or []
+
+    entries = []
+    try:
+        with open(ALLOWED_WEB_IPS_FILE, "r", encoding="utf-8") as f:
+            for line_no, raw_line in enumerate(f, start=1):
+                line = raw_line.split("#", 1)[0].strip()
+                if not line:
+                    continue
+                try:
+                    if "/" in line:
+                        entries.append(ipaddress.ip_network(line, strict=False))
+                    else:
+                        entries.append(ipaddress.ip_address(line))
+                except ValueError:
+                    print(f"[WEB-IP-ALLOWLIST] Ignoring invalid entry on line {line_no}: {line}", file=sys.stderr)
+    except Exception as exc:
+        print(f"[WEB-IP-ALLOWLIST] Could not read {ALLOWED_WEB_IPS_FILE}: {exc}", file=sys.stderr)
+        entries = []
+
+    _allowed_web_ip_cache["mtime"] = stat.st_mtime
+    _allowed_web_ip_cache["entries"] = entries
+    return entries
+
+
+def _request_client_ip():
+    value = (request.remote_addr or "").strip()
+    if value.startswith("::ffff:"):
+        value = value[7:]
+    return value
+
+
+def _is_web_client_allowed(client_ip: str) -> bool:
+    try:
+        ip_obj = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return False
+
+    if ip_obj.is_loopback and _env_flag("ALLOW_LOCALHOST_WEB", "1"):
+        return True
+
+    entries = _parse_allowed_web_ips_file()
+    if not entries:
+        return True
+
+    for entry in entries:
+        if isinstance(entry, (ipaddress.IPv4Network, ipaddress.IPv6Network)):
+            if ip_obj in entry:
+                return True
+        elif ip_obj == entry:
+            return True
+    return False
+
+
+@app.before_request
+def enforce_web_ip_allowlist():
+    client_ip = _request_client_ip()
+    if _is_web_client_allowed(client_ip):
+        return None
+
+    delay = max(0, int(os.getenv("WEB_IP_BLOCK_DELAY_SECONDS", "120") or "120"))
+    print(f"[WEB-IP-ALLOWLIST] Tarpitting blocked web client {client_ip} for {delay}s", file=sys.stderr)
+    if delay:
+        time.sleep(delay)
+    return ("", 404)
 
 
 
@@ -276,7 +397,7 @@ DEFAULT_SETTINGS = {
     "module_credentials": {},
     "module_last_params": {},
     "module_schedules": [],
-    "agent_server_url": "http://127.0.0.1:5000",
+    "agent_server_url": _default_agent_server_url(),
     "agents": [],
     "stale_scan_days": 7,
     "agent_online_minutes": 5,
@@ -346,6 +467,9 @@ def read_settings():
     merged = DEFAULT_SETTINGS.copy()
     if isinstance(loaded, dict):
         merged.update(loaded)
+
+    if _https_required() and merged.get("agent_server_url") == "http://127.0.0.1:5000":
+        merged["agent_server_url"] = _default_agent_server_url()
 
     if merged != loaded:
         _write_sqlite_json("settings", merged)
@@ -429,7 +553,7 @@ def _normalize_agent_payload(payload, existing=None):
 def _write_agent_config_files(agent, settings):
     if not agent:
         return
-    base_url = (settings or {}).get("agent_server_url") or "http://127.0.0.1:5000"
+    base_url = (settings or {}).get("agent_server_url") or _default_agent_server_url()
     host_override = (agent.get("server_host") or "").strip()
     if host_override:
         base_url = host_override
@@ -765,13 +889,142 @@ def _auth_user_from_row(row):
     }
 
 
+_AUDIT_SENSITIVE_KEYS = {
+    "password", "pass", "secret", "token", "api_key", "apikey", "authorization",
+    "cookie", "session", "password_hash"
+}
+
+
+def _audit_client_ip():
+    if has_request_context():
+        return _request_client_ip()
+    return None
+
+
+def _audit_user_agent():
+    if has_request_context():
+        return (request.headers.get("User-Agent") or "")[:300]
+    return None
+
+
+def _sanitize_audit_value(value, depth=0):
+    if depth > 5:
+        return "<truncated>"
+    if isinstance(value, dict):
+        cleaned = {}
+        for key, item in value.items():
+            key_str = str(key)
+            if key_str.lower() in _AUDIT_SENSITIVE_KEYS:
+                cleaned[key_str] = "<redacted>"
+            else:
+                cleaned[key_str] = _sanitize_audit_value(item, depth + 1)
+        return cleaned
+    if isinstance(value, list):
+        return [_sanitize_audit_value(item, depth + 1) for item in value[:200]]
+    if isinstance(value, str):
+        return value if len(value) <= 1000 else value[:1000] + "...<truncated>"
+    return value
+
+
+def _audit_log_path(day=None):
+    if day is None:
+        day = datetime.now().strftime("%Y-%m-%d")
+    return os.path.join(AUDIT_LOG_DIR, f"audit-{day}.jsonl")
+
+
+def _cleanup_audit_logs(force=False):
+    try:
+        now = time.time()
+        last = getattr(_cleanup_audit_logs, "_last_run", 0)
+        if not force and now - last < 3600:
+            return
+        _cleanup_audit_logs._last_run = now
+        cutoff = now - (AUDIT_LOG_RETENTION_DAYS * 86400)
+        for path in glob.glob(os.path.join(AUDIT_LOG_DIR, "audit-*.jsonl")):
+            try:
+                if os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def _write_audit_event(event, actor=None, role=None, client_ip=None, user_agent=None, **details):
+    try:
+        _cleanup_audit_logs()
+        record = {
+            "ts": datetime.now().isoformat(),
+            "event": event,
+            "actor": actor,
+            "role": role,
+            "client_ip": client_ip,
+            "user_agent": user_agent,
+            **_sanitize_audit_value(details)
+        }
+        os.makedirs(AUDIT_LOG_DIR, exist_ok=True)
+        path = _audit_log_path()
+        line = json.dumps(record, ensure_ascii=False, sort_keys=True)
+        with open(path, "a", encoding="utf-8") as f:
+            try:
+                portalocker.lock(f, portalocker.LOCK_EX)
+            except Exception:
+                pass
+            f.write(line + "\n")
+            try:
+                portalocker.unlock(f)
+            except Exception:
+                pass
+    except Exception as exc:
+        print(f"[AUDIT] Failed to write audit event {event}: {exc}", file=sys.stderr)
+
+
+def _read_audit_days():
+    _cleanup_audit_logs()
+    days = []
+    for path in sorted(glob.glob(os.path.join(AUDIT_LOG_DIR, "audit-*.jsonl")), reverse=True):
+        name = os.path.basename(path)
+        if not (name.startswith("audit-") and name.endswith(".jsonl")):
+            continue
+        day = name[len("audit-"):-len(".jsonl")]
+        try:
+            stat = os.stat(path)
+            days.append({
+                "day": day,
+                "file": name,
+                "size": stat.st_size,
+                "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
+            })
+        except Exception:
+            continue
+    return days
+
+
 def _audit(action, target=None, details=None, actor=None):
     try:
         now = datetime.now().isoformat()
         username = actor
+        role = None
         if username is None:
             user = getattr(g, "current_user", None)
             username = user.get("username") if isinstance(user, dict) else session.get("user")
+            role = user.get("role") if isinstance(user, dict) else session.get("role")
+        elif has_request_context():
+            user = getattr(g, "current_user", None)
+            if isinstance(user, dict) and user.get("username") == username:
+                role = user.get("role")
+            else:
+                found = _find_user(username)
+                role = found.get("role") if found else None
+        _write_audit_event(
+            action,
+            actor=username,
+            role=role,
+            client_ip=_audit_client_ip(),
+            user_agent=_audit_user_agent(),
+            target=target,
+            details=details or {}
+        )
         conn = _get_sqlite_conn()
         conn.execute(
             "INSERT INTO audit_log (actor, action, target, details_json, ip_address, created_at) "
@@ -781,7 +1034,7 @@ def _audit(action, target=None, details=None, actor=None):
                 action,
                 target,
                 json.dumps(details or {}),
-                request.remote_addr if request else None,
+                _audit_client_ip(),
                 now,
             )
         )
@@ -1161,6 +1414,55 @@ def _site_from_module_config(config):
             return value.strip()
     return None
 
+
+def _module_audit_details(module_id, config, thread_id=None, status=None, duration_s=None, error=None):
+    config = config if isinstance(config, dict) else {}
+    params = config.get("parameters") if isinstance(config.get("parameters"), dict) else {}
+    audit_ctx = config.get("_audit") if isinstance(config.get("_audit"), dict) else {}
+    targets = params.get("targets") if isinstance(params.get("targets"), dict) else {}
+    manual_devices = targets.get("manual_devices") if isinstance(targets.get("manual_devices"), list) else []
+    device_ids = targets.get("device_ids") if isinstance(targets.get("device_ids"), list) else []
+    target_ips = []
+    for key in ("router_ip", "ip", "target_ip", "nvr_ip", "host"):
+        value = params.get(key)
+        if isinstance(value, str) and value.strip():
+            target_ips.append(value.strip())
+    for entry in manual_devices[:20]:
+        if isinstance(entry, dict) and entry.get("ip"):
+            target_ips.append(str(entry.get("ip")).strip())
+    details = {
+        "module_id": module_id,
+        "thread_id": thread_id,
+        "site": _site_from_module_config(config),
+        "module_user": params.get("username") or audit_ctx.get("module_user"),
+        "credential_name": audit_ctx.get("credential_name"),
+        "target_ip": target_ips[0] if target_ips else None,
+        "target_ips": target_ips[:20],
+        "selected_device_count": len(device_ids),
+        "manual_device_count": len(manual_devices),
+        "status": status,
+        "duration_s": duration_s,
+        "schedule_id": config.get("schedule_id"),
+        "schedule_name": config.get("schedule_name"),
+        "log_file": os.path.basename(config.get("log_file") or "") if config.get("log_file") else None,
+    }
+    if error:
+        details["error"] = str(error)[:500]
+    return details
+
+
+def _write_module_audit(event, module_id, config, thread_id=None, status=None, duration_s=None, error=None):
+    audit_ctx = config.get("_audit") if isinstance(config, dict) and isinstance(config.get("_audit"), dict) else {}
+    _write_audit_event(
+        event,
+        actor=audit_ctx.get("actor") or "scheduler",
+        role=audit_ctx.get("role") or ("system" if audit_ctx.get("actor") == "scheduler" else None),
+        client_ip=audit_ctx.get("client_ip"),
+        user_agent=audit_ctx.get("user_agent"),
+        **_module_audit_details(module_id, config, thread_id=thread_id, status=status, duration_s=duration_s, error=error)
+    )
+
+
 def _require_role(*roles):
     user = _get_effective_user()
     if not user:
@@ -1274,6 +1576,8 @@ class ModuleRunner:
         def module_thread():
             config_file = None
             acquired = False
+            module_started_at = None
+            module_audit_finished = False
             try:
                 log_file = os.path.join(BASE_DIR, f"module_log_{thread_id}.txt")
                 site_name = config.get("site_name") if isinstance(config, dict) else None
@@ -1323,6 +1627,9 @@ class ModuleRunner:
                     "thread_id": thread_id,
                     "log_file": log_file
                 }
+                config["log_file"] = log_file
+                module_started_at = datetime.now()
+                _write_module_audit("module_start", module_id, config, thread_id=thread_id, status="running")
                 
                 config_file = f"module_config_{thread_id}.json"
                 with open(config_file, 'w') as f:
@@ -1423,6 +1730,16 @@ class ModuleRunner:
                         self.running_modules[thread_id]["status"] = final_status
                         self.running_modules[thread_id]["progress"] = 100
                         self.running_modules[thread_id]["completed_at"] = datetime.now().isoformat()
+                duration_s = round((datetime.now() - module_started_at).total_seconds(), 3) if module_started_at else None
+                _write_module_audit(
+                    "module_finish",
+                    module_id,
+                    config,
+                    thread_id=thread_id,
+                    status=final_status,
+                    duration_s=duration_s
+                )
+                module_audit_finished = True
 
                 
                 # Clean up temp config file
@@ -1437,13 +1754,22 @@ class ModuleRunner:
                     if thread_id in self.running_modules:
                         self.running_modules[thread_id]["status"] = "timeout"
                         self.running_modules[thread_id]["progress"] = 100
+                duration_s = round((datetime.now() - module_started_at).total_seconds(), 3) if module_started_at else None
+                _write_module_audit("module_timeout", module_id, config, thread_id=thread_id, status="timeout", duration_s=duration_s)
+                module_audit_finished = True
             except Exception as e:
                 with self.lock:
                     if thread_id in self.running_modules:
                         self.running_modules[thread_id]["status"] = "error"
                         self.running_modules[thread_id]["error"] = str(e)
                         self.running_modules[thread_id]["progress"] = 100
+                duration_s = round((datetime.now() - module_started_at).total_seconds(), 3) if module_started_at else None
+                _write_module_audit("module_error", module_id, config, thread_id=thread_id, status="error", duration_s=duration_s, error=e)
+                module_audit_finished = True
             finally:
+                if module_started_at and not module_audit_finished:
+                    duration_s = round((datetime.now() - module_started_at).total_seconds(), 3)
+                    _write_module_audit("module_error", module_id, config, thread_id=thread_id, status="error", duration_s=duration_s)
                 try:
                     if config_file and os.path.exists(config_file):
                         os.remove(config_file)
@@ -1692,7 +2018,13 @@ class ScheduleRunner:
                 "site_name": site_name,
                 "parameters": params,
                 "schedule_id": schedule_id,
-                "schedule_name": schedule.get("name") if isinstance(schedule, dict) else None
+                "schedule_name": schedule.get("name") if isinstance(schedule, dict) else None,
+                "_audit": {
+                    "actor": "scheduler",
+                    "role": "system",
+                    "credential_name": credential_profile,
+                    "module_user": params.get("username")
+                }
             }
             thread_id = module_runner.run_module(module_id, config)
             while True:
@@ -2309,6 +2641,9 @@ def run_module(module_id):
     print(f"=== /api/modules/{module_id}/run called ===", file=sys.stderr)
     
     config = request.json
+    if not isinstance(config, dict):
+        config = {}
+    credential_profile_name = None
     if isinstance(config, dict):
         params = config.get("parameters")
         if isinstance(params, dict):
@@ -2333,6 +2668,7 @@ def run_module(module_id):
                     if isinstance(profile, dict) and profile.get("name") not in known_names
                 ]
             profile_name = str(params.get("credential_profile")).strip()
+            credential_profile_name = profile_name
             for profile in profiles:
                 if isinstance(profile, dict) and profile.get("name") == profile_name:
                     params["username"] = profile.get("username", "")
@@ -2369,6 +2705,16 @@ def run_module(module_id):
     print(f"Request data: {json.dumps(safe_config, indent=2)}", file=sys.stderr)
     site_name = _site_from_module_config(config)
     if site_name and not _can_write_site(user, site_name):
+        _write_audit_event(
+            "module_denied",
+            actor=user.get("username"),
+            role=user.get("role"),
+            client_ip=_audit_client_ip(),
+            user_agent=_audit_user_agent(),
+            module_id=module_id,
+            site=site_name,
+            reason="site_forbidden"
+        )
         return jsonify({"error": "forbidden"}), 403
     
     # Validate module exists
@@ -2380,6 +2726,15 @@ def run_module(module_id):
         return jsonify({"error": f"Module {module_id} not found"}), 404
     
     print(f"Module {module_id} found. Starting execution...", file=sys.stderr)
+    params = config.get("parameters") if isinstance(config.get("parameters"), dict) else {}
+    config["_audit"] = {
+        "actor": user.get("username"),
+        "role": user.get("role"),
+        "client_ip": _audit_client_ip(),
+        "user_agent": _audit_user_agent(),
+        "credential_name": credential_profile_name,
+        "module_user": params.get("username")
+    }
     
     # Run the module
     thread_id = module_runner.run_module(module_id, config)
@@ -2774,6 +3129,101 @@ def auth_config():
     return jsonify({"success": True, "enabled": enabled})
 
 
+def _valid_audit_day(day):
+    return isinstance(day, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", day)
+
+
+@app.route('/api/audit/logs')
+def list_audit_logs():
+    user, err = _require_role("admin")
+    if err:
+        return err
+    return jsonify({
+        "retention_days": AUDIT_LOG_RETENTION_DAYS,
+        "logs": _read_audit_days()
+    })
+
+
+@app.route('/api/audit/logs/<day>')
+def read_audit_log(day):
+    user, err = _require_role("admin")
+    if err:
+        return err
+    if not _valid_audit_day(day):
+        return jsonify({"error": "invalid_day"}), 400
+    path = _audit_log_path(day)
+    if not os.path.exists(path):
+        return jsonify({"error": "not_found"}), 404
+    try:
+        limit = max(1, min(int(request.args.get("limit") or 50), 200))
+    except Exception:
+        limit = 50
+    try:
+        page = max(1, int(request.args.get("page") or 1))
+    except Exception:
+        page = 1
+    event_filter = (request.args.get("event") or "").strip().lower()
+    text_filter = (request.args.get("q") or "").strip().lower()
+    rows = []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except Exception:
+                    row = {"event": "parse_error", "raw": line}
+                if event_filter and str(row.get("event", "")).lower() != event_filter:
+                    continue
+                if text_filter and text_filter not in json.dumps(row, ensure_ascii=False).lower():
+                    continue
+                rows.append(row)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    rows.reverse()
+    total = len(rows)
+    pages = max(1, (total + limit - 1) // limit)
+    if page > pages:
+        page = pages
+    start = (page - 1) * limit
+    page_rows = rows[start:start + limit]
+    return jsonify({
+        "day": day,
+        "limit": limit,
+        "page": page,
+        "pages": pages,
+        "total": total,
+        "events": page_rows,
+        "count": len(page_rows),
+        "has_prev": page > 1,
+        "has_next": page < pages
+    })
+
+
+@app.route('/api/audit/logs/<day>/download')
+def download_audit_log(day):
+    user, err = _require_role("admin")
+    if err:
+        return err
+    if not _valid_audit_day(day):
+        return jsonify({"error": "invalid_day"}), 400
+    path = _audit_log_path(day)
+    if not os.path.exists(path):
+        return jsonify({"error": "not_found"}), 404
+    _write_audit_event(
+        "audit.download",
+        actor=user.get("username"),
+        role=user.get("role"),
+        client_ip=_audit_client_ip(),
+        user_agent=_audit_user_agent(),
+        day=day,
+        file=os.path.basename(path)
+    )
+    return send_file(path, as_attachment=True, download_name=os.path.basename(path), mimetype="application/x-ndjson")
+
+
 @app.route('/static/maps/<filename>')
 def serve_map_file(filename):
     """Serve map HTML files directly"""
@@ -2969,6 +3419,7 @@ def export_data():
         if settings is not None:
             zf.writestr("settings.json", json.dumps(settings, indent=2))
     buf.seek(0)
+    _audit("data.export", details={"download_name": "cmapp_export.zip"})
 
     return send_file(
         buf,
@@ -3012,6 +3463,7 @@ def import_data():
         if imported_sqlite:
             _migrate_auth_users_from_settings._done = False
             _migrate_auth_users_from_settings()
+            _audit("data.import", details={"filename": upload.filename, "imported_sqlite": True})
             return jsonify({"success": True})
         if devices_payload is not None:
             _write_sqlite_json("devices", devices_payload)
@@ -3023,6 +3475,7 @@ def import_data():
             init_database()
         _migrate_auth_users_from_settings._done = False
         _migrate_auth_users_from_settings()
+        _audit("data.import", details={"filename": upload.filename, "imported_sqlite": imported_sqlite})
         return jsonify({"success": True})
     except zipfile.BadZipFile:
         return jsonify({"error": "invalid_zip"}), 400
@@ -3065,6 +3518,12 @@ def handle_settings():
             current_settings.update(new_settings)
         write_settings(current_settings)
         module_runner.set_max_concurrent(current_settings.get("module_max_concurrent", 2))
+        _audit(
+            "settings.update",
+            details={
+                "keys": sorted([str(k) for k in new_settings.keys()]) if isinstance(new_settings, dict) else []
+            }
+        )
         auth = current_settings.get("auth", {})
         current_settings["auth"] = {"enabled": bool(auth.get("enabled", False))}
         return jsonify(current_settings)
@@ -3345,7 +3804,7 @@ def agent_poll_config(agent_id):
         return jsonify({"error": "agent_not_found"}), 404
     if token != (agent.get("token") or ""):
         return jsonify({"error": "invalid_token"}), 401
-    base_url = (settings.get("agent_server_url") or "http://127.0.0.1:5000")
+    base_url = (settings.get("agent_server_url") or _default_agent_server_url())
     if agent.get("server_host"):
         base_url = agent.get("server_host")
     response = {
@@ -3893,11 +4352,18 @@ if __name__ == '__main__':
             os.makedirs(module_dir, exist_ok=True)
             print(f"Created module directory: {module_dir}", file=sys.stderr)
     
+    behind_https_proxy = _behind_https_proxy()
+    use_ssl = False if behind_https_proxy else _direct_https_enabled()
+    https_required = _https_required()
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "5000"))
+    scheme = "https" if use_ssl or behind_https_proxy else "http"
+
     print("=" * 60)
-    print("NETWORK DISCOVERY PLATFORM (HTTPS)")
+    print("NETWORK DISCOVERY PLATFORM")
     print("=" * 60)
-    print(f"Dashboard URL: https://localhost:8443")
-    print(f"API Base URL: https://localhost:8443/api/")
+    print(f"Dashboard URL: {scheme}://localhost:{port}")
+    print(f"API Base URL: {scheme}://localhost:{port}/api/")
     print("\nAvailable API endpoints:")
     print("  GET  /api/database          - Get database")
     print("  GET  /api/sites             - List sites")
@@ -3908,18 +4374,24 @@ if __name__ == '__main__':
     print("  GET  /api/stats             - Get stats")
     print("  GET  /api/settings          - Get settings")
     print("  PUT  /api/settings          - Update settings")
-    print("\n⚠️  WARNING: Using self-signed SSL certificate")
-    print("   Browsers will show security warnings - accept them for development")
+    if use_ssl:
+        print("\nHTTPS direct mode enabled.")
+        if not (os.getenv("SSL_CERT_FILE") and os.getenv("SSL_KEY_FILE")):
+            print("Using Flask adhoc self-signed certificate; browsers will show a warning.")
+    elif behind_https_proxy:
+        print("\nHTTPS proxy mode enabled. Flask expects TLS to terminate at the reverse proxy.")
+    elif https_required:
+        raise RuntimeError("HTTPS_REQUIRED=1 but neither direct HTTPS nor HTTPS proxy mode is enabled.")
+    else:
+        print("\nHTTP mode explicitly enabled with HTTPS_REQUIRED=0.")
     print("\nDebug logs will appear below...")
     print("=" * 60)
-    
-    if __name__ == "__main__":
-        use_ssl = os.getenv("USE_SSL", "0") == "1"
 
-        host = os.getenv("HOST", "0.0.0.0")
-        port = int(os.getenv("PORT", "5000"))
+    ssl_ctx = None
+    if use_ssl:
+        cert_file = os.getenv("SSL_CERT_FILE")
+        key_file = os.getenv("SSL_KEY_FILE")
+        ssl_ctx = (cert_file, key_file) if cert_file and key_file else "adhoc"
 
-        ssl_ctx = "adhoc" if use_ssl else None
-
-        print(f"Starting server on {'https' if use_ssl else 'http'}://{host}:{port}")
-        app.run(debug=True, host=host, port=port, use_reloader=False)
+    print(f"Starting server on {'https' if use_ssl else 'http'}://{host}:{port}")
+    app.run(debug=True, host=host, port=port, use_reloader=False, ssl_context=ssl_ctx)

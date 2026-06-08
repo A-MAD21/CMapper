@@ -766,8 +766,101 @@ body {
     margin: 0;
 }
 
-.site-selector select {
+.site-selector select,
+.site-selector input {
     min-width: 200px;
+    padding: 10px 14px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.site-selector input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.map-site-combobox {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    min-width: 280px;
+}
+
+.map-site-combobox input {
+    width: 100%;
+    min-width: 0;
+    padding-right: 42px;
+}
+
+.map-site-toggle {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    bottom: 1px;
+    width: 38px;
+    border: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0 6px 6px 0;
+}
+
+.map-site-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+.map-site-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 50;
+    max-height: 280px;
+    overflow-y: auto;
+    background: var(--bg-surface);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.36);
+    padding: 4px;
+}
+
+.map-site-option,
+.map-site-empty {
+    width: 100%;
+    display: block;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-primary);
+    text-align: left;
+    font-size: 0.92rem;
+}
+
+.map-site-option {
+    cursor: pointer;
+}
+
+.map-site-option:hover,
+.map-site-option:focus,
+.map-site-option.is-active {
+    outline: none;
+    background: rgba(37, 99, 235, 0.18);
+}
+
+.map-site-empty {
+    color: var(--text-secondary);
 }
 
 /* Modals */

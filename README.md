@@ -22,6 +22,13 @@ pip install -r requirements.txt
 python Backend.py
 ```
 
+## HTTPS
+CMapper defaults to HTTPS. It supports two modes:
+- Reverse proxy mode: run Flask on `127.0.0.1:5000` and terminate TLS with Nginx/Caddy.
+- Direct Flask HTTPS mode: run `python Backend.py`; `USE_SSL=1` is the default.
+
+See `deployment/README_HTTPS.md` and `deployment/nginx/cmapper.conf`.
+
 ## Troubleshooting
 - If the UI appears stuck on load, the `feather-icons` CDN may be blocked, which can break initialization. Guard the `feather.replace()` call or host the script locally.
 

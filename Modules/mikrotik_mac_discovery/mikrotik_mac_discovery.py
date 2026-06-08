@@ -44,6 +44,18 @@ def is_truncated_name(name: str) -> bool:
     return bool(name) and name.strip().endswith("...")
 
 
+def clean_scan_hostname(name: str) -> str:
+    value = (name or "").strip().strip('"').strip("'").strip()
+    if not value:
+        return ""
+    value = value.rstrip(".")
+    if "/" in value:
+        value = value.split("/", 1)[0].strip()
+    if "." in value:
+        value = value.split(".", 1)[0].strip()
+    return value
+
+
 def parse_bool(value: Any, default: bool = False) -> bool:
     if isinstance(value, bool):
         return value
@@ -367,14 +379,24 @@ def parse_ip_scan(output: str) -> List[Dict[str, str]]:
     for rec in _parse_detail_records(output):
         ip = rec.get("address") or rec.get("ip-address") or rec.get("address-range")
         mac = rec.get("mac-address")
-        netbios = rec.get("netbios") or rec.get("netbios-name") or rec.get("netbios_name") or ""
-        identity = netbios or rec.get("identity") or rec.get("host-name") or ""
+        scan_hostname = clean_scan_hostname(
+            rec.get("dns")
+            or rec.get("dns-name")
+            or rec.get("identity")
+            or rec.get("host-name")
+            or ""
+        )
+        netbios = clean_scan_hostname(
+            rec.get("netbios") or rec.get("netbios-name") or rec.get("netbios_name") or ""
+        )
         iface = rec.get("interface")
         if mac:
+            identity = scan_hostname or netbios or mac
             devices.append({
                 "ip": ip,
                 "mac": normalize_mac(mac),
-                "identity": identity if identity else mac,
+                "identity": identity,
+                "scan_hostname": scan_hostname,
                 "netbios": netbios,
                 "interface": iface
             })
@@ -391,7 +413,12 @@ def parse_ip_scan(output: str) -> List[Dict[str, str]]:
             continue
         if line.lower().startswith("flags:"):
             continue
-        if "ADDRESS" in line.upper() and "NETBIOS" in line.upper():
+        if line.lower().startswith("columns:"):
+            header_seen = True
+            header_columns = {}
+            continue
+        upper_line = line.upper()
+        if "ADDRESS" in upper_line and "MAC-ADDRESS" in upper_line and ("NETBIOS" in upper_line or "DNS" in upper_line):
             header_seen = True
             upper = raw_line.upper()
             header_columns = {
@@ -411,18 +438,29 @@ def parse_ip_scan(output: str) -> List[Dict[str, str]]:
                 ip = ip_match.group(0)
                 mac_match = re.search(r"(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", raw_line)
                 mac = mac_match.group(0) if mac_match else ""
+                scan_hostname = ""
                 netbios = ""
+                dns_idx = header_columns.get("dns", -1)
                 netbios_idx = header_columns.get("netbios", -1)
+                if dns_idx != -1 and len(raw_line) > dns_idx:
+                    next_idxs = [idx for idx in (netbios_idx,) if idx != -1 and idx > dns_idx]
+                    end_idx = min(next_idxs) if next_idxs else None
+                    scan_hostname = clean_scan_hostname(raw_line[dns_idx:end_idx].strip() if end_idx else raw_line[dns_idx:].strip())
                 if netbios_idx != -1 and len(raw_line) > netbios_idx:
-                    netbios = raw_line[netbios_idx:].strip()
-                elif mac_match:
+                    netbios = clean_scan_hostname(raw_line[netbios_idx:].strip())
+                elif dns_idx == -1 and netbios_idx == -1 and mac_match:
                     tail = raw_line[mac_match.end():].strip()
                     tail_parts = tail.split()
-                    netbios = tail_parts[-1] if len(tail_parts) > 1 else ""
+                    if len(tail_parts) > 1:
+                        # Position-based fallback is usually NETBIOS. Treat it
+                        # as the weakest hostname source so DHCP can override it.
+                        netbios = clean_scan_hostname(tail_parts[-1])
+                identity = scan_hostname or netbios or mac
                 devices.append({
                     "ip": ip,
                     "mac": normalize_mac(mac) if mac else "",
-                    "identity": netbios if netbios else mac,
+                    "identity": identity,
+                    "scan_hostname": scan_hostname,
                     "netbios": netbios,
                     "interface": None
                 })
@@ -1143,9 +1181,10 @@ def main() -> None:
                 ip_match = dhcp_hostnames.get("by_ip", {}).get(ip) if ip else None
                 mac_key = normalize_mac(mac) if mac else None
                 mac_match = dhcp_hostnames.get("by_mac", {}).get(mac_key) if mac_key else None
-                scan_label = (item.get("netbios") or item.get("identity") or "").strip()
-                scan_has_real_name = bool(scan_label) and not is_mac_name(scan_label)
-                scan_is_truncated = is_truncated_name(scan_label)
+                scan_hostname = (item.get("scan_hostname") or "").strip()
+                netbios_label = (item.get("netbios") or "").strip()
+                scan_has_real_name = bool(scan_hostname) and not is_mac_name(scan_hostname)
+                scan_is_truncated = is_truncated_name(scan_hostname)
                 is_catch_ip_thief = False
                 if catch_ip_thieves and ip and not ip_match:
                     active_ips = dhcp_hostnames.get("active_ips", set())
@@ -1163,6 +1202,8 @@ def main() -> None:
                 elif mac_match and not scan_has_real_name and not is_catch_ip_thief:
                     item["dhcp_hostname"] = mac_match
                     dhcp_hits += 1
+                if not scan_has_real_name and netbios_label:
+                    item["identity"] = item.get("dhcp_hostname") or netbios_label
                 if is_catch_ip_thief:
                     item["catch_ip_thief"] = True
                 devices.append(item)
@@ -1178,18 +1219,18 @@ def main() -> None:
             continue
         ip = d.get("ip")
         vendor = lookup_vendor(mac, oui_ranges)
-        scan_name = d.get("netbios") or d.get("identity") or vendor or mac
-        name = scan_name
+        scan_name = d.get("scan_hostname") or ""
+        netbios_name = d.get("netbios") or ""
         dhcp_name = d.get("dhcp_hostname") or ""
-        if dhcp_name:
-            name = dhcp_name
+        name = scan_name or dhcp_name or netbios_name or vendor or mac
+        record_scan_name = scan_name or netbios_name or name
         catch_ip_thief = bool(d.get("catch_ip_thief"))
         oui = normalize_mac(mac)[:8]
         rec = DeviceRecord(
             mac=mac,
             ip=ip,
             name=name,
-            scan_name=scan_name,
+            scan_name=record_scan_name,
             dhcp_name=dhcp_name,
             iface=d.get("interface"),
             vendor=vendor,

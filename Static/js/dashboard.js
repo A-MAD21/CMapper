@@ -229,37 +229,14 @@ class NetworkPlatform {
         
 
     updateMapTab() {
-        const siteSelect = document.getElementById('mapSiteSelect');
-        if (!siteSelect) return;
-        
-        // Store current selection
-        const currentValue = siteSelect.value;
-        
-        // Clear and repopulate
-        siteSelect.innerHTML = '<option value="">Select Site</option>';
-        
-        if (this.sites && this.sites.length > 0) {
-            this.sites.forEach(site => {
-                const option = document.createElement('option');
-                option.value = site.name;
-                option.textContent = site.name;
-                
-                // Auto-select current site
-                if (site.name === this.currentSite) {
-                    option.selected = true;
-                }
-                
-                siteSelect.appendChild(option);
-            });
+        const siteInput = document.getElementById('mapSiteSelect');
+        if (!siteInput) return;
+
+        const fallbackValue = this.currentMapSite || this.currentSite || '';
+        if (!siteInput.value && this.isKnownMapSite(fallbackValue)) {
+            siteInput.value = fallbackValue;
         }
-        
-        // Restore selection if it exists
-        if (currentValue) {
-            const optionExists = Array.from(siteSelect.options).some(opt => opt.value === currentValue);
-            if (optionExists) {
-                siteSelect.value = currentValue;
-            }
-        }
+        this.updateMapSiteOptions(siteInput.value);
         
         // Update Show Map button
         this.updateShowMapButton();
@@ -267,6 +244,86 @@ class NetworkPlatform {
         this.currentTextMapUrl = '';
         const downloadBtn = document.getElementById('downloadTextMapBtn');
         if (downloadBtn) downloadBtn.disabled = true;
+    }
+
+    getMapSiteNames() {
+        return (this.sites || [])
+            .map(site => site && site.name ? site.name : '')
+            .filter(Boolean);
+    }
+
+    isKnownMapSite(siteName) {
+        if (!siteName) return false;
+        return this.getMapSiteNames().includes(siteName);
+    }
+
+    getSelectedMapSite() {
+        const siteInput = document.getElementById('mapSiteSelect');
+        const value = (siteInput?.value || '').trim();
+        return this.isKnownMapSite(value) ? value : '';
+    }
+
+    getMapActionSite() {
+        const siteInput = document.getElementById('mapSiteSelect');
+        const value = (siteInput?.value || '').trim();
+        if (value) {
+            return this.isKnownMapSite(value) ? value : '';
+        }
+        return this.isKnownMapSite(this.currentSite) ? this.currentSite : '';
+    }
+
+    getFirstMapSiteMatch(searchText) {
+        const needle = (searchText || '').trim().toLowerCase();
+        if (!needle) return '';
+        return this.getMapSiteNames().find(name => name.toLowerCase().includes(needle)) || '';
+    }
+
+    updateMapSiteOptions(searchText = '') {
+        const dropdown = document.getElementById('mapSiteDropdown');
+        if (!dropdown) return;
+
+        const needle = (searchText || '').trim().toLowerCase();
+        const names = this.getMapSiteNames();
+        const filteredNames = needle
+            ? names.filter(name => name.toLowerCase().includes(needle))
+            : names;
+
+        dropdown.innerHTML = '';
+        if (!filteredNames.length) {
+            const empty = document.createElement('div');
+            empty.className = 'map-site-empty';
+            empty.textContent = 'No matching sites';
+            dropdown.appendChild(empty);
+        } else {
+            filteredNames.forEach(name => {
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.className = 'map-site-option';
+                option.dataset.site = name;
+                option.textContent = name;
+                dropdown.appendChild(option);
+            });
+        }
+        this.setMapSiteDropdownOpen(!!this.mapSiteDropdownOpen);
+    }
+
+    setMapSiteDropdownOpen(open) {
+        this.mapSiteDropdownOpen = !!open;
+        const dropdown = document.getElementById('mapSiteDropdown');
+        const input = document.getElementById('mapSiteSelect');
+        if (dropdown) dropdown.hidden = !this.mapSiteDropdownOpen;
+        if (input) input.setAttribute('aria-expanded', this.mapSiteDropdownOpen ? 'true' : 'false');
+    }
+
+    selectMapSite(siteName) {
+        if (!this.isKnownMapSite(siteName)) return;
+        const input = document.getElementById('mapSiteSelect');
+        if (input) input.value = siteName;
+        this.currentSite = siteName;
+        this.updateCurrentSiteDisplay();
+        this.updateMapSiteOptions(siteName);
+        this.setMapSiteDropdownOpen(false);
+        this.updateShowMapButton();
     }
 
     updateMapControls() {
@@ -289,7 +346,7 @@ class NetworkPlatform {
         
         if (!siteSelect || !showMapBtn) return;
         
-        showMapBtn.disabled = !siteSelect.value;
+        showMapBtn.disabled = !this.isKnownMapSite(siteSelect.value);
     }
 
     getMapSpacing() {
@@ -546,7 +603,7 @@ class NetworkPlatform {
 
         // Generate map button
 document.getElementById('generateMapBtn')?.addEventListener('click', function() {
-    const siteName = document.getElementById('mapSiteSelect').value;
+    const siteName = platform.getMapActionSite ? platform.getMapActionSite() : document.getElementById('mapSiteSelect').value;
     if (!siteName) {
         platform.showError('Please select a site first');
         return;
@@ -595,7 +652,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', function() 
         });
 // Show text map
 document.getElementById('showTextMapBtn')?.addEventListener('click', async () => {
-    const siteName = document.getElementById('mapSiteSelect').value;
+    const siteName = platform.getMapActionSite ? platform.getMapActionSite() : document.getElementById('mapSiteSelect').value;
     if (siteName) {
         const btn = document.getElementById('showTextMapBtn');
         const originalText = btn.innerHTML;
@@ -650,7 +707,7 @@ function readErrorMessage(response, fallback) {
 
 // Show visual map  
 document.getElementById('showVisualMapBtn')?.addEventListener('click', async () => {
-    const siteName = document.getElementById('mapSiteSelect').value;
+    const siteName = platform.getMapActionSite ? platform.getMapActionSite() : document.getElementById('mapSiteSelect').value;
     if (siteName) {
         const btn = document.getElementById('showVisualMapBtn');
         const originalText = btn.innerHTML;
@@ -692,7 +749,7 @@ document.getElementById('showVisualMapBtn')?.addEventListener('click', async () 
 
 // Generate both maps
 document.getElementById('generateMapBtn')?.addEventListener('click', async () => {
-    const siteName = document.getElementById('mapSiteSelect').value;
+    const siteName = platform.getMapActionSite ? platform.getMapActionSite() : document.getElementById('mapSiteSelect').value;
     if (!siteName) {
         platform.showMessage('Please select a site first', 'warning');
         return;
@@ -749,6 +806,25 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         document.getElementById('saveSettingsBtn')?.addEventListener('click', () => {
             this.saveSettings();
         });
+        document.getElementById('auditLogRefreshBtn')?.addEventListener('click', () => {
+            this.auditLogPage = 1;
+            this.loadAuditEvents();
+        });
+        document.getElementById('auditLogDownloadBtn')?.addEventListener('click', () => {
+            this.downloadAuditLog();
+        });
+        document.getElementById('auditLogDay')?.addEventListener('change', () => {
+            this.auditLogPage = 1;
+            this.loadAuditEvents();
+        });
+        document.getElementById('auditLogPrevBtn')?.addEventListener('click', () => {
+            this.auditLogPage = Math.max(1, (this.auditLogPage || 1) - 1);
+            this.loadAuditEvents();
+        });
+        document.getElementById('auditLogNextBtn')?.addEventListener('click', () => {
+            this.auditLogPage = (this.auditLogPage || 1) + 1;
+            this.loadAuditEvents();
+        });
         document.getElementById('showCompletedJobs')?.addEventListener('change', (event) => {
             this.showCompletedJobs = !!event.target.checked;
             this.updateModuleJobs();
@@ -767,20 +843,78 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         // ==================== MAP TAB EVENT LISTENERS ====================
         
         // Map site selection
-        document.getElementById('mapSiteSelect')?.addEventListener('change', (e) => {
+        document.getElementById('mapSiteToggle')?.addEventListener('click', () => {
+            const input = document.getElementById('mapSiteSelect');
+            this.setMapSiteDropdownOpen(!this.mapSiteDropdownOpen);
+            this.updateMapSiteOptions(input?.value || '');
+            input?.focus();
+        });
+        document.getElementById('mapSiteSelect')?.addEventListener('input', (e) => {
+            const value = e.target.value || '';
+            this.setMapSiteDropdownOpen(true);
+            this.updateMapSiteOptions(value);
+            if (this.isKnownMapSite(value)) {
+                this.currentSite = value;
+                this.updateCurrentSiteDisplay();
+            }
             this.updateShowMapButton();
+        });
+        document.getElementById('mapSiteSelect')?.addEventListener('focus', (e) => {
+            this.setMapSiteDropdownOpen(true);
+            this.updateMapSiteOptions(e.target.value || '');
+        });
+        document.getElementById('mapSiteSelect')?.addEventListener('keydown', (e) => {
+            const input = document.getElementById('mapSiteSelect');
+            if (!input) return;
+            if (e.key === 'Escape') {
+                this.setMapSiteDropdownOpen(false);
+                return;
+            }
+            if (e.key !== 'Enter') return;
+            const selectedSite = this.isKnownMapSite(input.value)
+                ? input.value
+                : this.getFirstMapSiteMatch(input.value);
+            if (selectedSite) {
+                e.preventDefault();
+                this.selectMapSite(selectedSite);
+            }
+        });
+        document.getElementById('mapSiteSelect')?.addEventListener('change', (e) => {
+            const value = e.target.value || '';
+            if (this.isKnownMapSite(value)) {
+                this.selectMapSite(value);
+            }
+            this.updateMapSiteOptions(value);
+            this.updateShowMapButton();
+        });
+        document.getElementById('mapSiteDropdown')?.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+        });
+        document.getElementById('mapSiteDropdown')?.addEventListener('click', (e) => {
+            const option = e.target.closest('.map-site-option');
+            if (!option) return;
+            this.selectMapSite(option.dataset.site || '');
+        });
+        document.addEventListener('click', (e) => {
+            const combo = document.getElementById('mapSiteCombo');
+            if (combo && !combo.contains(e.target)) {
+                this.setMapSiteDropdownOpen(false);
+            }
         });
 
         document.getElementById('mapAddBtn')?.addEventListener('click', () => {
-            if (!this.currentSite) {
+            const siteName = this.getMapActionSite();
+            if (!siteName) {
                 this.showError('Select a site first');
                 return;
             }
+            this.currentSite = siteName;
+            this.updateCurrentSiteDisplay();
             this.openModuleById('add_device_manual');
         });
 
         document.getElementById('mapMacSearchBtn')?.addEventListener('click', () => {
-            const siteName = document.getElementById('mapSiteSelect')?.value || this.currentSite || '';
+            const siteName = this.getMapActionSite();
             if (!siteName) {
                 this.showError('Select a site first');
                 return;
@@ -793,7 +927,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         });
 
         document.getElementById('mapGroupBtn')?.addEventListener('click', () => {
-            const siteName = document.getElementById('mapSiteSelect')?.value || this.currentSite || '';
+            const siteName = this.getMapActionSite();
             if (!siteName) {
                 this.showError('Select a site first');
                 return;
@@ -828,7 +962,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         
         // Show Map button
         document.getElementById('showMapBtn')?.addEventListener('click', async () => {
-            const siteName = document.getElementById('mapSiteSelect').value;
+            const siteName = this.getMapActionSite();
             if (siteName) {
                 const btn = document.getElementById('showMapBtn');
                 const originalText = btn.innerHTML;
@@ -893,7 +1027,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         
         // Refresh map button
         document.getElementById('refreshMapBtn')?.addEventListener('click', () => {
-            const siteName = document.getElementById('mapSiteSelect').value;
+            const siteName = this.getMapActionSite();
             if (siteName) {
                 this.loadMapForSite(siteName);
             }
@@ -1153,6 +1287,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 this.applySettings();
                 if (this.currentUserRole === 'admin') {
                     this.renderModuleCredentials();
+                    this.loadAuditLogDays();
                 }
             }
         } catch (error) {
@@ -3032,6 +3167,10 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         if (dataTransferSection) {
             dataTransferSection.style.display = this.currentUserRole === 'admin' ? 'block' : 'none';
         }
+        const auditLogsSection = document.getElementById('auditLogsSection');
+        if (auditLogsSection) {
+            auditLogsSection.style.display = this.currentUserRole === 'admin' ? 'block' : 'none';
+        }
         const ouiRangesSection = document.getElementById('ouiRangesSection');
         if (ouiRangesSection) {
             ouiRangesSection.style.display = this.currentUserRole === 'admin' ? 'block' : 'none';
@@ -3056,6 +3195,109 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 this.renderSiteMultiSelect(addSites, [], (this.sites || []).map(site => site.name));
             }
         }
+    }
+
+    async loadAuditLogDays() {
+        if (this.currentUserRole !== 'admin') return;
+        const select = document.getElementById('auditLogDay');
+        if (!select) return;
+        const data = await this.fetchData('/api/audit/logs', { timeoutMs: 8000 });
+        const logs = data?.logs || [];
+        select.innerHTML = logs.length
+            ? logs.map(log => `<option value="${this.escapeHtml(log.day)}">${this.escapeHtml(log.day)} (${this.formatBytes(log.size || 0)})</option>`).join('')
+            : '<option value="">No logs yet</option>';
+        const meta = document.getElementById('auditLogsMeta');
+        if (meta) {
+            meta.textContent = `Audit logs are kept for ${data?.retention_days || 14} days.`;
+        }
+        if (logs.length) {
+            await this.loadAuditEvents();
+        } else {
+            this.renderAuditEvents([]);
+        }
+    }
+
+    async loadAuditEvents() {
+        if (this.currentUserRole !== 'admin') return;
+        const day = document.getElementById('auditLogDay')?.value || '';
+        if (!day) {
+            this.renderAuditEvents([]);
+            this.updateAuditPagination({ page: 1, pages: 1, has_prev: false, has_next: false });
+            return;
+        }
+        const eventFilter = document.getElementById('auditLogEvent')?.value.trim() || '';
+        const search = document.getElementById('auditLogSearch')?.value.trim() || '';
+        const page = Math.max(1, this.auditLogPage || 1);
+        const params = new URLSearchParams({ limit: '50', page: String(page) });
+        if (eventFilter) params.set('event', eventFilter);
+        if (search) params.set('q', search);
+        const data = await this.fetchData(`/api/audit/logs/${encodeURIComponent(day)}?${params.toString()}`, { timeoutMs: 10000 });
+        if (data?.page) {
+            this.auditLogPage = data.page;
+        }
+        this.renderAuditEvents(data?.events || []);
+        const meta = document.getElementById('auditLogsMeta');
+        if (meta && data) {
+            meta.textContent = `Showing ${data.count || 0} of ${data.total || 0} event(s) from ${day}. Raw files are retained for 14 days.`;
+        }
+        this.updateAuditPagination(data);
+    }
+
+    renderAuditEvents(events) {
+        const body = document.getElementById('auditLogsTableBody');
+        if (!body) return;
+        if (!events.length) {
+            body.innerHTML = '<tr><td colspan="5">No audit events</td></tr>';
+            return;
+        }
+        body.innerHTML = events.map(event => {
+            const details = { ...event };
+            ['ts', 'event', 'actor', 'role', 'client_ip', 'user_agent'].forEach(key => delete details[key]);
+            const detailText = JSON.stringify(details);
+            return `
+                <tr>
+                    <td>${this.escapeHtml(this.formatDateTime(event.ts))}</td>
+                    <td>${this.escapeHtml(event.event || '')}</td>
+                    <td>${this.escapeHtml(event.actor || '')}</td>
+                    <td>${this.escapeHtml(event.client_ip || '')}</td>
+                    <td><code style="white-space: pre-wrap;">${this.escapeHtml(detailText)}</code></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    updateAuditPagination(data) {
+        const pageInfo = document.getElementById('auditLogPageInfo');
+        const prevBtn = document.getElementById('auditLogPrevBtn');
+        const nextBtn = document.getElementById('auditLogNextBtn');
+        const page = data?.page || 1;
+        const pages = data?.pages || 1;
+        if (pageInfo) {
+            pageInfo.textContent = `Page ${page} / ${pages}`;
+        }
+        if (prevBtn) {
+            prevBtn.disabled = !data?.has_prev;
+        }
+        if (nextBtn) {
+            nextBtn.disabled = !data?.has_next;
+        }
+    }
+
+    downloadAuditLog() {
+        if (this.currentUserRole !== 'admin') return;
+        const day = document.getElementById('auditLogDay')?.value || '';
+        if (!day) {
+            this.showError('No audit log selected');
+            return;
+        }
+        window.location.href = `/api/audit/logs/${encodeURIComponent(day)}/download`;
+    }
+
+    formatBytes(value) {
+        const bytes = Number(value) || 0;
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     }
 
     updateCurrentSiteDisplay() {

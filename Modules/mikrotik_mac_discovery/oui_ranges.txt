@@ -13,7 +13,7 @@ F0:92:1C:00:00:00-F0:92:1C:FF:FF:FF=Server,device_type=server
 B4:29:3D:00:00:00-B4:29:3D:FF:FF:FF=PDA,device_type=pda
 E4:F1:4C:00:00:00-E4:F1:4C:FF:FF:FF=UniviewNVR,device_type=nvr
 E0:63:DA:00:00:00-E0:63:DA:FF:FF:FF=APUnifi,device_type=ap
-18:C0:4D:00:00:00-18:C0:4D:FF:FF:FF=APUnifi,device_type=pc
+18:C0:4D:00:00:00-18:C0:4D:FF:FF:FF=PC,device_type=pc
 C4:14:3C:00:00:00-C4:14:3C:FF:FF:FF=Cisco,device_type=switch
 18:E8:29:00:00:00-18:E8:29:FF:FF:FF=APUbiquiti,device_type=ap
 24:E9:B3:00:00:00-24:E9:B3:FF:FF:FF=Cisco,device_type=switch
@@ -370,3 +370,14 @@ A0:AD:9F:00:00:00-A0:AD:9F:FF:FF:FF=PC,device_type=pc
 CC:15:31:00:00:00-CC:15:31:FF:FF:FF=PC,device_type=pc
 4C:5F:70:00:00:00-4C:5F:70:FF:FF:FF=PC,device_type=pc
 C4:EF:BB:00:00:00-C4:EF:BB:FF:FF:FF=PC,device_type=pc
+50:98:39:00:00:00-50:98:39:FF:FF:FF=Xiaomi,device_type=phone
+62:9B:F9:00:00:00-62:9B:F9:FF:FF:FF=Xiaomi,device_type=phone
+B6:70:1B:00:00:00-B6:70:1B:FF:FF:FF=Phone,device_type=phone
+9E:CF:DF:00:00:00-9E:CF:DF:FF:FF:FF=Phone,device_type=phone
+46:6A:F2:00:00:00-46:6A:F2:FF:FF:FF=phone,device_type=phone
+33:66:55:00:00:00-33:66:55:FF:FF:FF=PDA,device_type=pda
+3C:20:F6:00:00:00-3C:20:F6:FF:FF:FF=phone,device_type=phone
+9C:28:F7:00:00:00-9C:28:F7:FF:FF:FF=xiaomi,device_type=phone
+5A:6C:A5:00:00:00-5A:6C:A5:FF:FF:FF=samsung,device_type=phone
+68:E4:3B:00:00:00-68:E4:3B:FF:FF:FF=PC,device_type=pc
+48:88:CA:00:00:00-48:88:CA:FF:FF:FF=Motorolla,device_type=phone
