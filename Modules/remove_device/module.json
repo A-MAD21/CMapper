@@ -18,6 +18,13 @@
       "required": false,
       "default": true,
       "label": "Do not remove connected nodes (leave isolated)"
+    },
+    {
+      "name": "block_rediscovery",
+      "type": "checkbox",
+      "required": false,
+      "default": false,
+      "label": "Block removed device from rediscovery"
     }
   ],
   "outputs": [

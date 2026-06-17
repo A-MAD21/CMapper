@@ -541,6 +541,8 @@ def main() -> None:
         ssh_port = 22
     interface = (params.get("interface") or "").strip() or None
     address_range = params.get("address_range")
+    extra_address_ranges = params.get("extra_address_ranges") if isinstance(params.get("extra_address_ranges"), list) else []
+    extra_address_ranges = [str(r).strip() for r in extra_address_ranges if str(r or "").strip()]
     duration = int(params.get("scan_duration_s", 30) or 30)
     note = params.get("note") or None
     site_name = config.get("site_name") or params.get("site_name") or "default"
@@ -550,17 +552,22 @@ def main() -> None:
     use_dhcp_hostname = parse_bool(params.get("use_dhcp_hostname"), True)
     catch_ip_thieves = parse_bool(params.get("catch_ip_thieves"), False)
 
-    if address_range:
-        range_value = address_range.strip()
+    def _valid_scan_range(range_value: str) -> bool:
+        range_value = (range_value or "").strip()
         valid_range = re.match(r"^\d{1,3}(?:\.\d{1,3}){3}-\d{1,3}(?:\.\d{1,3}){3}$", range_value)
         valid_single = re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", range_value)
         valid_cidr = re.match(r"^\d{1,3}(?:\.\d{1,3}){3}/\d{1,2}$", range_value)
-        if not (valid_range or valid_single or valid_cidr):
+        return bool(valid_range or valid_single or valid_cidr)
+
+    if address_range:
+        range_value = address_range.strip()
+        if not _valid_scan_range(range_value):
             print(json.dumps({
                 "status": "error",
                 "message": "Invalid address range format. Use a single IP, CIDR, or start-end range like 10.192.111.1-10.192.111.126."
             }))
             return
+    extra_address_ranges = [r for r in extra_address_ranges if _valid_scan_range(r)]
 
     if address_range and not interface:
         interface = "ether1"
@@ -1008,9 +1015,6 @@ def main() -> None:
         }
 
     def resolve_scan_targets() -> List[Dict[str, str]]:
-        if address_range:
-            return [{"interface": interface, "range": address_range}]
-
         targets: List[Dict[str, str]] = []
         seen_targets: set[tuple[str, str]] = set()
 
@@ -1024,6 +1028,15 @@ def main() -> None:
                 return
             seen_targets.add(key)
             targets.append({"interface": iface, "range": target_range})
+
+        def add_site_extra_ranges() -> None:
+            for target_range in extra_address_ranges:
+                add_target(interface or "ether1", target_range)
+
+        if address_range:
+            add_target(interface or "ether1", address_range)
+            add_site_extra_ranges()
+            return targets
 
         dhcp_servers = parse_dhcp_servers()
         pool_map = parse_ip_pool_map()
@@ -1050,6 +1063,7 @@ def main() -> None:
         # outside the lease pool still need last_seen refreshed when ip-scan
         # sees them. DHCP lease names remain available as a naming fallback.
         if targets:
+            add_site_extra_ranges()
             return targets
 
         if interface:
@@ -1060,24 +1074,35 @@ def main() -> None:
                 for net in nets:
                     add_target(iface, net)
         if targets:
+            add_site_extra_ranges()
             return targets
 
         # Last resort: ip address print filtered or pool ranges without interface mapping
         addr_ranges = parse_ip_address_ranges(interface)
         if addr_ranges:
-            return [{"interface": interface or "ether1", "range": r} for r in addr_ranges]
+            for r in addr_ranges:
+                add_target(interface or "ether1", r)
+            add_site_extra_ranges()
+            return targets
         pool_ranges = parse_ip_pool_ranges()
         if pool_ranges:
-            return [{"interface": interface or "ether1", "range": r} for r in pool_ranges]
+            for r in pool_ranges:
+                add_target(interface or "ether1", r)
+            add_site_extra_ranges()
+            return targets
         try:
             fallback_network = str(ipaddress.ip_interface(f"{router_ip}/24").network)
-            return [{"interface": interface or "ether1", "range": fallback_network}]
+            add_target(interface or "ether1", fallback_network)
+            add_site_extra_ranges()
+            return targets
         except Exception:
-            return []
+            add_site_extra_ranges()
+            return targets
 
     devices: List[Dict[str, str]] = []
     seen_devices: set[tuple[str, str, str]] = set()
     seen_ips: set[str] = set()
+    seen_ip_macs: Dict[str, set[str]] = {}
     scan_paths = ["tool ip-scan"]
     dhcp_hostnames = parse_dhcp_leases() if use_dhcp_hostname else {
         "by_ip": {},
@@ -1170,6 +1195,8 @@ def main() -> None:
                         item["mac"] = lease_mac
                         item["identity"] = item.get("identity") or lease_mac
                         mac = lease_mac
+                if ip and mac:
+                    seen_ip_macs.setdefault(ip, set()).add(normalize_mac(mac).lower())
                 ip_key = (item.get("ip") or "").strip()
                 mac_key = normalize_mac(item.get("mac") or "") if item.get("mac") else ""
                 iface_key = (item.get("interface") or target_iface or "").strip()
@@ -1287,16 +1314,71 @@ def main() -> None:
         device_id = f"{mac_id}_{safe_site(site_name)}"
         if locked_collision(rec):
             continue
-        existing = next(
+        existing_by_mac = next(
             (d for d in database["devices"] if d.get("mac", "").lower() == rec.mac.lower() and d.get("site") == site_name),
             None
         )
+        ip_matches = []
+        if replace_on_ip and rec.ip:
+            ip_matches = [
+                d for d in database["devices"]
+                if d.get("site") == site_name
+                and d.get("ip") == rec.ip
+                and not d.get("locked")
+            ]
+
+        if replace_on_ip and rec.ip and existing_by_mac:
+            stale_ip_ids = {
+                d.get("id") for d in ip_matches
+                if d.get("id") and (d.get("mac") or "").lower() != rec.mac.lower()
+            }
+            if stale_ip_ids:
+                database["devices"] = [
+                    d for d in database["devices"]
+                    if d.get("id") not in stale_ip_ids
+                ]
+
+        existing = existing_by_mac
         matched_by_mac = existing is not None
-        if not existing and replace_on_ip and rec.ip:
+        if not existing and ip_matches:
             existing = next(
-                (d for d in database["devices"] if d.get("ip") == rec.ip and d.get("site") == site_name),
+                (
+                    d for d in ip_matches
+                    if (d.get("mac") or "").lower() == rec.mac.lower()
+                    or not (d.get("mac") or "").strip()
+                ),
                 None
-        )
+            )
+            if existing is None:
+                existing = ip_matches[0]
+            matched_by_mac = False
+
+        if replace_on_ip and existing and rec.ip:
+            stale_ip_ids = {
+                d.get("id") for d in ip_matches
+                if d.get("id")
+                and d.get("id") != existing.get("id")
+                and (d.get("mac") or "").lower() != rec.mac.lower()
+            }
+            if stale_ip_ids:
+                database["devices"] = [
+                    d for d in database["devices"]
+                    if d.get("id") not in stale_ip_ids
+                ]
+
+        if not existing and not replace_on_ip and rec.ip:
+            existing_same_ip_mac = next(
+                (
+                    d for d in database["devices"]
+                    if d.get("site") == site_name
+                    and d.get("ip") == rec.ip
+                    and (d.get("mac") or "").lower() == rec.mac.lower()
+                ),
+                None
+            )
+            if existing_same_ip_mac:
+                existing = existing_same_ip_mac
+                matched_by_mac = True
 
         if existing:
             if existing.get("locked"):
@@ -1382,6 +1464,10 @@ def main() -> None:
             if device_id_existing in touched_device_ids:
                 continue
             if (device.get("ip") or "").strip() not in seen_ips:
+                continue
+            device_mac = normalize_mac(device.get("mac") or "").lower() if device.get("mac") else ""
+            scan_macs = seen_ip_macs.get((device.get("ip") or "").strip(), set())
+            if device_mac and scan_macs and device_mac not in scan_macs:
                 continue
             device["last_seen"] = now
             touched_device_ids.add(device_id_existing)

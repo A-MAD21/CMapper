@@ -95,7 +95,10 @@ def generate_visual_map(site_name: str | None = None, spacing: Any = None) -> Di
             site_name = selected_site.get("name") or "default"
 
         all_devices = data.get("devices", [])
-        devices = [d for d in all_devices if d.get("site") == site_name]
+        devices = [
+            d for d in all_devices
+            if d.get("site") == site_name and not d.get("hide_from_map")
+        ]
         if not devices:
             return {"status": "error", "message": f"No devices found for site '{site_name}'"}
         root_ip = (selected_site.get("root_ip") or "").strip()

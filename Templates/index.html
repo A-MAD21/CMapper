@@ -206,6 +206,7 @@
                                     <th class="sortable" data-sort-target="dashboardSites" data-sort-key="name">Site Name</th>
                                     <th class="sortable" data-sort-target="dashboardSites" data-sort-key="root_ip">Root IP</th>
                                     <th class="sortable" data-sort-target="dashboardSites" data-sort-key="devices">Devices</th>
+                                    <th class="sortable" data-sort-target="dashboardSites" data-sort-key="map_reliable">Reliable Map</th>
                                     <th class="sortable" data-sort-target="dashboardSites" data-sort-key="last_scan">Last Scan</th>
                                     <th class="sortable" data-sort-target="dashboardSites" data-sort-key="status">Status</th>
                                     <th>Actions</th>
@@ -224,10 +225,18 @@
                 <div class="card">
                     <div class="card-header">
                         <h2>Manage Sites</h2>
-                        <button class="btn btn-primary" id="addSiteBtn2">
-                            <i data-feather="plus"></i>
-                            Add New Site
-                        </button>
+                        <div class="header-actions">
+                            <div class="site-selector">
+                                <select id="siteMapStatusSiteSelect">
+                                    <option value="">Select site</option>
+                                </select>
+                            </div>
+                            <div id="sitesMapStatusControl"></div>
+                            <button class="btn btn-primary" id="addSiteBtn2">
+                                <i data-feather="plus"></i>
+                                Add New Site
+                            </button>
+                        </div>
                     </div>
                     <div class="table-container">
                         <table class="data-table">
@@ -237,6 +246,7 @@
                                     <th class="sortable" data-sort-target="sites" data-sort-key="root_ip">Root IP</th>
                                     <th class="sortable" data-sort-target="sites" data-sort-key="created">Created</th>
                                     <th class="sortable" data-sort-target="sites" data-sort-key="devices">Devices</th>
+                                    <th class="sortable" data-sort-target="sites" data-sort-key="map_reliable">Reliable Map</th>
                                     <th class="sortable" data-sort-target="sites" data-sort-key="last_scan">Last Scan</th>
                                     <th class="sortable" data-sort-target="sites" data-sort-key="locked">Locked</th>
                                     <th>Actions</th>
@@ -269,6 +279,8 @@
                                     <option value="">All Networks</option>
                                 </select>
                             </div>
+                            <div id="deviceActiveScanRangesControl"></div>
+                            <div id="devicesMapStatusControl"></div>
                             <button class="btn btn-primary" id="exportDevicesBtn">
                                 <i data-feather="download"></i>
                                 Export Devices
@@ -276,6 +288,14 @@
                             <button class="btn btn-secondary" id="deleteSelectedDevicesBtn" disabled>
                                 <i data-feather="trash-2"></i>
                                 Remove Selected
+                            </button>
+                            <button class="btn btn-secondary" id="mapSelectedDevicesBtn" disabled>
+                                <i data-feather="map-pin"></i>
+                                Map Selected
+                            </button>
+                            <button class="btn btn-secondary" id="unmapSelectedDevicesBtn" disabled>
+                                <i data-feather="eye-off"></i>
+                                Unmap Selected
                             </button>
                             <button class="btn btn-secondary" id="deleteCatchedDevicesBtn">
                                 <i data-feather="slash"></i>
@@ -532,6 +552,7 @@
                                     <div class="map-site-dropdown" id="mapSiteDropdown" hidden></div>
                                 </div>
                             </div>
+                            <div id="mapMapStatusControl"></div>
                             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                                 <button class="btn btn-primary" id="showTextMapBtn">
                                     <i data-feather="list"></i> Text Map
@@ -1013,6 +1034,21 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="siteMapReliable">
+                                <span>Reliable map completed</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="siteMapReliableAt">Reliable Map Date / Time</label>
+                            <input type="datetime-local" id="siteMapReliableAt">
+                        </div>
+                        <div class="form-group">
+                            <label for="siteActiveScanRanges">Active MikroTik Scan Ranges</label>
+                            <textarea id="siteActiveScanRanges" rows="4" placeholder="10.192.109.0/24&#10;190.1.1.0/24"></textarea>
+                            <div class="form-hint">One range per line. MikroTik discovery scans these in addition to its default detected range.</div>
+                        </div>
+                        <div class="form-group">
                             <label for="siteNotes">Notes (Optional)</label>
                             <textarea id="siteNotes" rows="3" placeholder="Additional information about this site"></textarea>
                         </div>
@@ -1066,6 +1102,7 @@
                                 <option value="firewall">Firewall</option>
                                 <option value="ap">Access Point</option>
                                 <option value="nvr">NVR</option>
+                                <option value="camera">Camera</option>
                                 <option value="pda">PDA</option>
                                 <option value="server">Server</option>
                                 <option value="finger">Finger</option>
@@ -1111,6 +1148,12 @@
                             <label class="checkbox-label">
                                 <input type="checkbox" id="editDeviceAlwaysShowMap">
                                 <span>Always show on map (even if isolated)</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="editDeviceHideFromMap">
+                                <span>Hide from map</span>
                             </label>
                         </div>
                     </div>
@@ -1264,6 +1307,7 @@
                                 <option value="ap">AP</option>
                                 <option value="server">Server</option>
                                 <option value="nvr">NVR</option>
+                                <option value="camera">Camera</option>
                                 <option value="pda">PDA</option>
                                 <option value="host">Host</option>
                                 <option value="phone">Phone</option>

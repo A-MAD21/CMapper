@@ -24,24 +24,36 @@ print("=== CDP DISCOVERY MODULE STARTING ===", file=sys.stderr)
 
 # ==================== SSH CONNECTION ====================
 
-def connect_to_device(host, username, password):
+def _parse_port(value, default):
+    try:
+        port = int(value)
+        if 1 <= port <= 65535:
+            return port
+    except (TypeError, ValueError):
+        pass
+    return default
+
+
+def connect_to_device(host, username, password, ssh_port=22, telnet_port=23):
     """
     Try multiple methods to connect to Cisco device: SSH (Netmiko), SSH (paramiko), Telnet (Netmiko)
     Returns: (success, connection_object_or_error, method)
     """
+    ssh_port = _parse_port(ssh_port, 22)
+    telnet_port = _parse_port(telnet_port, 23)
     
     # Method 1: Try Netmiko first (best for network devices)
     try:
         from netmiko import ConnectHandler
         
-        print(f"DEBUG: Trying SSH-Netmiko to {host}", file=sys.stderr)
+        print(f"DEBUG: Trying SSH-Netmiko to {host}:{ssh_port}", file=sys.stderr)
         
         device = {
             'device_type': 'cisco_ios',
             'host': host,
             'username': username,
             'password': password,
-            'port': 22,
+            'port': ssh_port,
             'secret': '',  # Enable password if needed
             'timeout': 15,
             'global_delay_factor': 2,
@@ -60,7 +72,7 @@ def connect_to_device(host, username, password):
     try:
         import paramiko
         
-        print(f"DEBUG: Trying SSH-paramiko to {host}", file=sys.stderr)
+        print(f"DEBUG: Trying SSH-paramiko to {host}:{ssh_port}", file=sys.stderr)
         
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -68,7 +80,7 @@ def connect_to_device(host, username, password):
         # For old Cisco devices with diffie-hellman-group1-sha1
         try:
             # Try with algorithm forcing
-            transport = paramiko.Transport((host, 22))
+            transport = paramiko.Transport((host, ssh_port))
             
             # Set legacy algorithms for old Cisco
             transport.get_security_options().kex = [
@@ -88,6 +100,7 @@ def connect_to_device(host, username, password):
             # Fall back to normal connection
             client.connect(
                 hostname=host,
+                port=ssh_port,
                 username=username,
                 password=password,
                 timeout=15,
@@ -106,14 +119,14 @@ def connect_to_device(host, username, password):
     try:
         from netmiko import ConnectHandler
         
-        print(f"DEBUG: Trying telnet to {host}", file=sys.stderr)
+        print(f"DEBUG: Trying telnet to {host}:{telnet_port}", file=sys.stderr)
         
         device = {
             'device_type': 'cisco_ios_telnet',
             'host': host,
             'username': username,
             'password': password,
-            'port': 23,
+            'port': telnet_port,
             'secret': '',  # Enable password if needed
             'timeout': 15,
             'global_delay_factor': 2,
@@ -470,6 +483,8 @@ def main():
     password = params.get("password", "").strip()
     subnet_mask = params.get("subnet_mask", "24")
     max_hops = int(params.get("max_hops", 3))
+    ssh_port = _parse_port(params.get("ssh_port", 22), 22)
+    telnet_port = _parse_port(params.get("telnet_port", 23), 23)
     
     db_path = config.get("database_path")
     
@@ -489,7 +504,7 @@ def main():
         print(json.dumps(error_msg))
         sys.exit(1)
     
-    print(f"DEBUG: Starting CDP discovery from {root_ip}/{subnet_mask}", file=sys.stderr)
+    print(f"DEBUG: Starting CDP discovery from {root_ip}/{subnet_mask} (ssh_port={ssh_port}, telnet_port={telnet_port})", file=sys.stderr)
     
     # 4. Read current database
     database = read_json_store(db_path, "devices")
@@ -543,7 +558,7 @@ def main():
         scanned_ips.add(current_ip)
         
         # Try to connect and get CDP
-        success, connection, method = connect_to_device(current_ip, username, password)
+        success, connection, method = connect_to_device(current_ip, username, password, ssh_port=ssh_port, telnet_port=telnet_port)
         
         if success:
             print(f"✓ Connected to {current_ip} via {method}", file=sys.stderr)

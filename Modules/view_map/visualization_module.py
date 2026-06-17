@@ -27,7 +27,7 @@ def generate_network_map(database, site_name, output_dir="static/maps"):
         # Find devices for this site
         site_devices = [
             d for d in database.get("devices", []) 
-            if d.get("site") == site_name
+            if d.get("site") == site_name and not d.get("hide_from_map")
         ]
         
         if not site_devices:
@@ -77,6 +77,8 @@ def generate_network_map(database, site_name, output_dir="static/maps"):
             "other": "host.png",
             "unknown": "host.png"
         }
+
+        visible_device_ids = {device.get("id") for device in site_devices}
 
         # Process each device
         for device in site_devices:
@@ -131,7 +133,7 @@ def generate_network_map(database, site_name, output_dir="static/maps"):
             
             # Process connections
             for conn in device.get("connections", []):
-                if 'remote_device' in conn:
+                if 'remote_device' in conn and conn.get("remote_device") in visible_device_ids:
                     connection_edge = {
                         'id': conn.get("id", f"conn_{uuid.uuid4().hex[:8]}"),
                         'from': device_id,

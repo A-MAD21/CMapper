@@ -313,6 +313,77 @@ def normalize_mac(value: str) -> str:
         mac = ":".join(mac[i:i+2] for i in range(0, 12, 2))
     return mac.upper()
 
+def _device_block(device, actor=None):
+    if not isinstance(device, dict):
+        return None
+    return {
+        "id": device.get("id") or "",
+        "site": device.get("site") or "",
+        "ip": device.get("ip") or "",
+        "mac": normalize_mac(device.get("mac") or ""),
+        "name": device.get("name") or "",
+        "blocked_at": datetime.now().isoformat(),
+        "blocked_by": actor or "",
+    }
+
+def _same_device_block(left, right):
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return False
+    if left.get("site") != right.get("site"):
+        return False
+    left_mac = normalize_mac(left.get("mac") or "")
+    right_mac = normalize_mac(right.get("mac") or "")
+    if left_mac and right_mac and left_mac == right_mac:
+        return True
+    if left.get("id") and right.get("id") and left.get("id") == right.get("id"):
+        return True
+    if not left_mac and not right_mac and left.get("ip") and left.get("ip") == right.get("ip"):
+        return True
+    return False
+
+def _add_device_block(data, device, actor=None):
+    block = _device_block(device, actor=actor)
+    if not block or not block.get("site"):
+        return
+    meta = data.setdefault("meta", {})
+    blocks = meta.setdefault("blocked_devices", [])
+    blocks[:] = [item for item in blocks if not _same_device_block(item, block)]
+    blocks.append(block)
+    meta["last_modified"] = datetime.now().isoformat()
+
+def _normalize_site_ranges(value):
+    if isinstance(value, str):
+        lines = re.split(r"[\n,;]+", value)
+    elif isinstance(value, list):
+        lines = value
+    else:
+        lines = []
+    ranges = []
+    seen = set()
+    cidr_re = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}/\d{1,2}$")
+    range_re = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}-\d{1,3}(?:\.\d{1,3}){3}$")
+    single_re = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+    for item in lines:
+        text = str(item or "").strip()
+        if not text:
+            continue
+        if not (cidr_re.match(text) or range_re.match(text) or single_re.match(text)):
+            continue
+        if text in seen:
+            continue
+        seen.add(text)
+        ranges.append(text)
+    return ranges
+
+def _site_active_scan_ranges(site_name):
+    if not site_name:
+        return []
+    data = read_database() or {}
+    site = next((s for s in data.get("sites", []) if isinstance(s, dict) and s.get("name") == site_name), None)
+    if not site:
+        return []
+    return _normalize_site_ranges(site.get("active_scan_ranges") or [])
+
 def _read_legacy_database_with_salvage():
     def _cleanup_corrupt_backups():
         cutoff = time.time() - (CORRUPT_RETENTION_DAYS * 86400)
@@ -1200,6 +1271,37 @@ def _safe_site_name(site_name):
         return ""
     return "".join(ch for ch in str(site_name) if ch.isalnum() or ch in ("-", "_")).strip().lower()
 
+def _invalidate_generated_maps(site_names):
+    if isinstance(site_names, str):
+        site_names = [site_names]
+    for site_name in site_names or []:
+        if not site_name:
+            continue
+        safe_site = _safe_site_name(site_name)
+        safe_site_raw = "".join(ch for ch in str(site_name) if ch.isalnum() or ch in ("-", "_")).strip()
+        patterns = [
+            os.path.join(GENERATED_MAPS_DIR, f"{site_name}_visual_map*.html"),
+            os.path.join(GENERATED_MAPS_DIR, f"{site_name}_text_map*.txt"),
+            os.path.join(GENERATED_MAPS_DIR, f"{site_name}_map*.html"),
+            os.path.join(GENERATED_MAPS_DIR, f"{safe_site}_visual_map*.html"),
+            os.path.join(GENERATED_MAPS_DIR, f"{safe_site}_text_map*.txt"),
+            os.path.join(GENERATED_MAPS_DIR, f"{safe_site}_map*.html"),
+            os.path.join(GENERATED_MAPS_DIR, f"{safe_site_raw}_visual_map*.html"),
+            os.path.join(GENERATED_MAPS_DIR, f"{safe_site_raw}_text_map*.txt"),
+            os.path.join(GENERATED_MAPS_DIR, f"{safe_site_raw}_map*.html"),
+            os.path.join(BASE_DIR, "maps", f"{site_name}_visual_map*.html"),
+            os.path.join(BASE_DIR, "maps", f"{safe_site}_visual_map*.html"),
+            os.path.join(BASE_DIR, "maps", f"{safe_site_raw}_visual_map*.html"),
+            os.path.join(BASE_DIR, "static", "maps", f"{safe_site}*.html"),
+            os.path.join(BASE_DIR, "Static", "maps", f"{safe_site}*.html"),
+        ]
+        for pattern in patterns:
+            for path in glob.glob(pattern):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+
 def _auth_required():
     auth = _get_auth_config()
     return auth["enabled"] and len(auth["users"]) > 0
@@ -2004,6 +2106,13 @@ class ScheduleRunner:
                 params["nic"] = "NIC1"
             if module_id == "uniview_nvr_capture" and not params.get("ip_mode"):
                 params["ip_mode"] = "filter"
+            if module_id == "mikrotik_mac_discovery":
+                site_ranges = _site_active_scan_ranges(site_name)
+                if site_ranges:
+                    existing_ranges = params.get("extra_address_ranges")
+                    if not isinstance(existing_ranges, list):
+                        existing_ranges = []
+                    params["extra_address_ranges"] = _normalize_site_ranges(existing_ranges + site_ranges)
             credential_profile = entry.get("credential_profile")
             if credential_profile:
                 profiles = module_creds.get(module_id, []) if isinstance(module_creds, dict) else []
@@ -2221,6 +2330,9 @@ def handle_sites():
             "created": datetime.now().isoformat(),
             "last_scan": None,
             "locked": False,
+            "map_reliable": bool(site_data.get("map_reliable")),
+            "map_reliable_at": (site_data.get("map_reliable_at") or "") if site_data.get("map_reliable") else "",
+            "active_scan_ranges": _normalize_site_ranges(site_data.get("active_scan_ranges")),
             "notes": site_data.get("notes", "")
         }
         
@@ -2351,12 +2463,20 @@ def handle_site(site_id):
         current_site = data["sites"][site_index]
         old_name = current_site.get("name")
         
-        for field in ["name", "root_ip", "notes", "locked"]:
+        for field in ["name", "root_ip", "notes", "locked", "map_reliable", "map_reliable_at", "active_scan_ranges"]:
             if field in update_data:
                 value = update_data[field]
                 if field == "name" and isinstance(value, str):
                     value = value.strip()
+                if field == "map_reliable":
+                    value = bool(value)
+                if field == "active_scan_ranges":
+                    value = _normalize_site_ranges(value)
                 current_site[field] = value
+        if not current_site.get("map_reliable"):
+            current_site["map_reliable_at"] = ""
+        elif not current_site.get("map_reliable_at"):
+            current_site["map_reliable_at"] = datetime.now().isoformat(timespec="minutes")
 
         new_name = current_site.get("name")
         if old_name and new_name and old_name != new_name:
@@ -2390,6 +2510,34 @@ def handle_site(site_id):
         data["devices"] = [d for d in data.get("devices", []) if d.get("site") != site_name]
         write_database(data)
         return jsonify({"success": True})
+
+@app.route('/api/sites/<site_id>/map_status', methods=['POST'])
+def update_site_map_status(site_id):
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if user.get("role") == "guest":
+        return jsonify({"error": "forbidden"}), 403
+
+    data = read_database()
+    site = next((s for s in data.get("sites", []) if s.get("id") == site_id), None)
+    if not site:
+        return jsonify({"error": "site_not_found"}), 404
+    if not _can_write_site(user, site.get("name")):
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json() or {}
+    reliable = bool(payload.get("map_reliable"))
+    mapped_at = str(payload.get("map_reliable_at") or "").strip()
+    if reliable and not mapped_at:
+        mapped_at = datetime.now().isoformat(timespec="minutes")
+
+    site["map_reliable"] = reliable
+    site["map_reliable_at"] = mapped_at if reliable else ""
+    site["last_modified"] = datetime.now().isoformat()
+    data.setdefault("meta", {})["last_modified"] = datetime.now().isoformat()
+    write_database(data)
+    return jsonify({"success": True, "site": site})
 
 @app.route('/api/devices')
 def get_devices():
@@ -2443,6 +2591,7 @@ def handle_device(device_id):
             "notes",
             "locked",
             "always_show_on_map",
+            "hide_from_map",
             "os",
             "vendor",
             "platform",
@@ -2570,12 +2719,17 @@ def handle_device(device_id):
 
         current_device["last_modified"] = datetime.now().isoformat()
         write_database(data)
+        if "hide_from_map" in update_data or "always_show_on_map" in update_data:
+            _invalidate_generated_maps(current_device.get("site"))
         return jsonify(current_device)
     
     elif request.method == 'DELETE':
-        data["devices"].pop(device_index)
+        removed_device = data["devices"].pop(device_index)
+        block_rediscovery = (request.args.get("block") or "").lower() in ("1", "true", "yes", "on")
+        if block_rediscovery:
+            _add_device_block(data, removed_device, actor=user.get("username"))
         write_database(data)
-        return jsonify({"success": True})
+        return jsonify({"success": True, "blocked": block_rediscovery})
 
 @app.route('/api/devices/bulk_delete', methods=['POST'])
 def bulk_delete_devices():
@@ -2586,6 +2740,7 @@ def bulk_delete_devices():
         return jsonify({"error": "forbidden"}), 403
     payload = request.get_json() or {}
     ids = payload.get("ids") or []
+    block_rediscovery = bool(payload.get("block"))
     if not isinstance(ids, list) or not ids:
         return jsonify({"error": "ids_required"}), 400
     ids = [i for i in ids if isinstance(i, str) and i.strip()]
@@ -2605,6 +2760,8 @@ def bulk_delete_devices():
                 forbidden.append(device_id)
                 remaining.append(device)
             else:
+                if block_rediscovery:
+                    _add_device_block(data, device, actor=user.get("username"))
                 deleted.append(device_id)
         else:
             remaining.append(device)
@@ -2615,6 +2772,54 @@ def bulk_delete_devices():
     return jsonify({
         "success": True,
         "deleted": deleted,
+        "blocked": block_rediscovery,
+        "forbidden": forbidden,
+        "missing": missing
+    })
+
+@app.route('/api/devices/bulk_map_visibility', methods=['POST'])
+def bulk_update_device_map_visibility():
+    user = _get_effective_user()
+    if not user:
+        return jsonify({"error": "auth_required"}), 401
+    if user.get("role") == "guest":
+        return jsonify({"error": "forbidden"}), 403
+    payload = request.get_json() or {}
+    ids = payload.get("ids") or []
+    visible = bool(payload.get("visible"))
+    if not isinstance(ids, list) or not ids:
+        return jsonify({"error": "ids_required"}), 400
+    ids = [i for i in ids if isinstance(i, str) and i.strip()]
+    if not ids:
+        return jsonify({"error": "ids_required"}), 400
+
+    data = read_database()
+    id_set = set(ids)
+    updated = []
+    forbidden = []
+    affected_sites = set()
+    for device in data.get("devices", []):
+        device_id = device.get("id")
+        if device_id not in id_set:
+            continue
+        if not _can_write_site(user, device.get("site")):
+            forbidden.append(device_id)
+            continue
+        device["hide_from_map"] = not visible
+        if visible:
+            device["always_show_on_map"] = True
+        device["last_modified"] = datetime.now().isoformat()
+        updated.append(device_id)
+        if device.get("site"):
+            affected_sites.add(device.get("site"))
+
+    write_database(data)
+    _invalidate_generated_maps(affected_sites)
+    missing = [i for i in ids if i not in updated and i not in forbidden]
+    return jsonify({
+        "success": True,
+        "updated": updated,
+        "visible": visible,
         "forbidden": forbidden,
         "missing": missing
     })
@@ -2727,6 +2932,13 @@ def run_module(module_id):
     
     print(f"Module {module_id} found. Starting execution...", file=sys.stderr)
     params = config.get("parameters") if isinstance(config.get("parameters"), dict) else {}
+    if module_id == "mikrotik_mac_discovery":
+        site_ranges = _site_active_scan_ranges(site_name)
+        if site_ranges:
+            existing_ranges = params.get("extra_address_ranges")
+            if not isinstance(existing_ranges, list):
+                existing_ranges = []
+            params["extra_address_ranges"] = _normalize_site_ranges(existing_ranges + site_ranges)
     config["_audit"] = {
         "actor": user.get("username"),
         "role": user.get("role"),
@@ -3338,6 +3550,7 @@ def get_map_for_site(site_name):
             return jsonify({"error": "forbidden"}), 403
 
         safe_site = _safe_site_name(site_name)
+        safe_site_raw = "".join(ch for ch in str(site_name) if ch.isalnum() or ch in ("-", "_")).strip()
 
         def _find_latest(patterns):
             candidates = []
@@ -3355,6 +3568,9 @@ def get_map_for_site(site_name):
             f"generated_maps/{safe_site}_visual_map*.html",
             f"maps/{safe_site}_visual_map*.html",
             f"{safe_site}_visual_map*.html",
+            f"generated_maps/{safe_site_raw}_visual_map*.html",
+            f"maps/{safe_site_raw}_visual_map*.html",
+            f"{safe_site_raw}_visual_map*.html",
         ])
         text = _find_latest([
             f"generated_maps/{site_name}_text_map*.txt",
@@ -3365,6 +3581,10 @@ def get_map_for_site(site_name):
             f"generated_maps/{safe_site}_map*.html",
             f"maps/{safe_site}_map*.html",
             f"{safe_site}_map*.html",
+            f"generated_maps/{safe_site_raw}_text_map*.txt",
+            f"generated_maps/{safe_site_raw}_map*.html",
+            f"maps/{safe_site_raw}_map*.html",
+            f"{safe_site_raw}_map*.html",
         ])
 
         path = visual or text
@@ -4254,29 +4474,20 @@ def get_stats():
         unknown_rate.append({"site": name, "rate": round(rate, 1), "unknown": unk, "total": total})
     unknown_rate.sort(key=lambda x: x["rate"], reverse=True)
 
-    # Uncompleted maps (no generated visual map)
-    def _site_has_visual_map(site_name: str) -> bool:
-        if not site_name:
-            return False
-        safe_site = site_name.replace("/", "_").replace("\\", "_").replace(":", "_")
-        patterns = [
-            os.path.join(GENERATED_MAPS_DIR, f"{site_name}_visual_map*.html"),
-            os.path.join(GENERATED_MAPS_DIR, f"{safe_site}_visual_map*.html"),
-            os.path.join("maps", f"{site_name}_visual_map*.html"),
-            os.path.join("maps", f"{safe_site}_visual_map*.html"),
-            f"{site_name}_visual_map*.html",
-            f"{safe_site}_visual_map*.html"
-        ]
-        for pattern in patterns:
-            if glob.glob(pattern):
-                return True
-        return False
-
-    uncompleted_maps = []
+    unreliable_maps = []
+    reliable_maps = []
     for site in sites:
         name = site.get("name") or ""
-        if not _site_has_visual_map(name):
-            uncompleted_maps.append(name)
+        if site.get("map_reliable"):
+            reliable_maps.append({
+                "site": name,
+                "mapped_at": site.get("map_reliable_at") or ""
+            })
+        else:
+            unreliable_maps.append(name)
+    unreliable_map_count = len(unreliable_maps)
+    reliable_map_count = len(reliable_maps)
+    unreliable_map_rate = round((unreliable_map_count / len(sites)) * 100, 1) if sites else 0
 
     # Catched IPs
     catched_by_site = {}
@@ -4309,7 +4520,12 @@ def get_stats():
         "sites_no_router": sites_no_router,
         "stale_sites": stale_sites,
         "unknown_rate_sites": unknown_rate[:5],
-        "uncompleted_maps": uncompleted_maps,
+        "uncompleted_maps": unreliable_maps,
+        "unreliable_maps": unreliable_maps,
+        "unreliable_map_count": unreliable_map_count,
+        "unreliable_map_rate": unreliable_map_rate,
+        "reliable_map_count": reliable_map_count,
+        "reliable_maps": reliable_maps,
         "catched_sites": catched_sites[:5],
         "catched_total": sum(catched_by_site.values()),
         "pc_no_domain_sites": pc_no_domain_sites[:10],

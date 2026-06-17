@@ -202,7 +202,10 @@ def generate_map_from_database(site_name: str | None = None) -> Dict[str, Any]:
 
         # Devices for site
         all_devices = data.get("devices", [])
-        devices = [d for d in all_devices if d.get("site") == site_name]
+        devices = [
+            d for d in all_devices
+            if d.get("site") == site_name and not d.get("hide_from_map")
+        ]
         if not devices:
             return {"status": "error", "message": f"No devices found for site '{site_name}'"}
 

@@ -1,0 +1,72 @@
+{
+  "id": "uniview_device_type_check",
+  "name": "Uniview Device Type Check",
+  "version": "1.0",
+  "description": "Checks Uniview NVR-labeled devices and reclassifies IPC cameras as camera nodes, then locks them from module updates.",
+  "author": "System",
+  "entry_point": "uniview_device_type_check.py",
+  "inputs": [
+    {
+      "name": "targets",
+      "type": "device_table",
+      "required": false,
+      "label": "Target NVRs",
+      "description": "Select NVR devices, or leave empty to check every NVR in the current site.",
+      "device_types": ["nvr"]
+    },
+    {
+      "name": "timeout_seconds",
+      "type": "number",
+      "required": false,
+      "default": 10,
+      "label": "HTTP Timeout (seconds)",
+      "min": 3,
+      "max": 60
+    },
+    {
+      "name": "concurrency",
+      "type": "number",
+      "required": false,
+      "default": 6,
+      "label": "Parallel Checks",
+      "min": 1,
+      "max": 32
+    },
+    {
+      "name": "lock_camera_nodes",
+      "type": "checkbox",
+      "required": false,
+      "default": true,
+      "label": "Lock IPC camera nodes",
+      "description": "When an IPC device is detected, lock the node so OUI/module updates cannot change it back."
+    },
+    {
+      "name": "override_locked",
+      "type": "checkbox",
+      "required": false,
+      "default": false,
+      "label": "Check locked nodes",
+      "description": "Normally locked devices are skipped. Enable only when intentionally correcting locked NVR rows."
+    },
+    {
+      "name": "trace_output",
+      "type": "select",
+      "required": false,
+      "default": "false",
+      "options": ["false", "true"],
+      "label": "Trace HTTP Output"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "updated",
+      "type": "number",
+      "description": "Number of NVR rows changed to camera."
+    },
+    {
+      "name": "checked",
+      "type": "number",
+      "description": "Number of devices checked."
+    }
+  ]
+}

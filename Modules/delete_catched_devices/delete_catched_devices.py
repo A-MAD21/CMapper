@@ -18,6 +18,43 @@ if SHARED_DIR not in sys.path:
 from sqlite_store import read_json_store, write_json_store
 
 
+def normalize_mac(value: str) -> str:
+    mac = (value or "").strip().replace("-", ":").replace(".", "")
+    if len(mac) == 12:
+        mac = ":".join(mac[i:i + 2] for i in range(0, 12, 2))
+    return mac.upper()
+
+
+def _same_block(left, right):
+    if left.get("site") != right.get("site"):
+        return False
+    left_mac = normalize_mac(left.get("mac") or "")
+    right_mac = normalize_mac(right.get("mac") or "")
+    if left_mac and right_mac and left_mac == right_mac:
+        return True
+    if left.get("id") and right.get("id") and left.get("id") == right.get("id"):
+        return True
+    if not left_mac and not right_mac and left.get("ip") and left.get("ip") == right.get("ip"):
+        return True
+    return False
+
+
+def add_block(data, device):
+    block = {
+        "id": device.get("id") or "",
+        "site": device.get("site") or "",
+        "ip": device.get("ip") or "",
+        "mac": normalize_mac(device.get("mac") or ""),
+        "name": device.get("name") or "",
+        "blocked_at": datetime.now().isoformat(),
+        "blocked_by": "delete_catched_devices",
+    }
+    meta = data.setdefault("meta", {})
+    blocks = meta.setdefault("blocked_devices", [])
+    blocks[:] = [item for item in blocks if not _same_block(item, block)]
+    blocks.append(block)
+
+
 def main():
     if len(sys.argv) < 2:
         print(json.dumps({"status": "error", "message": "Config file required"}))
@@ -32,6 +69,8 @@ def main():
         return
 
     site_name = (config.get("site_name") or "").strip()
+    params = config.get("parameters", {})
+    block_rediscovery = bool(params.get("block_rediscovery", False))
     db_path = config.get("database_path")
     if not site_name:
         print(json.dumps({"status": "error", "message": "Site name is required"}))
@@ -55,6 +94,8 @@ def main():
         name = (device.get("name") or "").strip()
         if name.startswith("Catched-") and not device.get("locked"):
             removed_ids.add(device.get("id"))
+            if block_rediscovery:
+                add_block(data, device)
             continue
         kept_devices.append(device)
 
@@ -77,7 +118,7 @@ def main():
     data.setdefault("meta", {})["last_modified"] = datetime.now().isoformat()
 
     try:
-        write_json_store(db_path, "devices", data)
+        write_json_store(db_path, "devices", data, merge=False)
     except Exception:
         print(json.dumps({"status": "error", "message": "Failed to write database"}))
         return
@@ -86,6 +127,7 @@ def main():
         "status": "success",
         "site": site_name,
         "devices_removed": len(removed_ids),
+        "blocked_rediscovery": block_rediscovery,
         "connections_cleaned": cleaned
     }))
 

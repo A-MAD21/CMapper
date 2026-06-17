@@ -46,6 +46,7 @@ class NetworkPlatform {
             { id: 'mikrotik_mac_discovery', label: 'MikroTik MAC Discovery' },
             { id: 'ubiquiti_cdp_reader', label: 'Read CDP (Ubiquiti)' },
             { id: 'uniview_nvr_capture', label: 'Uniview NVR Packet Capture' },
+            { id: 'uniview_device_type_check', label: 'Uniview Device Type Check' },
             { id: 'mac_table_search', label: 'MAC Search' },
             { id: 'mac_group_map', label: 'Map Group' }
         ];
@@ -241,6 +242,7 @@ class NetworkPlatform {
         // Update Show Map button
         this.updateShowMapButton();
         this.updateMapControls();
+        this.renderSiteMapStatusControls();
         this.currentTextMapUrl = '';
         const downloadBtn = document.getElementById('downloadTextMapBtn');
         if (downloadBtn) downloadBtn.disabled = true;
@@ -324,6 +326,114 @@ class NetworkPlatform {
         this.updateMapSiteOptions(siteName);
         this.setMapSiteDropdownOpen(false);
         this.updateShowMapButton();
+        this.renderSiteMapStatusControls();
+    }
+
+    getSiteByName(siteName) {
+        if (!siteName) return null;
+        return (this.sites || []).find(site => site.name === siteName) || null;
+    }
+
+    getDevicesTabSiteName() {
+        const select = document.getElementById('deviceSiteFilter');
+        return select?.value || '';
+    }
+
+    getSiteManagementStatusSiteName() {
+        const select = document.getElementById('siteMapStatusSiteSelect');
+        const selected = select?.value || '';
+        if (this.isKnownMapSite(selected)) return selected;
+        return this.isKnownMapSite(this.currentSite) ? this.currentSite : '';
+    }
+
+    currentDateTimeLocal() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        return now.toISOString().slice(0, 16);
+    }
+
+    dateTimeLocalValue(value) {
+        if (!value) return '';
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) {
+            parsed.setMinutes(parsed.getMinutes() - parsed.getTimezoneOffset());
+            return parsed.toISOString().slice(0, 16);
+        }
+        return String(value).slice(0, 16);
+    }
+
+    renderSiteMapStatusControls() {
+        const configs = [
+            { id: 'sitesMapStatusControl', siteName: this.getSiteManagementStatusSiteName() },
+            { id: 'devicesMapStatusControl', siteName: this.getDevicesTabSiteName() },
+            { id: 'mapMapStatusControl', siteName: this.getMapActionSite() }
+        ];
+
+        configs.forEach(({ id, siteName }) => {
+            const container = document.getElementById(id);
+            if (!container) return;
+            const site = this.getSiteByName(siteName);
+            const disabled = !site || this.currentUserRole === 'guest';
+            const checked = site?.map_reliable ? 'checked' : '';
+            const mappedAt = this.dateTimeLocalValue(site?.map_reliable_at || '');
+            const label = site ? 'Reliable map' : 'Select site';
+            container.innerHTML = `
+                <div class="site-map-status-control ${disabled ? 'disabled' : ''}" data-site-status-control="${id}" data-site-id="${site?.id || ''}">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="site-map-reliable" ${checked} ${disabled ? 'disabled' : ''}>
+                        <span>${label}</span>
+                    </label>
+                    <input type="datetime-local" class="site-map-reliable-at" value="${mappedAt}" ${disabled ? 'disabled' : ''}>
+                    <button class="btn btn-secondary site-map-status-save" type="button" ${disabled ? 'disabled' : ''}>Save</button>
+                </div>
+            `;
+            const checkbox = container.querySelector('.site-map-reliable');
+            const dateInput = container.querySelector('.site-map-reliable-at');
+            const saveBtn = container.querySelector('.site-map-status-save');
+            checkbox?.addEventListener('change', () => {
+                if (checkbox.checked && dateInput && !dateInput.value) {
+                    dateInput.value = this.currentDateTimeLocal();
+                }
+            });
+            saveBtn?.addEventListener('click', () => {
+                this.saveSiteMapStatus(id);
+            });
+        });
+    }
+
+    async saveSiteMapStatus(controlId) {
+        const container = document.getElementById(controlId);
+        const control = container?.querySelector('[data-site-id]');
+        const siteId = control?.dataset.siteId || '';
+        if (!siteId) {
+            this.showError('Select a site first');
+            return;
+        }
+        const reliable = !!control.querySelector('.site-map-reliable')?.checked;
+        const dateInput = control.querySelector('.site-map-reliable-at');
+        if (reliable && dateInput && !dateInput.value) {
+            dateInput.value = this.currentDateTimeLocal();
+        }
+        try {
+            const response = await fetch(`/api/sites/${siteId}/map_status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    map_reliable: reliable,
+                    map_reliable_at: dateInput?.value || ''
+                })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showError(data.error || 'Failed to update map status');
+                return;
+            }
+            this.showMessage(reliable ? 'Site marked as reliably mapped' : 'Site marked as not reliably mapped');
+            await this.loadData();
+        } catch (error) {
+            console.error('Failed to update map status:', error);
+            this.showError('Failed to update map status');
+        }
     }
 
     updateMapControls() {
@@ -584,12 +694,26 @@ class NetworkPlatform {
                 select.value = '';
             }
         });
+        document.getElementById('siteMapReliable')?.addEventListener('change', (event) => {
+            const dateInput = document.getElementById('siteMapReliableAt');
+            if (event.target.checked && dateInput && !dateInput.value) {
+                dateInput.value = this.currentDateTimeLocal();
+            }
+        });
+        document.getElementById('siteMapStatusSiteSelect')?.addEventListener('change', (event) => {
+            if (event.target.value) {
+                this.currentSite = event.target.value;
+                this.updateCurrentSiteDisplay();
+            }
+            this.renderSiteMapStatusControls();
+        });
 
         // Site selection
         document.getElementById('deviceSiteFilter')?.addEventListener('change', (e) => {
             this.devicesPage = 1;
             this.devicesNetworkFilter = '';
             this.updateDevicesTab();
+            this.renderSiteMapStatusControls();
         });
         document.getElementById('deviceNetworkFilter')?.addEventListener('change', (e) => {
             this.devicesPage = 1;
@@ -858,6 +982,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 this.updateCurrentSiteDisplay();
             }
             this.updateShowMapButton();
+            this.renderSiteMapStatusControls();
         });
         document.getElementById('mapSiteSelect')?.addEventListener('focus', (e) => {
             this.setMapSiteDropdownOpen(true);
@@ -886,6 +1011,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             }
             this.updateMapSiteOptions(value);
             this.updateShowMapButton();
+            this.renderSiteMapStatusControls();
         });
         document.getElementById('mapSiteDropdown')?.addEventListener('mousedown', (e) => {
             e.preventDefault();
@@ -1063,6 +1189,12 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         });
         document.getElementById('deleteSelectedDevicesBtn')?.addEventListener('click', () => {
             this.deleteSelectedDevices();
+        });
+        document.getElementById('mapSelectedDevicesBtn')?.addEventListener('click', () => {
+            this.setSelectedDevicesMapVisibility(true);
+        });
+        document.getElementById('unmapSelectedDevicesBtn')?.addEventListener('click', () => {
+            this.setSelectedDevicesMapVisibility(false);
         });
         document.getElementById('deleteCatchedDevicesBtn')?.addEventListener('click', () => {
             this.runDeleteCatchedDevices();
@@ -1543,6 +1675,12 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                     <div class="stat-value">${this.stats.unknown_devices || 0}</div>
                     <div class="stat-chip">Needs classification</div>
                 </div>
+                <div class="stat-card kpi" style="--stat-accent:#EF4444;">
+                    <div class="kpi-icon"><i data-feather="map"></i></div>
+                    <div class="stat-label">Sites Without Reliable Map</div>
+                    <div class="stat-value">${this.stats.unreliable_map_count || 0}</div>
+                    <div class="stat-chip">${this.stats.unreliable_map_rate || 0}% of sites</div>
+                </div>
             `;
             if (chartsGrid) {
                 const staleDays = this.stats.stale_scan_days || 7;
@@ -1550,7 +1688,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 const sitesNoRouter = this.stats.sites_no_router || [];
                 const staleSites = this.stats.stale_sites || [];
                 const unknownRates = this.stats.unknown_rate_sites || [];
-                const uncompletedMaps = this.stats.uncompleted_maps || [];
+                const unreliableMaps = this.stats.unreliable_maps || this.stats.uncompleted_maps || [];
                 const catchedSites = this.stats.catched_sites || [];
                 const catchedTotal = this.stats.catched_total || 0;
                 const pcNoDomainSites = this.stats.pc_no_domain_sites || [];
@@ -1628,13 +1766,13 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                     <div class="chart-card">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
-                                <div class="chart-title">Uncompleted Maps</div>
-                                <div class="chart-subtitle">Sites missing visual maps</div>
+                                <div class="chart-title">Sites Without Reliable Map</div>
+                                <div class="chart-subtitle">Manual reliable-map status</div>
                             </div>
-                            <strong>${uncompletedMaps.length}</strong>
+                            <strong>${unreliableMaps.length}</strong>
                         </div>
                         <div style="margin-top: 12px; font-size: 12px;">
-                            ${listItems(uncompletedMaps.slice(0, 6), 'All maps completed.')}
+                            ${listItems(unreliableMaps.slice(0, 6), 'All sites are marked reliable.')}
                         </div>
                     </div>
                     <div class="chart-card">
@@ -1667,6 +1805,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             const sortedSites = this.sortSites(this.sites, 'dashboardSites');
             sitesBody.innerHTML = sortedSites.map(site => {
                 const siteDevices = this.devices.filter(d => d.site === site.name).length;
+                const mapStatus = this.siteMapStatusBadge(site);
                 return `
                     <tr>
                         <td>
@@ -1677,6 +1816,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                         </td>
                         <td>${site.root_ip || 'N/A'}</td>
                         <td>${siteDevices} devices</td>
+                        <td>${mapStatus}</td>
                         <td>${site.last_scan ? this.formatTime(site.last_scan) : 'Never'}</td>
                         <td>
                             <span class="status-badge ${site.locked ? 'status-offline' : 'status-online'}">
@@ -1690,69 +1830,6 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                                 </button>
                                 <button class="btn-icon" title="Edit Site" onclick="platform.editSite('${site.id}')">
                                     <i data-feather="edit"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        } else {
-            sitesBody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="empty-state">
-                        <div style="padding: 32px; text-align: center;">
-                            <i data-feather="map-pin" style="width: 48px; height: 48px;"></i>
-                            <h3 style="margin: 16px 0 8px;">No Sites Configured</h3>
-                            <p style="color: var(--text-secondary); margin-bottom: 16px;">
-                                Add your first site to get started
-                            </p>
-                            <button class="btn btn-primary" onclick="platform.showAddSiteModal()">
-                                <i data-feather="plus"></i>
-                                Add Site
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }
-        
-        this.applySortIndicators('dashboardSites');
-        replaceIcons();
-    }
-
-    updateSitesTab() {
-        const sitesBody = document.getElementById('sitesManagementBody');
-        if (this.sites && this.sites.length > 0) {
-            const sortedSites = this.sortSites(this.sites, 'sites');
-            sitesBody.innerHTML = sortedSites.map(site => {
-                const siteDevices = this.devices.filter(d => d.site === site.name).length;
-                return `
-                    <tr>
-                        <td>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <i data-feather="map-pin"></i>
-                                <strong>${site.name}</strong>
-                            </div>
-                        </td>
-                        <td>${site.root_ip || 'N/A'}</td>
-                        <td>${this.formatTime(site.created)}</td>
-                        <td>${siteDevices} devices</td>
-                        <td>${site.last_scan ? this.formatTime(site.last_scan) : 'Never'}</td>
-                        <td>
-                            <span class="status-badge ${site.locked ? 'status-offline' : 'status-online'}">
-                                ${site.locked ? 'Yes' : 'No'}
-                            </span>
-                        </td>
-                        <td>
-                            <div class="action-buttons">
-                                <button class="btn-icon" title="Select Site" onclick="platform.selectSite('${site.name}')">
-                                    <i data-feather="check-circle"></i>
-                                </button>
-                                <button class="btn-icon" title="Edit Site" onclick="platform.editSite('${site.id}')">
-                                    <i data-feather="edit"></i>
-                                </button>
-                                <button class="btn-icon" title="Delete Site" onclick="platform.deleteSite('${site.id}', '${site.name}')">
-                                    <i data-feather="trash-2"></i>
                                 </button>
                             </div>
                         </td>
@@ -1779,7 +1856,82 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             `;
         }
         
+        this.applySortIndicators('dashboardSites');
+        this.renderSiteMapStatusControls();
+        replaceIcons();
+    }
+
+    updateSitesTab() {
+        const statusSelect = document.getElementById('siteMapStatusSiteSelect');
+        if (statusSelect) {
+            const currentValue = statusSelect.value || this.currentSite || '';
+            const siteOptions = (this.sites || []).map(site => (
+                `<option value="${site.name}" ${site.name === currentValue ? 'selected' : ''}>${site.name}</option>`
+            )).join('');
+            statusSelect.innerHTML = '<option value="">Select site</option>' + siteOptions;
+        }
+        const sitesBody = document.getElementById('sitesManagementBody');
+        if (this.sites && this.sites.length > 0) {
+            const sortedSites = this.sortSites(this.sites, 'sites');
+            sitesBody.innerHTML = sortedSites.map(site => {
+                const siteDevices = this.devices.filter(d => d.site === site.name).length;
+                const mapStatus = this.siteMapStatusBadge(site);
+                return `
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <i data-feather="map-pin"></i>
+                                <strong>${site.name}</strong>
+                            </div>
+                        </td>
+                        <td>${site.root_ip || 'N/A'}</td>
+                        <td>${this.formatTime(site.created)}</td>
+                        <td>${siteDevices} devices</td>
+                        <td>${mapStatus}</td>
+                        <td>${site.last_scan ? this.formatTime(site.last_scan) : 'Never'}</td>
+                        <td>
+                            <span class="status-badge ${site.locked ? 'status-offline' : 'status-online'}">
+                                ${site.locked ? 'Yes' : 'No'}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-icon" title="Select Site" onclick="platform.selectSite('${site.name}')">
+                                    <i data-feather="check-circle"></i>
+                                </button>
+                                <button class="btn-icon" title="Edit Site" onclick="platform.editSite('${site.id}')">
+                                    <i data-feather="edit"></i>
+                                </button>
+                                <button class="btn-icon" title="Delete Site" onclick="platform.deleteSite('${site.id}', '${site.name}')">
+                                    <i data-feather="trash-2"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } else {
+            sitesBody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="empty-state">
+                        <div style="padding: 32px; text-align: center;">
+                            <i data-feather="map-pin" style="width: 48px; height: 48px;"></i>
+                            <h3 style="margin: 16px 0 8px;">No Sites Configured</h3>
+                            <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                                Add your first site to get started
+                            </p>
+                            <button class="btn btn-primary" onclick="platform.showAddSiteModal()">
+                                <i data-feather="plus"></i>
+                                Add Site
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+        
         this.applySortIndicators('sites');
+        this.renderSiteMapStatusControls();
         replaceIcons();
     }
 
@@ -1838,6 +1990,8 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 networks.push(parsed);
             }
         };
+        const site = this.getSiteByName(siteName);
+        (site?.active_scan_ranges || []).forEach(add);
         (this.agents || []).forEach(agent => {
             if (!agent || agent.site !== siteName) return;
             add(agent.target_range);
@@ -1846,6 +2000,94 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         });
         networks.sort((a, b) => b.prefix - a.prefix || a.cidr.localeCompare(b.cidr, undefined, { numeric: true }));
         return networks;
+    }
+
+    normalizeScanRangeList(values) {
+        const items = Array.isArray(values)
+            ? values
+            : String(values || '').split(/[\n,;]+/);
+        const seen = new Set();
+        const ranges = [];
+        items.forEach(item => {
+            const value = String(item || '').trim();
+            if (!value || seen.has(value)) return;
+            if (!this.parseCidr(value) && !/^\d{1,3}(?:\.\d{1,3}){3}(?:-\d{1,3}(?:\.\d{1,3}){3})?$/.test(value)) {
+                return;
+            }
+            seen.add(value);
+            ranges.push(value);
+        });
+        return ranges;
+    }
+
+    renderDeviceActiveScanRanges(siteName, networks = []) {
+        const container = document.getElementById('deviceActiveScanRangesControl');
+        if (!container) return;
+        if (!siteName) {
+            container.innerHTML = '';
+            return;
+        }
+        const site = this.getSiteByName(siteName);
+        if (!site) {
+            container.innerHTML = '';
+            return;
+        }
+        const active = new Set(this.normalizeScanRangeList(site.active_scan_ranges || []));
+        const candidateRanges = networks.map(item => item.cidr).filter(Boolean);
+        if (!candidateRanges.length) {
+            container.innerHTML = '<div class="form-hint">No ranges detected</div>';
+            return;
+        }
+        container.innerHTML = `
+            <div class="range-picker">
+                <button class="btn btn-secondary btn-sm" type="button" id="activeScanRangesToggle">Active scan ranges (${active.size})</button>
+                <div class="range-picker-panel" id="activeScanRangesPanel" hidden>
+                    ${candidateRanges.map(range => `
+                        <label class="range-item">
+                            <input type="checkbox" class="active-scan-range-select" value="${range}" ${active.has(range) ? 'checked' : ''}>
+                            <span>${range}</span>
+                        </label>
+                    `).join('')}
+                    <button class="btn btn-primary btn-sm" type="button" id="saveActiveScanRangesBtn">Save Ranges</button>
+                </div>
+            </div>
+        `;
+        document.getElementById('activeScanRangesToggle')?.addEventListener('click', () => {
+            const panel = document.getElementById('activeScanRangesPanel');
+            if (panel) panel.hidden = !panel.hidden;
+        });
+        document.getElementById('saveActiveScanRangesBtn')?.addEventListener('click', () => {
+            const selected = Array.from(document.querySelectorAll('.active-scan-range-select:checked'))
+                .map(input => input.value)
+                .filter(Boolean);
+            const candidateSet = new Set(candidateRanges);
+            const preserved = Array.from(active).filter(range => !candidateSet.has(range));
+            this.saveSiteActiveScanRanges(site.id, preserved.concat(selected));
+        });
+    }
+
+    async saveSiteActiveScanRanges(siteId, ranges) {
+        const site = (this.sites || []).find(s => s.id === siteId);
+        if (!site) {
+            this.showError('Site not found');
+            return;
+        }
+        try {
+            const response = await fetch(`/api/sites/${siteId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active_scan_ranges: this.normalizeScanRangeList(ranges) })
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Failed to save active ranges');
+            }
+            this.showMessage('Active scan ranges saved');
+            await this.loadData();
+        } catch (error) {
+            console.error('Save active ranges error:', error);
+            this.showError(error.message || 'Failed to save active ranges');
+        }
     }
 
     getDeviceNetworkOptions(siteDevices, siteName) {
@@ -1911,6 +2153,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         const nextValue = validValues.has(currentValue) ? currentValue : '';
         networkFilter.value = nextValue;
         this.devicesNetworkFilter = nextValue;
+        this.renderDeviceActiveScanRanges(siteName, networks);
         return nextValue;
     }
 
@@ -2006,6 +2249,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 const checked = this.selectedDeviceIds.has(device.id) ? 'checked' : '';
                 const isRoot = device.ip && rootIpBySite.get(device.site) === device.ip;
                 const rootBadge = isRoot ? '<span class="status-badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-size: 11px;">Root</span>' : '';
+                const mapHiddenBadge = device.hide_from_map ? '<span class="status-badge" style="background: rgba(100, 116, 139, 0.15); color: #64748b; font-size: 11px;">Map hidden</span>' : '';
                 return `
                     <tr>
                         <td>
@@ -2016,6 +2260,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                                 <i data-feather="server" style="width: 16px; height: 16px;"></i>
                                 <strong>${device.name || device.id}</strong>
                                 ${rootBadge}
+                                ${mapHiddenBadge}
                                 ${device.locked ? '<i data-feather="lock" style="width: 12px; height: 12px; color: var(--warning);"></i>' : ''}
                             </div>
                         </td>
@@ -2078,8 +2323,17 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         });
         this.syncSelectAllCheckbox(pagedDevices);
         this.applySortIndicators('devices');
+        this.renderSiteMapStatusControls();
 
         replaceIcons();
+    }
+
+    siteMapStatusBadge(site) {
+        if (!site || !site.map_reliable) {
+            return '<span class="status-badge status-offline">Not reliable</span>';
+        }
+        const mappedAt = site.map_reliable_at ? ` ${this.formatTime(site.map_reliable_at)}` : '';
+        return `<span class="status-badge status-online">Reliable${mappedAt}</span>`;
     }
 
     updateDevicesPagination(totalDevices, totalPages) {
@@ -2160,6 +2414,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
             } else if (state.key === 'status') {
                 valA = a.locked ? 'locked' : 'active';
                 valB = b.locked ? 'locked' : 'active';
+            } else if (state.key === 'map_reliable') {
+                valA = `${a.map_reliable ? '1' : '0'}-${a.map_reliable_at || ''}`;
+                valB = `${b.map_reliable ? '1' : '0'}-${b.map_reliable_at || ''}`;
             } else {
                 valA = a[state.key] ?? '';
                 valB = b[state.key] ?? '';
@@ -2230,12 +2487,50 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
     }
 
     updateSelectedDevicesUI() {
-        const btn = document.getElementById('deleteSelectedDevicesBtn');
-        if (!btn) return;
         const count = this.selectedDeviceIds.size;
-        btn.disabled = count === 0;
-        btn.innerHTML = `<i data-feather="trash-2"></i> Remove Selected${count ? ` (${count})` : ''}`;
+        const deleteBtn = document.getElementById('deleteSelectedDevicesBtn');
+        const mapBtn = document.getElementById('mapSelectedDevicesBtn');
+        const unmapBtn = document.getElementById('unmapSelectedDevicesBtn');
+        if (deleteBtn) {
+            deleteBtn.disabled = count === 0;
+            deleteBtn.innerHTML = `<i data-feather="trash-2"></i> Remove Selected${count ? ` (${count})` : ''}`;
+        }
+        if (mapBtn) {
+            mapBtn.disabled = count === 0;
+            mapBtn.innerHTML = `<i data-feather="map-pin"></i> Map Selected${count ? ` (${count})` : ''}`;
+        }
+        if (unmapBtn) {
+            unmapBtn.disabled = count === 0;
+            unmapBtn.innerHTML = `<i data-feather="eye-off"></i> Unmap Selected${count ? ` (${count})` : ''}`;
+        }
         replaceIcons();
+    }
+
+    async setSelectedDevicesMapVisibility(visible) {
+        const ids = Array.from(this.selectedDeviceIds);
+        if (!ids.length) return;
+        const action = visible ? 'show on the map' : 'hide from the map';
+        if (!confirm(`${visible ? 'Map' : 'Unmap'} ${ids.length} selected devices?`)) {
+            return;
+        }
+        try {
+            const response = await fetch('/api/devices/bulk_map_visibility', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids, visible })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showError(data.error || `Failed to ${action}`);
+                return;
+            }
+            this.selectedDeviceIds.clear();
+            this.showMessage(`${data.updated?.length || 0} devices updated`);
+            this.loadData();
+        } catch (error) {
+            console.error('Map visibility update failed:', error);
+            this.showError(`Failed to ${action}`);
+        }
     }
 
     async deleteSelectedDevices() {
@@ -2244,6 +2539,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         if (!confirm(`Delete ${ids.length} devices?`)) {
             return;
         }
+        const blockRediscovery = confirm('Block these devices from future rediscovery too? Choose Cancel if you only want to delete them for now.');
         const batchSize = 50;
         for (let i = 0; i < ids.length; i += batchSize) {
             const batch = ids.slice(i, i + batchSize);
@@ -2251,7 +2547,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 const response = await fetch('/api/devices/bulk_delete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ids: batch })
+                    body: JSON.stringify({ ids: batch, block: blockRediscovery })
                 });
                 if (!response.ok) {
                     const data = await response.json().catch(() => ({}));
@@ -3531,7 +3827,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                             checked = 'checked';
                             autoselect = true;
                         }
-                        if (module.id === 'uniview_nvr_capture' && this.isNvrDevice(d)) {
+                        if ((module.id === 'uniview_nvr_capture' || module.id === 'uniview_device_type_check') && this.isNvrDevice(d)) {
                             checked = 'checked';
                             autoselect = true;
                         }
@@ -4229,6 +4525,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         if (siteIdInput) siteIdInput.value = '';
         document.getElementById('siteName').value = '';
         document.getElementById('siteRootIP').value = '';
+        document.getElementById('siteMapReliable').checked = false;
+        document.getElementById('siteMapReliableAt').value = '';
+        document.getElementById('siteActiveScanRanges').value = '';
         document.getElementById('siteNotes').value = '';
         this.populateSiteRootDeviceOptions('', '');
     }
@@ -4237,6 +4536,13 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         const siteId = document.getElementById('siteId')?.value || '';
         const name = document.getElementById('siteName').value.trim();
         const rootIP = document.getElementById('siteRootIP').value.trim();
+        const mapReliable = document.getElementById('siteMapReliable').checked;
+        const mapReliableAtInput = document.getElementById('siteMapReliableAt');
+        if (mapReliable && mapReliableAtInput && !mapReliableAtInput.value) {
+            mapReliableAtInput.value = this.currentDateTimeLocal();
+        }
+        const mapReliableAt = mapReliableAtInput?.value || '';
+        const activeScanRanges = this.normalizeScanRangeList(document.getElementById('siteActiveScanRanges')?.value || '');
         const notes = document.getElementById('siteNotes').value.trim();
         
         if (!name || !rootIP) {
@@ -4254,6 +4560,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 body: JSON.stringify({
                     name: name,
                     root_ip: rootIP,
+                    map_reliable: mapReliable,
+                    map_reliable_at: mapReliableAt,
+                    active_scan_ranges: activeScanRanges,
                     notes: notes
                 })
             });
@@ -4318,6 +4627,9 @@ selectSite(siteName) {
         if (siteIdInput) siteIdInput.value = siteId;
         document.getElementById('siteName').value = site.name || '';
         document.getElementById('siteRootIP').value = site.root_ip || '';
+        document.getElementById('siteMapReliable').checked = !!site.map_reliable;
+        document.getElementById('siteMapReliableAt').value = this.dateTimeLocalValue(site.map_reliable_at || '');
+        document.getElementById('siteActiveScanRanges').value = this.normalizeScanRangeList(site.active_scan_ranges || []).join('\n');
         document.getElementById('siteNotes').value = site.notes || '';
         this.populateSiteRootDeviceOptions(site.name, site.root_ip || '');
         document.getElementById('addSiteModal').classList.add('active');
@@ -4368,6 +4680,7 @@ selectSite(siteName) {
         document.getElementById('editDeviceNotes').value = device.notes || '';
         document.getElementById('editDeviceLocked').checked = device.locked || false;
         document.getElementById('editDeviceAlwaysShowMap').checked = device.always_show_on_map || false;
+        document.getElementById('editDeviceHideFromMap').checked = device.hide_from_map || false;
         document.getElementById('editDeviceOS').value = device.os || '';
         document.getElementById('editDeviceVendor').value = device.vendor || '';
         document.getElementById('editDevicePlatform').value = device.platform || device.model || '';
@@ -4404,6 +4717,7 @@ selectSite(siteName) {
             notes: document.getElementById('editDeviceNotes').value.trim(),
             locked: document.getElementById('editDeviceLocked').checked,
             always_show_on_map: document.getElementById('editDeviceAlwaysShowMap').checked,
+            hide_from_map: document.getElementById('editDeviceHideFromMap').checked,
             connections_list: this.collectConnectionRows(),
             create_missing_nodes: document.getElementById('editCreateMissingNodes').checked
         };
@@ -4508,15 +4822,16 @@ selectSite(siteName) {
         if (!confirm('Delete this device?')) {
             return;
         }
+        const blockRediscovery = confirm('Block this device from future rediscovery too? Choose Cancel if you only want to delete it for now.');
         
         try {
-            const response = await fetch(`/api/devices/${deviceId}`, {
+            const response = await fetch(`/api/devices/${deviceId}?block=${blockRediscovery ? '1' : '0'}`, {
                 method: 'DELETE'
             });
             
             if (response.ok) {
                 this.selectedDeviceIds.delete(deviceId);
-                this.showMessage('Device deleted');
+                this.showMessage(blockRediscovery ? 'Device deleted and blocked from rediscovery' : 'Device deleted');
                 this.loadData();
             }
         } catch (error) {

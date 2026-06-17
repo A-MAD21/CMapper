@@ -27,16 +27,36 @@
       "name": "username",
       "type": "text",
       "required": true,
-      "label": "SSH Username",
+      "label": "Username",
       "placeholder": "admin"
     },
     {
       "name": "password",
       "type": "password",
       "required": true,
-      "label": "SSH Password",
+      "label": "Password",
       "placeholder": "••••••••",
-      "description": "Password will be hidden"
+      "description": "Used for SSH first, then Telnet fallback"
+    },
+    {
+      "name": "ssh_port",
+      "type": "number",
+      "required": false,
+      "default": 22,
+      "label": "SSH Port",
+      "description": "Port used for SSH connections",
+      "min": 1,
+      "max": 65535
+    },
+    {
+      "name": "telnet_port",
+      "type": "number",
+      "required": false,
+      "default": 23,
+      "label": "Telnet Port",
+      "description": "Port used if SSH fails and Telnet fallback is attempted",
+      "min": 1,
+      "max": 65535
     },
     {
       "name": "max_hops",

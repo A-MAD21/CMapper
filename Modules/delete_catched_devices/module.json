@@ -5,5 +5,13 @@
   "description": "Remove devices in the current site whose name starts with Catched- and clean related connections.",
   "author": "System",
   "entry_point": "delete_catched_devices.py",
-  "inputs": []
+  "inputs": [
+    {
+      "name": "block_rediscovery",
+      "type": "checkbox",
+      "required": false,
+      "default": false,
+      "label": "Block removed Catched devices from rediscovery"
+    }
+  ]
 }

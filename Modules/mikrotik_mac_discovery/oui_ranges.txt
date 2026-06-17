@@ -121,7 +121,7 @@ FC:FB:FB:00:00:00-FC:FB:FB:FF:FF:FF=Cisco,device_type=switch
 9C:B6:54:00:00:00-9C:B6:54:FF:FF:FF=Server,device_type=server
 50:87:89:00:00:00-50:87:89:FF:FF:FF=Cisco,device_type=switch
 00:1F:C9:00:00:00-00:1F:C9:FF:FF:FF=Cisco,device_type=switch
-00:1C:B0:00:00:00-00:1C:B0:FF:FF:FF=Cisco,device_type=server
+00:1C:B0:00:00:00-00:1C:B0:FF:FF:FF=Cisco,device_type=switch
 D0:C2:82:00:00:00-D0:C2:82:FF:FF:FF=Cisco,device_type=switch
 00:15:C6:00:00:00-00:15:C6:FF:FF:FF=Cisco,device_type=switch
 00:14:6A:00:00:00-00:14:6A:FF:FF:FF=Cisco,device_type=switch
@@ -381,3 +381,4 @@ B6:70:1B:00:00:00-B6:70:1B:FF:FF:FF=Phone,device_type=phone
 5A:6C:A5:00:00:00-5A:6C:A5:FF:FF:FF=samsung,device_type=phone
 68:E4:3B:00:00:00-68:E4:3B:FF:FF:FF=PC,device_type=pc
 48:88:CA:00:00:00-48:88:CA:FF:FF:FF=Motorolla,device_type=phone
+B4:A4:E3:00:00:00-B4:A4:E3:FF:FF:FF=Cisco Switch,device_type=switch

@@ -11,7 +11,11 @@ def generate_site_map(database, site_name, output_dir="."):
     """Generate simple HTML map for a site"""
     
     # Filter devices for this site
-    site_devices = [d for d in database.get("devices", []) if d.get("site") == site_name]
+    site_devices = [
+        d for d in database.get("devices", [])
+        if d.get("site") == site_name and not d.get("hide_from_map")
+    ]
+    visible_device_ids = {d.get("id") for d in site_devices}
     
     # Create nodes and edges
     nodes = []
@@ -27,6 +31,8 @@ def generate_site_map(database, site_name, output_dir="."):
         
         # Add connections
         for conn in device.get("connections", []):
+            if conn.get("remote_device") not in visible_device_ids:
+                continue
             edges.append({
                 "from": device["id"],
                 "to": conn.get("remote_device"),
