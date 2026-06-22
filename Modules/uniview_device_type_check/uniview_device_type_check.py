@@ -4,8 +4,8 @@ Uniview Device Type Check
 
 Uniview cameras and NVRs can share OUI ranges. This module checks every NVR
 row in the selected site against the Uniview web UI device type endpoints.
-If the reported device type starts with IPC, the row is reclassified as camera
-and locked so generic module/OUI updates do not flip it back.
+If the reported device type identifies an IPC, the row is reclassified as
+camera and locked so generic module/OUI updates do not flip it back.
 """
 
 from __future__ import annotations
@@ -69,7 +69,13 @@ def _target_devices(data: Dict[str, Any], site_name: str, params: Dict[str, Any]
         if isinstance(d, dict) and d.get("site") == site_name and (d.get("ip") or "").strip()
     ]
     targets = params.get("targets") or {}
-    device_ids = set(targets.get("device_ids") or [])
+    raw_device_ids = targets.get("device_ids")
+    if raw_device_ids == "__AUTO__":
+        device_ids = set()
+    elif isinstance(raw_device_ids, list):
+        device_ids = {device_id for device_id in raw_device_ids if device_id}
+    else:
+        device_ids = set()
     manual_devices = targets.get("manual_devices") or []
 
     if device_ids:
@@ -133,6 +139,15 @@ def _parse_device_type(text: str) -> Optional[str]:
         if value.upper().startswith("IPC"):
             return value
     return candidates[0]
+
+
+def _is_ipc_device_type(value: str) -> bool:
+    normalized = (value or "").strip().upper()
+    if normalized.startswith("IPC"):
+        return True
+    # Older Uniview IPC firmware exposes <DeviceType>1</DeviceType> in the
+    # public device_cap.xml instead of a textual IPC model identifier.
+    return normalized == "1"
 
 
 def _extract_http_error(resp: Any) -> str:
@@ -306,7 +321,7 @@ def main() -> None:
             continue
 
         device_type = (result["device_type"] or "").strip()
-        is_ipc = device_type.upper().startswith("IPC")
+        is_ipc = _is_ipc_device_type(device_type)
         target = None
         if device.get("id"):
             target = by_id.get(device.get("id"))

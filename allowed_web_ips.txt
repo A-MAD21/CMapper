@@ -13,6 +13,8 @@
 # NVRs, or other network devices.
 #jafari.bahare
 10.192.84.123
+#jafari.bahare-F4
+10.192.77.126
 #seify.amir
 10.192.84.114
 #seify.amir2
@@ -31,3 +33,5 @@
 172.18.0.220
 #arshi
 172.18.1.241
+#Masoumzadeh
+172.18.0.161

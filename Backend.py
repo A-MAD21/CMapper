@@ -384,6 +384,65 @@ def _site_active_scan_ranges(site_name):
         return []
     return _normalize_site_ranges(site.get("active_scan_ranges") or [])
 
+def _parse_iso_datetime(value):
+    if not value:
+        return None
+    try:
+        text = str(value).strip()
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone().replace(tzinfo=None)
+        return parsed
+    except Exception:
+        return None
+
+def _latest_iso(*values):
+    parsed = [(value, _parse_iso_datetime(value)) for value in values if value]
+    parsed = [(value, dt) for value, dt in parsed if dt is not None]
+    if not parsed:
+        return next((value for value in values if value), "")
+    return max(parsed, key=lambda item: item[1])[0]
+
+def _site_effective_last_scan(site, site_devices=None, agents=None):
+    values = [site.get("last_scan") if isinstance(site, dict) else ""]
+    if isinstance(site_devices, list):
+        values.extend(d.get("last_seen") for d in site_devices if isinstance(d, dict))
+    site_name = site.get("name") if isinstance(site, dict) else ""
+    for agent in agents or []:
+        if isinstance(agent, dict) and agent.get("site") == site_name:
+            values.append(agent.get("last_scan_at"))
+    return _latest_iso(*values)
+
+def _touch_site_last_scan(site_name, when=None):
+    if not site_name:
+        return
+    data = read_database() or {}
+    touched = False
+    timestamp = when or datetime.now().isoformat()
+    for site in data.get("sites", []):
+        if isinstance(site, dict) and site.get("name") == site_name:
+            site["last_scan"] = _latest_iso(site.get("last_scan"), timestamp) or timestamp
+            site["last_modified"] = datetime.now().isoformat()
+            touched = True
+            break
+    if touched:
+        data.setdefault("meta", {})["last_modified"] = datetime.now().isoformat()
+        write_database(data)
+
+SITE_SCAN_MODULES = {
+    "cdp_discovery",
+    "mikrotik_mac_discovery",
+    "ubiquiti_cdp_reader",
+    "uniview_nvr_capture",
+    "uniview_device_type_check",
+    "agent_ip_scan",
+}
+
+def _is_site_scan_module(module_id):
+    return module_id in SITE_SCAN_MODULES
+
 def _read_legacy_database_with_salvage():
     def _cleanup_corrupt_backups():
         cutoff = time.time() - (CORRUPT_RETENTION_DAYS * 86400)
@@ -816,7 +875,11 @@ def _normalize_schedule_payload(payload):
                     targets["device_ids"] = "__AUTO__"
                 if "manual_devices" in targets:
                     targets["manual_devices"] = []
-            elif targets is None and module_id in ("ubiquiti_cdp_reader", "uniview_nvr_capture"):
+            elif targets is None and module_id in (
+                "ubiquiti_cdp_reader",
+                "uniview_nvr_capture",
+                "uniview_device_type_check",
+            ):
                 params["targets"] = {
                     "auto": True,
                     "auto_on_empty": True,
@@ -914,7 +977,11 @@ def _validate_schedule_config(schedule):
             name = field.get("name")
             if not name:
                 continue
-            if module_id in ("ubiquiti_cdp_reader", "uniview_nvr_capture") and name == "targets":
+            if module_id in (
+                "ubiquiti_cdp_reader",
+                "uniview_nvr_capture",
+                "uniview_device_type_check",
+            ) and name == "targets":
                 continue
             if module_id == "uniview_nvr_capture" and name == "nic" and params.get("nic") in (None, ""):
                 params["nic"] = field.get("default") or "NIC1"
@@ -1832,6 +1899,10 @@ class ModuleRunner:
                         self.running_modules[thread_id]["status"] = final_status
                         self.running_modules[thread_id]["progress"] = 100
                         self.running_modules[thread_id]["completed_at"] = datetime.now().isoformat()
+                if final_status == "completed" and _is_site_scan_module(module_id):
+                    site_name = _site_from_module_config(config)
+                    if site_name:
+                        _touch_site_last_scan(site_name, datetime.now().isoformat())
                 duration_s = round((datetime.now() - module_started_at).total_seconds(), 3) if module_started_at else None
                 _write_module_audit(
                     "module_finish",
@@ -2090,7 +2161,11 @@ class ScheduleRunner:
                 continue
             params = copy.deepcopy(entry.get("parameters") or {})
             scope_mode = ((schedule.get("site_scope") or {}).get("mode") or "").lower()
-            if module_id in ("ubiquiti_cdp_reader", "uniview_nvr_capture"):
+            if module_id in (
+                "ubiquiti_cdp_reader",
+                "uniview_nvr_capture",
+                "uniview_device_type_check",
+            ):
                 targets = params.get("targets")
                 if isinstance(targets, dict) and targets.get("device_ids") == "__AUTO__":
                     params["targets"] = {"auto": True}
@@ -2303,7 +2378,28 @@ def handle_sites():
             return jsonify({"error": "auth_required"}), 401
         data = read_database()
         sites = _filter_sites_for_user(data.get("sites", []), user)
-        return jsonify(sites)
+        devices = _filter_devices_for_user(data.get("devices", []), user)
+        devices_by_site = {}
+        for device in devices:
+            if isinstance(device, dict):
+                devices_by_site.setdefault(device.get("site") or "", []).append(device)
+        settings = read_settings() or {}
+        agents = settings.get("agents", []) if isinstance(settings, dict) else []
+        enriched_sites = []
+        for site in sites:
+            if not isinstance(site, dict):
+                continue
+            item = dict(site)
+            effective_last_scan = _site_effective_last_scan(
+                site,
+                devices_by_site.get(site.get("name") or "", []),
+                agents
+            )
+            if effective_last_scan:
+                item["stored_last_scan"] = site.get("last_scan")
+                item["last_scan"] = effective_last_scan
+            enriched_sites.append(item)
+        return jsonify(enriched_sites)
     
     elif request.method == 'POST':
         user, err = _require_role("admin")
@@ -2856,7 +2952,11 @@ def run_module(module_id):
                 params["targets"] = {"auto": True}
             if params.get("nic") is None and module_id == "uniview_nvr_capture":
                 params["nic"] = "NIC1"
-            if params.get("targets") is None and module_id in ("ubiquiti_cdp_reader", "uniview_nvr_capture"):
+            if params.get("targets") is None and module_id in (
+                "ubiquiti_cdp_reader",
+                "uniview_nvr_capture",
+                "uniview_device_type_check",
+            ):
                 params["targets"] = {"auto": True}
             if module_id == "ubiquiti_cdp_reader" and isinstance(params.get("targets"), dict) and params["targets"].get("auto") is True:
                 params["targets"]["device_types"] = ["ap"]
@@ -4382,6 +4482,7 @@ def agent_report():
     settings["agents"] = agents
     write_settings(settings)
     _write_agent_config_files(agent, settings)
+    _touch_site_last_scan(site, scan_time)
 
     return jsonify({
         "status": "success",
@@ -4448,14 +4549,18 @@ def get_stats():
     # Sites with stale scans
     stale_sites = []
     cutoff = datetime.now() - timedelta(days=stale_days)
+    agents = settings.get("agents", []) if isinstance(settings, dict) else []
     for site in sites:
-        last_scan = site.get("last_scan")
+        last_scan = _site_effective_last_scan(
+            site,
+            devices_by_site.get(site.get("name") or "", []),
+            agents
+        )
         if not last_scan:
             stale_sites.append(site.get("name") or "")
             continue
-        try:
-            dt = datetime.fromisoformat(last_scan)
-        except Exception:
+        dt = _parse_iso_datetime(last_scan)
+        if not dt:
             stale_sites.append(site.get("name") or "")
             continue
         if dt < cutoff:
@@ -4519,16 +4624,16 @@ def get_stats():
         "stale_scan_days": stale_days,
         "sites_no_router": sites_no_router,
         "stale_sites": stale_sites,
-        "unknown_rate_sites": unknown_rate[:5],
+        "unknown_rate_sites": unknown_rate,
         "uncompleted_maps": unreliable_maps,
         "unreliable_maps": unreliable_maps,
         "unreliable_map_count": unreliable_map_count,
         "unreliable_map_rate": unreliable_map_rate,
         "reliable_map_count": reliable_map_count,
         "reliable_maps": reliable_maps,
-        "catched_sites": catched_sites[:5],
+        "catched_sites": catched_sites,
         "catched_total": sum(catched_by_site.values()),
-        "pc_no_domain_sites": pc_no_domain_sites[:10],
+        "pc_no_domain_sites": pc_no_domain_sites,
         "pc_no_domain_total": sum(pc_no_domain_by_site.values())
     }
 

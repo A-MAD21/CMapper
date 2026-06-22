@@ -31,6 +31,7 @@ class NetworkPlatform {
         this.deviceColumnFilters = {};
         this.moduleLogCache = new Map();
         this.serverModuleJobs = [];
+        this.dashboardReports = {};
         this.sortState = {
             dashboardSites: { key: 'name', dir: 'asc' },
             sites: { key: 'name', dir: 'asc' },
@@ -1694,11 +1695,50 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 const pcNoDomainSites = this.stats.pc_no_domain_sites || [];
                 const pcNoDomainTotal = this.stats.pc_no_domain_total || 0;
 
+                this.dashboardReports = {
+                    sitesNoRouter: {
+                        title: 'Sites With Unknown Router',
+                        subtitle: 'All sites missing a router type',
+                        columns: ['No.', 'Site'],
+                        rows: sitesNoRouter.map((site, index) => [index + 1, site])
+                    },
+                    staleSites: {
+                        title: 'No Recent Scans',
+                        subtitle: `All sites older than ${staleDays} days`,
+                        columns: ['No.', 'Site'],
+                        rows: staleSites.map((site, index) => [index + 1, site])
+                    },
+                    unknownRates: {
+                        title: 'Highest Unknown Rate',
+                        subtitle: 'All sites sorted by unknown-device rate',
+                        columns: ['No.', 'Site', 'Unknown Rate'],
+                        rows: unknownRates.map((item, index) => [index + 1, item.site || '', `${Number(item.rate || 0)}%`])
+                    },
+                    unreliableMaps: {
+                        title: 'Sites Without Reliable Map',
+                        subtitle: 'All sites not marked as reliably mapped',
+                        columns: ['No.', 'Site'],
+                        rows: unreliableMaps.map((site, index) => [index + 1, site])
+                    },
+                    catchedSites: {
+                        title: 'Catched IPs',
+                        subtitle: 'All sites with Catched devices',
+                        columns: ['No.', 'Site', 'Catched Count'],
+                        rows: catchedSites.map((item, index) => [index + 1, item.site || '', Number(item.count || 0)])
+                    },
+                    pcNoDomainSites: {
+                        title: 'PCs With No Domain',
+                        subtitle: 'All sites with PC/domain gaps',
+                        columns: ['No.', 'Site', 'PCs With No Domain'],
+                        rows: pcNoDomainSites.map((item, index) => [index + 1, item.site || '', Number(item.count || 0)])
+                    }
+                };
+
                 const listItems = (items, emptyText) => {
                     if (!items.length) {
                         return `<div style="color: var(--text-secondary); font-size: 12px;">${emptyText}</div>`;
                     }
-                    return items.map(item => `<div>${item}</div>`).join('');
+                    return items.map(item => `<div>${this.escapeHtml(item)}</div>`).join('');
                 };
 
                 const barList = (items, key, valueKey, emptyText, color) => {
@@ -1716,7 +1756,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                                     : Math.min(100, Math.max(0, (value / maxValue) * 100));
                                 return `
                                     <div class="chart-row">
-                                        <div>${label}</div>
+                                        <div>${this.escapeHtml(label)}</div>
                                         <div class="chart-bar">
                                             <span style="width:${pct}%; background:${color};"></span>
                                         </div>
@@ -1729,7 +1769,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 };
 
                 chartsGrid.innerHTML = `
-                    <div class="chart-card">
+                    <div class="chart-card clickable" data-dashboard-report="sitesNoRouter">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
                                 <div class="chart-title">Sites With Unknown Router</div>
@@ -1741,7 +1781,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                             ${listItems(sitesNoRouter.slice(0, 6), 'All sites have a router.')}
                         </div>
                     </div>
-                    <div class="chart-card">
+                    <div class="chart-card clickable" data-dashboard-report="staleSites">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
                                 <div class="chart-title">No Recent Scans</div>
@@ -1753,7 +1793,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                             ${listItems(staleSites.slice(0, 6), 'All sites scanned recently.')}
                         </div>
                     </div>
-                    <div class="chart-card">
+                    <div class="chart-card clickable" data-dashboard-report="unknownRates">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
                                 <div class="chart-title">Highest Unknown Rate</div>
@@ -1761,9 +1801,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                             </div>
                             <strong>${unknownRates.length}</strong>
                         </div>
-                        ${barList(unknownRates, 'site', 'rate', 'No data.', 'linear-gradient(90deg, #F59E0B, #EF4444)')}
+                        ${barList(unknownRates.slice(0, 5), 'site', 'rate', 'No data.', 'linear-gradient(90deg, #F59E0B, #EF4444)')}
                     </div>
-                    <div class="chart-card">
+                    <div class="chart-card clickable" data-dashboard-report="unreliableMaps">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
                                 <div class="chart-title">Sites Without Reliable Map</div>
@@ -1775,7 +1815,7 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                             ${listItems(unreliableMaps.slice(0, 6), 'All sites are marked reliable.')}
                         </div>
                     </div>
-                    <div class="chart-card">
+                    <div class="chart-card clickable" data-dashboard-report="catchedSites">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
                                 <div class="chart-title">Catched IPs</div>
@@ -1783,9 +1823,9 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                             </div>
                             <strong>${catchedTotal}</strong>
                         </div>
-                        ${barList(catchedSites.map(item => ({ site: item.site, count: item.count })), 'site', 'count', 'No catched IPs.', 'linear-gradient(90deg, #38BDF8, #10B981)')}
+                        ${barList(catchedSites.slice(0, 5).map(item => ({ site: item.site, count: item.count })), 'site', 'count', 'No catched IPs.', 'linear-gradient(90deg, #38BDF8, #10B981)')}
                     </div>
-                    <div class="chart-card">
+                    <div class="chart-card clickable" data-dashboard-report="pcNoDomainSites">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
                                 <div class="chart-title">PCs With No Domain</div>
@@ -1793,9 +1833,14 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                             </div>
                             <strong>${pcNoDomainTotal}</strong>
                         </div>
-                        ${barList(pcNoDomainSites.map(item => ({ site: item.site, count: item.count })), 'site', 'count', 'All PCs have domain data.', 'linear-gradient(90deg, #8B5CF6, #38BDF8)')}
+                        ${barList(pcNoDomainSites.slice(0, 10).map(item => ({ site: item.site, count: item.count })), 'site', 'count', 'All PCs have domain data.', 'linear-gradient(90deg, #8B5CF6, #38BDF8)')}
                     </div>
                 `;
+                chartsGrid.querySelectorAll('[data-dashboard-report]').forEach(card => {
+                    card.addEventListener('click', () => {
+                        this.showDashboardReport(card.dataset.dashboardReport);
+                    });
+                });
             }
         }
 
@@ -1859,6 +1904,36 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
         this.applySortIndicators('dashboardSites');
         this.renderSiteMapStatusControls();
         replaceIcons();
+    }
+
+    showDashboardReport(reportKey) {
+        const report = (this.dashboardReports || {})[reportKey];
+        if (!report) return;
+
+        const modal = document.getElementById('dashboardReportModal');
+        const title = document.getElementById('dashboardReportTitle');
+        const subtitle = document.getElementById('dashboardReportSubtitle');
+        const head = document.getElementById('dashboardReportHead');
+        const body = document.getElementById('dashboardReportBody');
+        if (!modal || !title || !subtitle || !head || !body) return;
+
+        const rows = Array.isArray(report.rows) ? report.rows : [];
+        const columns = Array.isArray(report.columns) ? report.columns : [];
+        title.textContent = report.title || 'Dashboard Report';
+        subtitle.textContent = `${report.subtitle || ''}${rows.length ? ` • ${rows.length} row${rows.length === 1 ? '' : 's'}` : ''}`;
+        head.innerHTML = `
+            <tr>
+                ${columns.map(column => `<th>${this.escapeHtml(column)}</th>`).join('')}
+            </tr>
+        `;
+        body.innerHTML = rows.length
+            ? rows.map(row => `
+                <tr>
+                    ${row.map(value => `<td>${this.escapeHtml(value)}</td>`).join('')}
+                </tr>
+            `).join('')
+            : `<tr><td colspan="${Math.max(columns.length, 1)}" class="empty-state">No records.</td></tr>`;
+        modal.classList.add('active');
     }
 
     updateSitesTab() {
@@ -4271,7 +4346,11 @@ document.getElementById('generateMapBtn')?.addEventListener('click', async () =>
                 });
                 const autoMarker = document.getElementById(`${idPrefix}${input.name}_autoselect`);
                 if (input.required && deviceIds.length === 0 && manualDevices.length === 0) {
-                    if (autoMarker || (module && (module.id === 'ubiquiti_cdp_reader' || module.id === 'uniview_nvr_capture'))) {
+                    if (autoMarker || (module && (
+                        module.id === 'ubiquiti_cdp_reader'
+                        || module.id === 'uniview_nvr_capture'
+                        || module.id === 'uniview_device_type_check'
+                    ))) {
                         inputs[input.name] = { device_ids: '__AUTO__', manual_devices: [] };
                     } else {
                         isValid = false;
