@@ -443,6 +443,24 @@ SITE_SCAN_MODULES = {
 def _is_site_scan_module(module_id):
     return module_id in SITE_SCAN_MODULES
 
+def _module_credential_profiles(module_creds, module_id):
+    if not isinstance(module_creds, dict):
+        return []
+    profiles = list(module_creds.get(module_id, []) or [])
+    inherited_from = []
+    if module_id in ("mac_table_search", "mac_group_map"):
+        inherited_from.append("cdp_discovery")
+    if module_id == "mikrotik_dhcp_backup":
+        inherited_from.append("mikrotik_mac_discovery")
+    if inherited_from:
+        known_names = {profile.get("name") for profile in profiles if isinstance(profile, dict)}
+        for source_module in inherited_from:
+            for profile in module_creds.get(source_module, []) or []:
+                if isinstance(profile, dict) and profile.get("name") not in known_names:
+                    profiles.append(profile)
+                    known_names.add(profile.get("name"))
+    return profiles
+
 def _read_legacy_database_with_salvage():
     def _cleanup_corrupt_backups():
         cutoff = time.time() - (CORRUPT_RETENTION_DAYS * 86400)
@@ -943,14 +961,14 @@ def _validate_schedule_config(schedule):
         params = copy.deepcopy(entry.get("parameters") or {})
         cred_profile = entry.get("credential_profile")
         if cred_profile:
-            profiles = module_creds.get(module_id, []) if isinstance(module_creds, dict) else []
+            profiles = _module_credential_profiles(module_creds, module_id)
             for profile in profiles:
                 if isinstance(profile, dict) and profile.get("name") == cred_profile:
                     params.setdefault("username", profile.get("username", ""))
                     params.setdefault("password", profile.get("password", ""))
                     break
 
-        if module_id == "mikrotik_mac_discovery":
+        if module_id in ("mikrotik_mac_discovery", "mikrotik_dhcp_backup"):
             has_router = bool(params.get("router_ip") or params.get("router_device_id"))
             if not has_router:
                 site_name = (schedule.get("site_scope") or {}).get("sites") or []
@@ -958,16 +976,16 @@ def _validate_schedule_config(schedule):
                 for dev in database.get("devices", []):
                     if site_name and dev.get("site") != site_name:
                         continue
-                    if (dev.get("type") or "").lower() != "server":
+                    if (dev.get("type") or "").lower() not in ("server", "router"):
                         continue
                     name = (dev.get("name") or "").lower()
                     vendor = (dev.get("vendor") or "").lower()
-                    if "mikrotik" in name or "mikrotik" in vendor:
+                    if "mikrotik" in name or "mikrotik" in vendor or "dhcp" in name:
                         if dev.get("ip"):
                             has_router = True
                             break
             if not has_router:
-                errors.append("mikrotik_mac_discovery: missing router_ip or router_device_id")
+                errors.append(f"{module_id}: missing router_ip or router_device_id")
 
         for field in module.get("inputs", []) or []:
             if not isinstance(field, dict):
@@ -2190,7 +2208,7 @@ class ScheduleRunner:
                     params["extra_address_ranges"] = _normalize_site_ranges(existing_ranges + site_ranges)
             credential_profile = entry.get("credential_profile")
             if credential_profile:
-                profiles = module_creds.get(module_id, []) if isinstance(module_creds, dict) else []
+                profiles = _module_credential_profiles(module_creds, module_id)
                 for profile in profiles:
                     if isinstance(profile, dict) and profile.get("name") == credential_profile:
                         params["username"] = profile.get("username", "")
@@ -2965,13 +2983,7 @@ def run_module(module_id):
         if isinstance(params, dict) and params.get("credential_profile"):
             settings = read_settings()
             module_creds = settings.get("module_credentials", {}) if isinstance(settings, dict) else {}
-            profiles = module_creds.get(module_id, []) if isinstance(module_creds, dict) else []
-            if module_id in ("mac_table_search", "mac_group_map") and isinstance(module_creds, dict):
-                known_names = {profile.get("name") for profile in profiles if isinstance(profile, dict)}
-                profiles = list(profiles) + [
-                    profile for profile in module_creds.get("cdp_discovery", [])
-                    if isinstance(profile, dict) and profile.get("name") not in known_names
-                ]
+            profiles = _module_credential_profiles(module_creds, module_id)
             profile_name = str(params.get("credential_profile")).strip()
             credential_profile_name = profile_name
             for profile in profiles:

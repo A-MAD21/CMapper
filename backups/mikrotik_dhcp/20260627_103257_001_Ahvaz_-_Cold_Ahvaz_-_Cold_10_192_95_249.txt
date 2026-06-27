@@ -1,0 +1,42 @@
+# jun/27/2026 07:04:13 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.95.160-10.192.95.220
+add name="POOL Dasti" ranges=10.192.95.220-10.192.95.235
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=1d name=\
+    dhcp1
+/ip address
+add address=10.192.95.249/25 interface=ether1 network=10.192.95.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.95.216 client-id=1:88:d7:f6:c6:15:12 mac-address=\
+    88:D7:F6:C6:15:12 server=dhcp1
+add address=10.192.95.208 client-id=1:4:92:26:5e:16:9f disabled=yes \
+    mac-address=04:92:26:5E:16:9F server=dhcp1
+add address=10.192.95.205 client-id=1:18:c0:4d:65:d0:e5 mac-address=\
+    18:C0:4D:65:D0:E5 server=dhcp1
+add address=10.192.95.182 client-id=1:c4:79:5:78:d8:5 comment="NVR Jadid 1" \
+    mac-address=C4:79:05:78:D8:05 server=dhcp1
+add address=10.192.95.184 client-id=1:c4:79:5:78:d7:ff comment="NVR Jadid 2" \
+    disabled=yes mac-address=C4:79:05:78:D7:FF server=dhcp1
+add address=10.192.95.184 client-id=1:c4:79:5:78:d7:fe comment="NVR jadid 2" \
+    mac-address=C4:79:05:78:D7:FE server=dhcp1
+/ip dhcp-server network
+add address=10.192.95.128/25 dns-server=10.192.30.3,10.192.30.2 gateway=\
+    10.192.95.129
+/ip route
+add distance=1 gateway=10.192.95.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name="Ahvaz - Cold"

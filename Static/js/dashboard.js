@@ -45,6 +45,7 @@ class NetworkPlatform {
         this.moduleCredentialTargets = [
             { id: 'cdp_discovery', label: 'CDP Discovery' },
             { id: 'mikrotik_mac_discovery', label: 'MikroTik MAC Discovery' },
+            { id: 'mikrotik_dhcp_backup', label: 'MikroTik DHCP Backup' },
             { id: 'ubiquiti_cdp_reader', label: 'Read CDP (Ubiquiti)' },
             { id: 'uniview_nvr_capture', label: 'Uniview NVR Packet Capture' },
             { id: 'uniview_device_type_check', label: 'Uniview Device Type Check' },
@@ -5004,8 +5005,24 @@ selectSite(siteName) {
         if (!moduleId) {
             return [];
         }
-        const profiles = (this.moduleCredentials || {})[moduleId];
-        return Array.isArray(profiles) ? profiles : [];
+        const profiles = [...(((this.moduleCredentials || {})[moduleId]) || [])];
+        const inheritedModules = [];
+        if (moduleId === 'mac_table_search' || moduleId === 'mac_group_map') {
+            inheritedModules.push('cdp_discovery');
+        }
+        if (moduleId === 'mikrotik_dhcp_backup') {
+            inheritedModules.push('mikrotik_mac_discovery');
+        }
+        const knownNames = new Set(profiles.map(profile => profile.name));
+        inheritedModules.forEach(sourceModule => {
+            (((this.moduleCredentials || {})[sourceModule]) || []).forEach(profile => {
+                if (!knownNames.has(profile.name)) {
+                    profiles.push(profile);
+                    knownNames.add(profile.name);
+                }
+            });
+        });
+        return profiles;
     }
 
     renderModuleCredentials() {
@@ -5709,14 +5726,22 @@ selectSite(siteName) {
             return [];
         }
         const profiles = [...(((this.moduleCredentials || {})[moduleId]) || [])];
+        const inheritedModules = [];
         if (moduleId === 'mac_table_search' || moduleId === 'mac_group_map') {
-            const knownNames = new Set(profiles.map(profile => profile.name));
-            (((this.moduleCredentials || {}).cdp_discovery) || []).forEach(profile => {
+            inheritedModules.push('cdp_discovery');
+        }
+        if (moduleId === 'mikrotik_dhcp_backup') {
+            inheritedModules.push('mikrotik_mac_discovery');
+        }
+        const knownNames = new Set(profiles.map(profile => profile.name));
+        inheritedModules.forEach(sourceModule => {
+            (((this.moduleCredentials || {})[sourceModule]) || []).forEach(profile => {
                 if (!knownNames.has(profile.name)) {
                     profiles.push(profile);
+                    knownNames.add(profile.name);
                 }
             });
-        }
+        });
         return profiles;
     }
 

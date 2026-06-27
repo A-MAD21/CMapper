@@ -1,0 +1,67 @@
+{
+  "id": "mikrotik_dhcp_backup",
+  "name": "MikroTik DHCP Backup",
+  "version": "1.0",
+  "description": "SSH to a MikroTik DHCP server, run RouterOS export, and save the text backup under backups/mikrotik_dhcp.",
+  "author": "System",
+  "entry_point": "mikrotik_dhcp_backup.py",
+  "inputs": [
+    {
+      "name": "router_device_id",
+      "type": "device_select",
+      "required": false,
+      "label": "Router Device (optional)",
+      "description": "Select the MikroTik DHCP server from this site.",
+      "device_types": [
+        "server",
+        "router"
+      ],
+      "device_name_contains": [
+        "mikrotik",
+        "dhcp"
+      ]
+    },
+    {
+      "name": "router_ip",
+      "type": "text",
+      "required": false,
+      "label": "Router IP (optional)",
+      "placeholder": "10.192.103.10",
+      "description": "Reachable IP of the MikroTik DHCP server. Used if no router device is selected."
+    },
+    {
+      "name": "username",
+      "type": "text",
+      "required": true,
+      "label": "SSH Username",
+      "placeholder": "admin"
+    },
+    {
+      "name": "password",
+      "type": "password",
+      "required": true,
+      "label": "SSH Password",
+      "placeholder": "••••••"
+    },
+    {
+      "name": "ssh_port",
+      "type": "number",
+      "required": false,
+      "default": 22,
+      "label": "SSH Port",
+      "description": "SSH port for the MikroTik device.",
+      "min": 1,
+      "max": 65535
+    },
+    {
+      "name": "timeout_s",
+      "type": "number",
+      "required": false,
+      "default": 90,
+      "label": "Timeout (seconds)",
+      "description": "Maximum time to wait for the export command.",
+      "min": 15,
+      "max": 600
+    }
+  ]
+}
