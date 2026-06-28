@@ -192,6 +192,31 @@ def _safe_part(value: str, fallback: str) -> str:
     return text[:80] if text else fallback
 
 
+def _delete_previous_backups(
+    backup_dir: str,
+    current_path: str,
+    site_part: str,
+    ip_part: str,
+) -> Tuple[list[str], list[str]]:
+    pattern = re.compile(
+        rf"^\d{{8}}_\d{{6}}_{re.escape(site_part)}_.+_{re.escape(ip_part)}(?:_\d+)?\.txt$"
+    )
+    deleted: list[str] = []
+    failures: list[str] = []
+    current_path = os.path.abspath(current_path)
+    for entry in os.scandir(backup_dir):
+        if not entry.is_file() or not pattern.match(entry.name):
+            continue
+        if os.path.abspath(entry.path) == current_path:
+            continue
+        try:
+            os.remove(entry.path)
+            deleted.append(entry.path)
+        except OSError as exc:
+            failures.append(f"{entry.path}: {exc}")
+    return deleted, failures
+
+
 def _resolve_router(config: Dict[str, Any], params: Dict[str, Any]) -> Tuple[str, str]:
     router_ip = str(params.get("router_ip") or "").strip()
     router_name = router_ip
@@ -199,8 +224,11 @@ def _resolve_router(config: Dict[str, Any], params: Dict[str, Any]) -> Tuple[str
     db_path = config.get("database_path")
     site_name = str(config.get("site_name") or "").strip()
 
-    if router_device_id and db_path and os.path.exists(db_path):
+    data: Dict[str, Any] = {}
+    if db_path and os.path.exists(db_path):
         data = read_json_store(db_path, "devices") or {}
+
+    if router_device_id:
         for device in data.get("devices", []):
             if not isinstance(device, dict):
                 continue
@@ -212,22 +240,22 @@ def _resolve_router(config: Dict[str, Any], params: Dict[str, Any]) -> Tuple[str
             router_name = str(device.get("name") or router_ip).strip()
             break
 
-        if not router_ip and site_name:
-            for device in data.get("devices", []):
-                if not isinstance(device, dict):
-                    continue
-                if device.get("site") != site_name:
-                    continue
-                if (device.get("type") or "").lower() not in ("server", "router"):
-                    continue
-                name = (device.get("name") or "").lower()
-                vendor = (device.get("vendor") or "").lower()
-                if "mikrotik" not in name and "mikrotik" not in vendor and "dhcp" not in name:
-                    continue
-                router_ip = str(device.get("ip") or "").strip()
-                router_name = str(device.get("name") or router_ip).strip()
-                if router_ip:
-                    break
+    if not router_ip and site_name:
+        for device in data.get("devices", []):
+            if not isinstance(device, dict):
+                continue
+            if device.get("site") != site_name:
+                continue
+            if (device.get("type") or "").lower() not in ("server", "router"):
+                continue
+            name = (device.get("name") or "").lower()
+            vendor = (device.get("vendor") or "").lower()
+            if "mikrotik" not in name and "mikrotik" not in vendor and "dhcp" not in name:
+                continue
+            router_ip = str(device.get("ip") or "").strip()
+            router_name = str(device.get("name") or router_ip).strip()
+            if router_ip:
+                break
 
     if not router_ip:
         raise ValueError("Router IP is required. Select a router device or enter Router IP.")
@@ -309,9 +337,20 @@ def main() -> None:
     with open(backup_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(export_text)
 
+    deleted_backups, delete_failures = _delete_previous_backups(
+        backup_dir,
+        backup_path,
+        site_part,
+        ip_part,
+    )
+
     duration_s = round((datetime.now() - started).total_seconds(), 3)
     _append_log(log_file, f"SAVED: {backup_path}")
     _append_log(log_file, f"Bytes: {os.path.getsize(backup_path)}")
+    for deleted_path in deleted_backups:
+        _append_log(log_file, f"DELETED OLD BACKUP: {deleted_path}")
+    for failure in delete_failures:
+        _append_log(log_file, f"WARNING: could not delete old backup: {failure}")
     _append_log(log_file, f"Duration: {duration_s}s")
 
     print(json.dumps({
@@ -321,6 +360,8 @@ def main() -> None:
         "router_ip": router_ip,
         "backup_path": backup_path,
         "bytes": os.path.getsize(backup_path),
+        "deleted_old_backups": len(deleted_backups),
+        "delete_warnings": delete_failures,
         "duration_s": duration_s
     }))
 

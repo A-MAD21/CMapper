@@ -1,0 +1,86 @@
+# jun/27/2026 14:11:34 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=\
+    10.192.94.161-10.192.94.238,10.192.13.65-10.192.13.250
+add name="DHCP new" ranges=10.192.13.65-10.192.13.250
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=15m name=\
+    dhcp1
+add address-pool="DHCP new" interface=ether1 lease-time=40m name="server new"
+/ip address
+add address=10.192.94.253/25 interface=ether1 network=10.192.94.128
+add address=10.192.13.254 interface=ether1 network=255.255.255.0
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.94.241 client-id=1:30:9c:23:80:b8:74 mac-address=\
+    30:9C:23:80:B8:74 server=dhcp1
+add address=10.192.94.238 mac-address=00:24:06:F4:2A:99
+add address=10.192.94.250 client-id=1:6c:f1:7e:3e:3b:d7 comment="NVR Cold1" \
+    mac-address=6C:F1:7E:3E:3B:D7 server=dhcp1
+add address=10.192.94.226 client-id=1:0:17:61:10:9e:fa comment=\
+    "Finger Print new #1" mac-address=00:17:61:10:9E:FA server=dhcp1
+add address=10.192.94.237 client-id=1:0:17:61:10:9f:cd comment=\
+    "Finger New #2" disabled=yes mac-address=00:17:61:10:9F:CD server=dhcp1
+add address=10.192.94.251 client-id=1:ac:8b:a9:70:75:7d mac-address=\
+    AC:8B:A9:70:75:7D server=dhcp1
+add address=10.192.94.252 mac-address=E0:63:DA:6A:6A:98
+add address=10.192.94.205 client-id=1:18:c0:4d:de:9c:22 mac-address=\
+    18:C0:4D:DE:9C:22 server=dhcp1
+add address=10.192.13.90 client-id=1:7c:10:c9:9f:c6:a3 comment=\
+    Mrs.Gharabeygli mac-address=7C:10:C9:9F:C6:A3 server=dhcp1
+add address=10.192.13.143 client-id=1:30:9c:23:80:b4:fe comment=\
+    "\8E\D4\DE\ED\CB\D8 \t\CF\DD\CB\DE\CF\CB\DD" mac-address=\
+    30:9C:23:80:B4:FE server=dhcp1
+add address=10.192.94.220 client-id=1:c:9d:92:85:be:4c comment="Rafiei PC" \
+    mac-address=0C:9D:92:85:BE:4C server=dhcp1
+add address=10.192.13.168 client-id=1:18:c0:4d:a4:a1:bb mac-address=\
+    18:C0:4D:A4:A1:BB server=dhcp1
+add address=10.192.94.182 client-id=1:fc:34:97:18:cf:f9 mac-address=\
+    FC:34:97:18:CF:F9 server=dhcp1
+add address=10.192.94.216 client-id=1:18:31:bf:7:fe:9f mac-address=\
+    18:31:BF:07:FE:9F server=dhcp1
+add address=10.192.94.170 comment="Mrs Fallah" mac-address=3C:7C:3F:14:61:89
+add address=10.192.94.172 comment="MRs Soltani.najme" mac-address=\
+    30:5A:3A:7F:E7:44
+add address=10.192.13.208 comment="Mrs Ahmadi.Rozhin" mac-address=\
+    24:4B:FE:49:68:E7
+add address=10.192.13.244 client-id=1:78:20:51:38:4c:f3 comment=\
+    "Mr golchin JBC" mac-address=78:20:51:38:4C:F3 server=dhcp1
+add address=10.192.94.201 mac-address=0C:9D:92:85:A7:4C
+add address=10.192.94.233 client-id=1:4:d4:c4:f3:6f:72 mac-address=\
+    04:D4:C4:F3:6F:72 server=dhcp1
+add address=10.192.13.146 client-id=1:3c:7c:3f:1f:e5:e9 mac-address=\
+    3C:7C:3F:1F:E5:E9 server=dhcp1
+add address=10.192.94.195 client-id=1:c:9d:92:85:b3:fc mac-address=\
+    0C:9D:92:85:B3:FC server=dhcp1
+add address=10.192.94.234 client-id=1:0:1:a9:1b:89:d4 comment=\
+    "New Finger1 - Cold" mac-address=00:01:A9:1B:89:D4 server=dhcp1
+add address=10.192.94.237 client-id=1:0:1:f5:2:1f:8d comment=\
+    "New Finger 1 - Dry" mac-address=00:01:F5:02:1F:8D server=dhcp1
+add address=10.192.94.186 client-id=1:88:26:3f:47:cc:ec comment="New NVR" \
+    mac-address=88:26:3F:47:CC:EC server=dhcp1
+add address=10.192.94.189 client-id=1:c0:74:ad:93:22:ff mac-address=\
+    C0:74:AD:93:22:FF server=dhcp1
+add address=10.192.94.207 comment="Old Finger2" mac-address=00:17:61:11:4D:32
+/ip dhcp-server network
+add address=10.192.13.0/24 dns-server=10.192.30.3,10.192.30.2 gateway=\
+    10.192.13.1
+add address=10.192.94.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    OKCO.ir gateway=10.192.94.129
+/ip route
+add distance=1 gateway=10.192.94.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name="Kerman Cold&Dry"

@@ -1,0 +1,65 @@
+# jun/27/2026 14:12:30 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface ethernet
+set [ find default-name=ether2 ] name=ether1
+set [ find default-name=ether1 ] disabled=yes name=ether2
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.94.26-10.192.94.114
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=8h name=\
+    dhcp1
+/ip address
+add address=10.192.94.2/25 interface=ether1 network=10.192.94.0
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.94.106 client-id=1:18:c0:4d:de:9c:81 mac-address=\
+    18:C0:4D:DE:9C:81 server=dhcp1
+add address=10.192.94.75 client-id=1:4:92:26:d5:b7:a7 mac-address=\
+    04:92:26:D5:B7:A7 server=dhcp1
+add address=10.192.94.120 client-id=1:4:d4:c4:f3:74:54 mac-address=\
+    04:D4:C4:F3:74:54 server=dhcp1
+add address=10.192.94.112 client-id=1:0:e0:4c:83:22:f2 mac-address=\
+    00:E0:4C:83:22:F2 server=dhcp1
+add address=10.192.94.105 client-id=1:4:d4:c4:f1:e2:b9 mac-address=\
+    04:D4:C4:F1:E2:B9 server=dhcp1
+add address=10.192.94.34 client-id=1:3c:7c:3f:14:61:b5 mac-address=\
+    3C:7C:3F:14:61:B5 server=dhcp1
+add address=10.192.94.60 client-id=cisco-0cd9.96ab.1d40-Vl1 mac-address=\
+    0C:D9:96:AB:1D:40 server=dhcp1
+add address=10.192.94.36 client-id=1:18:31:bf:8:3:ef mac-address=\
+    18:31:BF:08:03:EF server=dhcp1
+add address=10.192.94.37 client-id=1:88:d7:f6:c6:14:71 mac-address=\
+    88:D7:F6:C6:14:71 server=dhcp1
+add address=10.192.94.43 client-id=1:c0:74:ad:c2:e1:9e mac-address=\
+    C0:74:AD:C2:E1:9E server=dhcp1
+add address=10.192.94.29 client-id=1:3c:7c:3f:b8:f2:51 mac-address=\
+    3C:7C:3F:B8:F2:51 server=dhcp1
+add address=10.192.94.28 client-id=1:3c:7c:3f:b8:43:1e mac-address=\
+    3C:7C:3F:B8:43:1E server=dhcp1
+add address=10.192.94.40 comment="Reserved For Mr.Soleimani Server" \
+    mac-address=00:22:55:88:77:44 server=dhcp1
+add address=10.192.94.44 client-id=1:c0:74:ad:c2:e1:9e comment=ESXI \
+    mac-address=C0:74:AD:C2:E1:91 server=dhcp1
+add address=10.192.94.72 client-id=1:b4:29:3d:89:6f:58 comment=\
+    "PDA QC - Temp" mac-address=B4:29:3D:89:6F:58 server=dhcp1
+add address=10.192.94.88 client-id=1:0:1:f5:2:1f:de comment=\
+    "New Finger Virgo 1" mac-address=00:01:F5:02:1F:DE server=dhcp1
+/ip dhcp-server network
+add address=10.192.94.0/25 dns-server=10.192.30.3,10.192.30.2 domain=okco.ir \
+    gateway=10.192.94.1
+/ip route
+add distance=1 gateway=10.192.94.1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Ahvaz-Dry

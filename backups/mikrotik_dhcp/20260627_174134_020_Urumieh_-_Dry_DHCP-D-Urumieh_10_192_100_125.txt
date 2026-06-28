@@ -1,0 +1,77 @@
+# 2026-06-27 14:08:05 by RouterOS 7.16.2
+# software id = 
+#
+/interface ethernet
+set [ find default-name=ether1 ] disable-running-check=no
+/ip pool
+add name=DHCP-Urumiah ranges=10.192.100.30-10.192.100.124
+/ip dhcp-server
+add address-pool=DHCP-Urumiah interface=ether1 lease-time=59m name=DHCP-S
+/port
+set 0 name=serial0
+set 1 name=serial1
+/ip address
+add address=10.192.100.125/25 interface=ether1 network=10.192.100.0
+/ip dhcp-client
+add interface=ether1
+/ip dhcp-server lease
+add address=10.192.100.41 comment="NVR 41" mac-address=11:22:33:44:55:66 \
+    server=DHCP-S
+add address=10.192.100.42 comment=NVR42 mac-address=11:22:33:44:55:67 server=\
+    DHCP-S
+add address=10.192.100.98 client-id=1:d8:b3:70:cc:fc:df comment=\
+    "AP Negahbani\\" mac-address=D8:B3:70:CC:FC:DF server=DHCP-S
+add address=10.192.100.47 client-id=1:b4:29:3d:7f:c2:c9 comment="TEST PDA" \
+    mac-address=B4:29:3D:7F:C2:C9 server=DHCP-S
+add address=10.192.100.121 comment="Switch(lost)" mac-address=\
+    00:00:00:00:00:01
+add address=10.192.100.45 comment=NVR45 mac-address=00:00:00:00:00:02
+add address=10.192.100.35 comment=NVR35 mac-address=00:00:00:00:00:03
+add address=10.192.100.25 comment=NVR25 mac-address=00:00:00:00:00:04
+add address=10.192.100.39 client-id=1:cc:28:aa:33:e5:86 mac-address=\
+    CC:28:AA:33:E5:86 server=DHCP-S
+add address=10.192.100.92 client-id=1:60:45:cb:a9:6:65 mac-address=\
+    60:45:CB:A9:06:65 server=DHCP-S
+add address=10.192.100.106 client-id=1:74:56:3c:63:12:80 mac-address=\
+    74:56:3C:63:12:80 server=DHCP-S
+add address=10.192.100.53 client-id=1:18:31:bf:7:fb:a5 mac-address=\
+    18:31:BF:07:FB:A5 server=DHCP-S
+add address=10.192.100.32 client-id=1:18:c0:4d:de:9c:ff mac-address=\
+    18:C0:4D:DE:9C:FF server=DHCP-S
+add address=10.192.100.62 client-id=1:2c:4d:54:4f:de:d3 mac-address=\
+    2C:4D:54:4F:DE:D3 server=DHCP-S
+add address=10.192.100.37 client-id=1:bc:fc:e7:86:c9:b1 mac-address=\
+    BC:FC:E7:86:C9:B1 server=DHCP-S
+add address=10.192.100.124 client-id=1:d4:5d:64:49:22:26 mac-address=\
+    D4:5D:64:49:22:26 server=DHCP-S
+add address=10.192.100.58 client-id=1:70:4d:7b:b3:b9:c mac-address=\
+    70:4D:7B:B3:B9:0C server=DHCP-S
+add address=10.192.100.36 client-id=1:34:97:f6:94:1c:9b mac-address=\
+    34:97:F6:94:1C:9B server=DHCP-S
+add address=10.192.100.102 client-id=1:88:d7:f6:c6:10:21 mac-address=\
+    88:D7:F6:C6:10:21 server=DHCP-S
+add address=10.192.100.63 client-id=1:fc:34:97:18:d0:1 mac-address=\
+    FC:34:97:18:D0:01 server=DHCP-S
+add address=10.192.100.91 client-id=1:0:17:61:10:65:43 comment="Finger 2" \
+    mac-address=00:17:61:10:65:43 server=DHCP-S
+add address=10.192.100.15 comment="Finger 1" mac-address=00:55:66:99:88:77 \
+    server=DHCP-S
+add address=10.192.100.93 client-id=1:0:1:a9:1b:89:be comment=\
+    "New Virgo Finger 1" mac-address=00:01:A9:1B:89:BE server=DHCP-S
+add address=10.192.100.112 comment="New Virgo Finger 2" mac-address=\
+    00:01:F5:02:1F:C6
+/ip dhcp-server network
+add address=10.192.100.0/25 dns-server=10.192.30.3,10.192.30.2 domain=OKCO.ir \
+    gateway=10.192.100.1
+/ip route
+add dst-address=0.0.0.0/0 gateway=ether1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=DHCP-D-Urumieh
+/system note
+set show-at-login=no

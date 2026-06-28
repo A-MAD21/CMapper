@@ -1,0 +1,46 @@
+# jun/27/2026 14:11:41 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=\
+    172.29.148.15-172.29.148.49,172.29.148.55-172.29.148.62
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=1h10m \
+    name=dhcp1
+/ip address
+add address=172.29.148.1/26 interface=ether1 network=172.29.148.0
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=172.29.148.31 client-id=1:b4:2e:99:db:b1:cb mac-address=\
+    B4:2E:99:DB:B1:CB server=dhcp1
+add address=172.29.148.62 client-id=1:70:4d:7b:b3:c4:b0 mac-address=\
+    70:4D:7B:B3:C4:B0 server=dhcp1
+add address=172.29.148.24 client-id=1:ac:e2:d3:46:23:e7 mac-address=\
+    AC:E2:D3:46:23:E7 server=dhcp1
+add address=172.29.148.17 client-id=1:b4:2e:99:75:28:d5 mac-address=\
+    B4:2E:99:75:28:D5 server=dhcp1
+add address=172.29.148.40 client-id=1:28:70:4e:cf:6a:f0 comment="AP Salon 3" \
+    mac-address=28:70:4E:CF:6A:F0 server=dhcp1
+add address=172.29.148.42 client-id=1:28:70:4e:cf:10:34 comment="AP salon 2" \
+    mac-address=28:70:4E:CF:10:34 server=dhcp1
+add address=172.29.148.43 comment="Virgo 1" mac-address=00:01:F5:02:20:22
+/ip dhcp-server network
+add address=172.29.148.0/26 dns-server=10.192.30.2,10.192.30.3 gateway=\
+    172.29.148.51
+/ip route
+add distance=1 gateway=172.29.148.51
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Rasht-Cold
+/system ntp client
+set enabled=yes primary-ntp=10.192.30.2 secondary-ntp=10.192.30.3

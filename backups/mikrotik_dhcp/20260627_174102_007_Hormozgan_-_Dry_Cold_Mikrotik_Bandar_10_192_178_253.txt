@@ -1,0 +1,104 @@
+# 2001-10-21 00:28:43 by RouterOS 7.16.2
+# software id = 
+#
+/interface ethernet
+set [ find default-name=ether1 ] disable-running-check=no
+set [ find default-name=ether2 ] disable-running-check=no
+/ip pool
+add name=BAbbad ranges=10.192.178.66-10.192.178.252
+/ip dhcp-server
+add address-pool=BAbbad interface=ether1 lease-time=59m name=server1
+/port
+set 0 name=serial0
+set 1 name=serial1
+/ip address
+add address=10.192.178.253/24 interface=ether1 network=10.192.178.0
+add address=190.168.10.250/24 disabled=yes interface=ether2 network=\
+    190.168.10.0
+/ip dhcp-client
+add interface=ether1
+/ip dhcp-server lease
+add address=10.192.178.239 client-id=1:0:17:61:10:a0:bc comment=Finger \
+    mac-address=00:17:61:10:A0:BC server=server1
+add address=10.192.178.228 client-id=1:c:ea:14:b0:e5:d3 comment="AP04 Cold" \
+    mac-address=0C:EA:14:B0:E5:D3 server=server1
+add address=10.192.178.227 client-id=1:c:ea:14:b5:6f:39 comment="AP03 Cold" \
+    mac-address=0C:EA:14:B5:6F:39 server=server1
+add address=10.192.178.226 client-id=1:c:ea:14:b5:6c:4b comment="AP02 Cold" \
+    mac-address=0C:EA:14:B5:6C:4B server=server1
+add address=10.192.178.224 client-id=1:c:ea:14:b5:74:a comment="AP06 Cold" \
+    mac-address=0C:EA:14:B5:74:0A server=server1
+add address=10.192.178.219 client-id=1:e4:f1:4c:60:43:51 comment=NVR \
+    mac-address=E4:F1:4C:60:43:51 server=server1
+add address=10.192.178.217 client-id=1:e4:f1:4c:60:43:6d comment=NVR \
+    mac-address=E4:F1:4C:60:43:6D server=server1
+add address=10.192.178.194 client-id=1:4:d4:c4:6:93:f2 mac-address=\
+    04:D4:C4:06:93:F2 server=server1
+add address=10.192.178.193 mac-address=00:00:00:00:00:06
+add address=10.192.178.191 mac-address=00:00:00:00:00:21
+add address=10.192.178.192 mac-address=00:00:00:00:00:08
+add address=10.192.178.189 mac-address=00:00:00:00:20:00
+add address=10.192.178.190 mac-address=00:00:00:00:00:13
+add address=10.192.178.195 mac-address=00:00:00:00:00:67
+add address=10.192.178.199 mac-address=00:00:00:00:00:68
+add address=10.192.178.196 client-id=1:e4:f1:4c:60:43:63 comment=NVR \
+    mac-address=E4:F1:4C:60:43:63 server=server1
+add address=10.192.178.186 comment=Printer mac-address=B0:22:7A:7F:11:DB \
+    server=server1
+add address=10.192.178.185 client-id=1:f4:92:bf:c6:9d:f8 comment=\
+    "AP06-Edari Dry" mac-address=F4:92:BF:C6:9D:F8 server=server1
+add address=10.192.178.46 client-id=112233445566 comment=NVR mac-address=\
+    E4:F1:4C:60:43:6D server=server1
+add address=10.192.178.166 comment="AP 00AC Guard" mac-address=\
+    D8:B3:70:CC:FD:E0
+add address=10.192.178.145 client-id=1:dc:2c:6e:ee:ff:a1 comment=Radio#2 \
+    mac-address=DC:2C:6E:EE:FF:A1 server=server1
+add address=10.192.178.81 client-id=1:0:17:61:10:a0:96 comment=FingerP#2 \
+    mac-address=00:17:61:10:A0:96 server=server1
+add address=10.192.178.144 client-id=1:18:fd:74:50:2c:cf comment=Radio#1 \
+    mac-address=18:FD:74:50:2C:CF server=server1
+add address=10.192.178.83 client-id=1:d4:5d:64:af:41:c9 comment="Mr Saberi" \
+    mac-address=D4:5D:64:AF:41:C9 server=server1
+add address=10.192.178.100 client-id=1:18:c0:4d:15:9a:2 mac-address=\
+    18:C0:4D:15:9A:02 server=server1
+add address=10.192.178.110 client-id=1:a8:5e:45:e7:2e:c2 mac-address=\
+    A8:5E:45:E7:2E:C2 server=server1
+add address=10.192.178.107 client-id=1:0:15:94:74:e8:0 comment=Bixolen \
+    mac-address=00:15:94:74:E8:00 server=server1
+add address=10.192.178.130 client-id=1:b4:2e:99:db:b2:1d mac-address=\
+    B4:2E:99:DB:B2:1D server=server1
+add address=10.192.178.99 client-id=1:b4:2e:99:75:23:eb mac-address=\
+    B4:2E:99:75:23:EB server=server1
+add address=10.192.178.135 client-id=1:b4:2e:99:73:8e:10 comment=\
+    "Mr Roodani PC" mac-address=B4:2E:99:73:8E:10 server=server1
+add address=10.192.178.106 client-id=1:2c:4d:54:e9:ae:11 mac-address=\
+    2C:4D:54:E9:AE:11 server=server1
+add address=10.192.178.143 client-id=1:60:45:cb:86:2a:52 mac-address=\
+    60:45:CB:86:2A:52 server=server1
+add address=10.192.178.77 client-id=1:c:ea:14:b0:e4:b3 comment="AP01 Cold" \
+    mac-address=0C:EA:14:B0:E4:B3 server=server1
+add address=10.192.178.78 client-id=1:28:70:4e:cf:10:46 comment="AP02 Cold" \
+    mac-address=28:70:4E:CF:10:46 server=server1
+add address=10.192.178.251 client-id=1:d8:b3:70:cc:fb:d4 comment="AP 01 Dry" \
+    mac-address=D8:B3:70:CC:FB:D4 server=server1
+add address=10.192.178.79 client-id=1:f4:92:bf:c6:a0:89 comment="AP 07 Dry" \
+    mac-address=F4:92:BF:C6:A0:89 server=server1
+add address=10.192.178.84 client-id=1:0:1:a9:1b:89:c4 comment=\
+    "New Virgo Finger 1" mac-address=00:01:A9:1B:89:C4 server=server1
+add address=10.192.178.102 client-id=1:0:1:f5:2:1f:f5 comment=\
+    "New Virgo Finger 2" mac-address=00:01:F5:02:1F:F5 server=server1
+/ip dhcp-server network
+add address=10.192.178.0/24 dns-server=10.192.30.3,10.192.30.2 gateway=\
+    10.192.178.1 netmask=24
+/ip route
+add dst-address=0.0.0.0/0 gateway=10.192.178.1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=BAbbad-DHCP
+/system note
+set show-at-login=no

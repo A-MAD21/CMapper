@@ -1,0 +1,62 @@
+# oct/25/2016 13:45:53 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface ethernet
+set [ find default-name=ether1 ] mac-address=00:0C:29:AD:F3:06
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.85.51-10.192.85.120
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=1d name=\
+    dhcp1
+/ip address
+add address=10.192.85.126/25 interface=ether1 network=10.192.85.0
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.85.115 client-id=1:ac:22:b:74:f6:56 mac-address=\
+    AC:22:0B:74:F6:56 server=dhcp1
+add address=10.192.85.80 client-id=1:0:e0:4c:36:2:0 comment="Surena PC" \
+    mac-address=00:E0:4C:36:02:00 server=dhcp1
+add address=10.192.85.111 client-id=1:0:17:61:10:9e:65 comment=\
+    "FingerPrint #2" mac-address=00:17:61:10:9E:65 server=dhcp1
+add address=10.192.85.67 client-id=1:18:c0:4d:18:82:9e comment="Mr Barsalani" \
+    mac-address=18:C0:4D:18:82:9E server=dhcp1
+add address=10.192.85.54 client-id=1:0:0:0:0:0:0 server=dhcp1
+add address=10.192.85.52 client-id=1:14:2:ec:31:9d:ec mac-address=\
+    14:02:EC:31:9D:EC server=dhcp1
+add address=10.192.85.82 client-id=1:4:d9:f5:ac:b2:d3 mac-address=\
+    04:D9:F5:AC:B2:D3 server=dhcp1
+add address=10.192.85.83 client-id=1:4:d4:c4:f3:73:91 mac-address=\
+    04:D4:C4:F3:73:91 server=dhcp1
+add address=10.192.85.53 client-id=1:4c:11:54:c0:ee:23 mac-address=\
+    4C:11:54:C0:EE:23 server=dhcp1
+add address=10.192.85.116 client-id=1:18:31:bf:7:fd:98 mac-address=\
+    18:31:BF:07:FD:98 server=dhcp1
+add address=10.192.85.119 client-id=1:e0:3f:49:46:4a:6f mac-address=\
+    E0:3F:49:46:4A:6F server=dhcp1
+add address=10.192.85.90 client-id=1:60:45:cb:6d:14:fb mac-address=\
+    60:45:CB:6D:14:FB server=dhcp1
+add address=10.192.85.69 client-id=1:e8:6a:64:b4:d9:e5 mac-address=\
+    E8:6A:64:B4:D9:E5 server=dhcp1
+add address=10.192.85.56 client-id=1:88:d7:f6:7e:6b:f9 mac-address=\
+    88:D7:F6:7E:6B:F9 server=dhcp1
+add address=10.192.85.70 client-id=1:0:1:a9:1b:89:de comment=\
+    "New Virgo 1 Finger" mac-address=00:01:A9:1B:89:DE server=dhcp1
+add address=10.192.85.72 client-id=1:0:1:a9:1b:89:89 comment=\
+    "New Virgo 2 Finger" mac-address=00:01:A9:1B:89:89 server=dhcp1
+/ip dhcp-server network
+add address=10.192.85.0/25 dns-server=10.192.30.3,10.192.30.2 gateway=\
+    10.192.85.1
+/ip route
+add distance=1 gateway=10.192.85.1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Mashhad-Dry

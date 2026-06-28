@@ -1,0 +1,89 @@
+# jun/27/2026 14:14:14 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.108.41-10.192.108.124
+add name=P2L ranges=191.168.0.15-191.168.15.250
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=40m name=\
+    dhcp1
+add address-pool=P2L disabled=no interface=ether2 name=P2L
+/ip address
+add address=10.192.108.126/25 interface=ether1 network=10.192.108.0
+add address=191.168.11.2/20 interface=ether2 network=191.168.0.0
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.108.47 client-id=1:b4:29:3d:7f:c1:45 comment="TEST PDA" \
+    mac-address=B4:29:3D:7F:C1:45 server=dhcp1
+add address=10.192.108.118 comment=JBC mac-address=74:D0:2B:7C:22:B9
+add address=10.192.108.102 client-id=1:a8:7e:ea:4a:c3:7e comment=\
+    "Mr.Dehghany PC" mac-address=A8:7E:EA:4A:C3:7E server=dhcp1
+add address=10.192.108.82 comment="Mr Murteza Mousavi Machine" mac-address=\
+    00:00:00:03:02:01
+add address=10.192.108.94 comment=Pick2Light mac-address=00:00:00:00:00:09
+add address=10.192.108.125 mac-address=B4:29:3D:7F:C1:56
+add address=10.192.108.68 comment="New Switch " mac-address=11:22:33:33:22:11
+add address=10.192.108.44 client-id=1:e4:f1:4c:60:43:6a comment="NEW NVR" \
+    mac-address=E4:F1:4C:60:43:6A server=dhcp1
+add address=10.192.108.114 client-id=1:74:56:3c:d6:55:c0 comment=Mrs.Moniri \
+    mac-address=74:56:3C:D6:55:C0 server=dhcp1
+add address=10.192.108.72 client-id=1:cc:28:aa:33:ec:ea comment=GuardmKH \
+    mac-address=CC:28:AA:33:EC:EA server=dhcp1
+add address=10.192.108.39 comment="Pick2Ligh2 Modem" mac-address=\
+    08:68:07:E8:0B:AC
+add address=10.192.108.54 client-id=1:b4:29:3d:89:6f:ed comment=\
+    "PDA shakhsi Mr Aminnasab" mac-address=B4:29:3D:89:6F:ED server=dhcp1
+add address=10.192.108.97 client-id=1:f8:32:e4:a3:1b:fe mac-address=\
+    F8:32:E4:A3:1B:FE server=dhcp1
+add address=10.192.108.71 client-id=1:0:c:29:c1:f7:f4 mac-address=\
+    00:0C:29:C1:F7:F4 server=dhcp1
+add address=191.168.11.10 comment=191.168.11.10 mac-address=11:22:33:44:33:22 \
+    server=P2L
+add address=10.192.108.109 comment="Linux P2l" mac-address=11:22:33:11:22:33 \
+    server=P2L
+add address=191.168.15.124 client-id=1:0:c:29:d7:1e:12 mac-address=\
+    00:0C:29:D7:1E:12 server=P2L
+add address=10.192.108.46 client-id=1:b4:2e:99:5a:f9:e0 comment="Mr Fattahi" \
+    mac-address=B4:2E:99:5A:F9:E0 server=dhcp1
+add address=10.192.108.122 client-id=1:3c:7c:3f:11:e4:8d mac-address=\
+    3C:7C:3F:11:E4:8D server=dhcp1
+add address=10.192.108.123 client-id=1:88:d7:f6:c6:13:34 mac-address=\
+    88:D7:F6:C6:13:34 server=dhcp1
+add address=10.192.108.73 client-id=1:24:4b:fe:79:d:5b mac-address=\
+    24:4B:FE:79:0D:5B server=dhcp1
+add address=10.192.108.104 client-id=1:b4:2e:99:5a:1c:37 mac-address=\
+    B4:2E:99:5A:1C:37 server=dhcp1
+add address=10.192.108.119 client-id=1:cc:28:aa:33:ec:c6 mac-address=\
+    CC:28:AA:33:EC:C6 server=dhcp1
+add address=10.192.108.90 client-id=1:b4:2e:99:75:23:f5 mac-address=\
+    B4:2E:99:75:23:F5 server=dhcp1
+add address=10.192.108.52 client-id=1:88:d7:f6:c6:14:1f mac-address=\
+    88:D7:F6:C6:14:1F server=dhcp1
+add address=10.192.108.41 client-id=1:88:d7:f6:7e:6c:d4 mac-address=\
+    88:D7:F6:7E:6C:D4 server=dhcp1
+add address=10.192.108.56 client-id=1:3c:7c:3f:e:a4:6c mac-address=\
+    3C:7C:3F:0E:A4:6C server=dhcp1
+add address=10.192.108.124 client-id=1:0:1:f5:2:20:2b comment=\
+    "New Virgo Finger 1" mac-address=00:01:F5:02:20:2B server=dhcp1
+add address=10.192.108.121 client-id=1:0:1:a9:1b:89:cd comment=\
+    "New Virgo Finger 02" mac-address=00:01:A9:1B:89:CD server=dhcp1
+/ip dhcp-server network
+add address=10.192.108.0/25 dns-server=10.192.30.3,10.192.30.2 gateway=\
+    10.192.108.1
+add address=191.168.0.0/20 dns-server=191.168.11.10 domain=okcs.store \
+    gateway=191.168.11.1
+/ip route
+add distance=1 gateway=10.192.108.1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name="Tabriz - Dry"

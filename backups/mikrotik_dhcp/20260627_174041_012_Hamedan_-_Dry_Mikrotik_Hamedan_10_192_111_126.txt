@@ -1,0 +1,83 @@
+# jun/27/2026 18:40:42 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name="pool k" ranges=10.192.111.50-10.192.111.115
+/ip dhcp-server
+add address-pool="pool k" disabled=no interface=ether1 lease-time=1d name=\
+    server1
+/ip address
+add address=172.29.129.189/26 interface=ether1 network=172.29.129.128
+add address=10.192.111.126/25 interface=ether1 network=10.192.111.0
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.111.65 client-id=1:2c:4d:54:51:76:85 mac-address=\
+    2C:4D:54:51:76:85 server=server1
+add address=10.192.111.66 client-id=1:60:45:cb:6d:15:10 mac-address=\
+    60:45:CB:6D:15:10 server=server1
+add address=10.192.111.82 comment="Printer m26" mac-address=6C:02:E0:BC:58:42 \
+    server=server1
+add address=10.192.111.2 comment=SW-Jadid1 mac-address=11:22:33:44:55:66
+add address=10.192.111.13 comment=SW-Jadid2 mac-address=11:22:33:44:55:65
+add address=10.192.111.4 comment=SW-Jadid3 mac-address=11:22:33:44:55:64
+add address=10.192.111.5 comment=SW-Jadid4 mac-address=11:22:33:44:55:63
+add address=10.192.111.6 comment=SW-Jadid5 mac-address=11:22:33:44:55:62
+add address=10.192.111.7 comment=SW-Jadid6 mac-address=11:22:33:44:55:61
+add address=10.192.111.11 comment=SW-Jadid-7 mac-address=11:22:33:66:99:88
+add address=10.192.111.125 client-id=1:d8:b3:70:a6:a3:52 comment="AP 10 Mesh" \
+    mac-address=D8:B3:70:A6:A3:52 server=server1
+add address=10.192.111.12 comment=SW-Jadid-8-SWC7 mac-address=\
+    00:00:00:00:00:01
+add address=10.192.111.117 client-id=1:3c:7c:3f:14:61:95 comment=Mr.Barazande \
+    mac-address=3C:7C:3F:14:61:95 server=server1
+add address=10.192.111.87 client-id=1:cc:28:aa:34:73:4a mac-address=\
+    CC:28:AA:34:73:4A server=server1
+add address=10.192.111.94 client-id=1:88:d7:f6:7e:6c:27 mac-address=\
+    88:D7:F6:7E:6C:27 server=server1
+add address=10.192.111.53 client-id=1:18:31:bf:7:f8:8b mac-address=\
+    18:31:BF:07:F8:8B server=server1
+add address=10.192.111.54 client-id=1:a0:ad:9f:19:24:9 comment=\
+    "MR Rajabi.abozar" mac-address=A0:AD:9F:19:24:09 server=server1
+add address=10.192.111.67 client-id=1:c8:a3:62:ed:b6:9d comment="MR Amiri" \
+    mac-address=C8:A3:62:ED:B6:9D server=server1
+add address=10.192.111.97 client-id=1:bc:fc:e7:d6:d:b1 mac-address=\
+    BC:FC:E7:D6:0D:B1 server=server1
+add address=10.192.111.96 client-id=1:a8:5e:45:6d:51:0 mac-address=\
+    A8:5E:45:6D:51:00 server=server1
+add address=10.192.111.88 client-id=1:18:c0:4d:65:d0:d5 mac-address=\
+    18:C0:4D:65:D0:D5 server=server1
+add address=10.192.111.63 client-id=1:0:50:ba:8c:f:4b mac-address=\
+    00:50:BA:8C:0F:4B server=server1
+add address=10.192.111.95 client-id=1:18:31:bf:c8:d7:18 mac-address=\
+    18:31:BF:C8:D7:18 server=server1
+add address=10.192.111.106 client-id=1:4c:ed:fb:bf:4a:90 mac-address=\
+    4C:ED:FB:BF:4A:90 server=server1
+add address=10.192.111.93 client-id=1:b4:29:3d:83:a:e4 mac-address=\
+    00:00:00:22:33:55 server=server1
+add address=10.192.111.105 client-id=1:0:1:a9:1b:89:ae comment=\
+    "New Virgo Finger 1" mac-address=00:01:A9:1B:89:AE server=server1
+add address=10.192.111.52 client-id=1:0:1:f5:2:20:1d comment=\
+    "New Virgo finger 2" mac-address=00:01:F5:02:20:1D server=server1
+/ip dhcp-server network
+add dns-server=10.192.30.3,10.192.30.2 domain=okco.ir gateway=10.192.111.1 \
+    netmask=25
+/ip route
+add distance=1 gateway=172.29.129.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system clock
+set time-zone-name=Asia/Tehran
+/system identity
+set name=Hamedan-Dry
+/system ntp client
+set enabled=yes primary-ntp=10.192.30.2 secondary-ntp=10.192.30.3 \
+    server-dns-names=okco.ir

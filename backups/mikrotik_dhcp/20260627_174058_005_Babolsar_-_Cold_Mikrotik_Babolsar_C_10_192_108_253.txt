@@ -1,0 +1,41 @@
+# jun/27/2026 14:13:19 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.108.151-10.192.108.220
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=1w name=\
+    dhcp1
+/ip address
+add address=10.192.108.253/25 interface=ether1 network=10.192.108.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.108.212 client-id=1:80:91:33:14:d9:d5 comment=\
+    "Mehrdad Karami" mac-address=80:91:33:14:D9:D5 server=dhcp1
+add address=10.192.108.182 client-id=1:0:17:61:11:2f:c comment=Sa@zani \
+    mac-address=00:17:61:11:2F:0C server=dhcp1
+add address=10.192.108.162 client-id=1:b4:2e:99:5a:ff:76 mac-address=\
+    B4:2E:99:5A:FF:76 server=dhcp1
+add address=10.192.108.174 client-id=1:c0:74:ad:c9:3:54 comment=SIP \
+    mac-address=C0:74:AD:C9:03:54 server=dhcp1
+add address=10.192.108.172 client-id=1:60:cf:84:6a:47:ca mac-address=\
+    60:CF:84:6A:47:CA server=dhcp1
+add address=10.192.108.181 client-id=1:0:17:61:10:9e:8c comment=Sa@zani2 \
+    mac-address=00:17:61:10:9E:8C server=dhcp1
+/ip dhcp-server network
+add address=10.192.108.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=10.192.108.129
+/ip route
+add distance=1 gateway=10.192.108.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Sard-Babolsar

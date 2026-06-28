@@ -1,0 +1,84 @@
+# jun/06/2012 21:34:53 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface ethernet
+set [ find default-name=ether1 ] mac-address=00:0C:29:AD:F3:06
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=\
+    172.29.147.109-172.29.147.126,10.192.97.40-10.192.97.126
+/ip dhcp-server
+add add-arp=yes address-pool=dhcp_pool0 disabled=no interface=ether1 \
+    lease-time=8h10m name=dhcp1
+/ip address
+add address=172.29.147.65/26 interface=ether1 network=172.29.147.64
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=172.29.147.122 client-id=1:18:c0:4d:a3:f4:fb mac-address=\
+    18:C0:4D:A3:F4:FB server=dhcp1
+add address=172.29.147.120 client-id=1:38:d5:47:f:21:23 mac-address=\
+    38:D5:47:0F:21:23 server=dhcp1
+add address=172.29.147.126 client-id=1:38:d5:47:f:19:28 mac-address=\
+    38:D5:47:0F:19:28 server=dhcp1
+add address=172.29.147.78 client-id=1:18:31:bf:8:0:b5 mac-address=\
+    18:31:BF:08:00:B5 server=dhcp1
+add address=172.29.147.91 client-id=1:ac:8b:a9:70:75:f8 comment="AP 06 Guard" \
+    mac-address=AC:8B:A9:70:75:F8 server=dhcp1
+add address=10.192.97.41 client-id=1:38:d5:47:f:18:d7 comment="Mr Omidi" \
+    mac-address=38:D5:47:0F:18:D7 server=dhcp1
+add address=10.192.97.46 client-id=1:38:d5:47:f:19:2 comment=Esmaeilzade \
+    mac-address=38:D5:47:0F:19:02 server=dhcp1
+add address=172.29.147.109 client-id=1:44:db:d2:26:d4:60 comment=\
+    "SIP 52242 gardesh2" mac-address=44:DB:D2:26:D4:60 server=dhcp1
+add address=10.192.97.122 client-id=1:0:17:61:11:2f:5f comment="Finger 2" \
+    mac-address=00:17:61:11:2F:5F server=dhcp1
+add address=172.29.147.125 client-id=1:c0:74:ad:93:22:de mac-address=\
+    C0:74:AD:93:22:DE server=dhcp1
+add address=172.29.147.124 client-id=1:d8:b3:70:cc:fc:aa comment="AP 07" \
+    mac-address=D8:B3:70:CC:FC:AA server=dhcp1
+add address=172.29.147.117 client-id=1:24:4b:fe:81:4c:54 mac-address=\
+    24:4B:FE:81:4C:54 server=dhcp1
+add address=172.29.147.105 comment="Reserved For SW-2-Edari-NVR" mac-address=\
+    00:00:00:00:00:01
+add address=10.192.97.88 client-id=1:c4:79:5:bf:9c:cd comment=NVR \
+    mac-address=C4:79:05:BF:9C:CD server=dhcp1
+add address=10.192.97.126 client-id=1:38:d5:47:f:1c:3f mac-address=\
+    38:D5:47:0F:1C:3F server=dhcp1
+add address=10.192.97.42 client-id=1:d4:5d:64:1d:9f:11 mac-address=\
+    D4:5D:64:1D:9F:11 server=dhcp1
+add address=10.192.97.44 client-id=1:38:d5:47:f:21:27 mac-address=\
+    38:D5:47:0F:21:27 server=dhcp1
+add address=172.29.147.118 client-id=1:18:31:bf:7:f6:f8 mac-address=\
+    18:31:BF:07:F6:F8 server=dhcp1
+add address=10.192.97.104 client-id=1:38:d5:47:13:bb:b8 mac-address=\
+    38:D5:47:13:BB:B8 server=dhcp1
+add address=10.192.97.120 client-id=1:30:e3:a4:ab:b4:9f mac-address=\
+    30:E3:A4:AB:B4:9F server=dhcp1
+add address=10.192.97.113 client-id=1:88:d7:f6:c6:12:87 mac-address=\
+    88:D7:F6:C6:12:87 server=dhcp1
+add address=10.192.97.123 client-id=1:0:e0:4c:36:1:8a mac-address=\
+    00:E0:4C:36:01:8A server=dhcp1
+add address=172.29.147.119 client-id=1:0:1:f5:2:20:24 comment=\
+    "New Finger Virgo 1" mac-address=00:01:F5:02:20:24 server=dhcp1
+add address=172.29.147.123 client-id=1:0:1:f5:2:20:20 comment=\
+    "New Finger Virgo 2" mac-address=00:01:F5:02:20:20 server=dhcp1
+add address=10.192.97.98 client-id=1:18:c0:4d:a4:a1:79 comment="MR Omidi" \
+    mac-address=18:C0:4D:A4:A1:79 server=dhcp1
+/ip dhcp-server network
+add address=10.192.97.0/25 dns-server=10.192.30.3,10.192.30.2 domain=okco.ir \
+    gateway=172.29.147.101 ntp-server=10.192.30.3
+add address=172.29.147.64/26 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=172.29.147.101 ntp-server=10.192.30.3
+/ip route
+add distance=1 gateway=172.29.147.101
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Rasht-Dry

@@ -1,0 +1,92 @@
+# 2026-06-27 14:11:23 by RouterOS 7.16.2
+# software id = 
+#
+/interface ethernet
+set [ find default-name=ether1 ] disable-running-check=no
+/ip pool
+add name=pool1 ranges=10.192.22.56-10.192.22.125
+/ip dhcp-server
+add address-pool=pool1 interface=ether1 lease-time=40m name=Shurabad
+/port
+set 0 name=serial0
+set 1 name=serial1
+/ip address
+add address=10.192.22.126/25 interface=ether1 network=10.192.22.0
+/ip dhcp-client
+add interface=ether1
+/ip dhcp-server lease
+add address=10.192.22.68 client-id=1:3c:52:82:25:e6:e5 comment=Printer \
+    mac-address=3C:52:82:25:E6:E5 server=Shurabad
+add address=10.192.22.40 client-id=1:e4:f1:4c:60:43:59 comment=NVR#1 \
+    mac-address=E4:F1:4C:60:43:59 server=Shurabad
+add address=10.192.22.41 client-id=1:e4:f1:4c:60:43:45 comment=NVR#2 \
+    mac-address=E4:F1:4C:60:43:45 server=Shurabad
+add address=10.192.22.42 client-id=1:e4:f1:4c:60:43:47 comment=NVR#3 \
+    mac-address=E4:F1:4C:60:43:47 server=Shurabad
+add address=10.192.22.43 client-id=1:e4:f1:4c:60:43:81 comment=NVR#4 \
+    mac-address=E4:F1:4C:60:43:81 server=Shurabad
+add address=10.192.22.44 client-id=1:e4:f1:4c:60:43:83 comment=NVR#5 \
+    mac-address=E4:F1:4C:60:43:83 server=Shurabad
+add address=10.192.22.67 client-id=1:38:d5:47:13:5b:97 comment=\
+    "Mr.Aghayari Riasat Anbar" mac-address=38:D5:47:13:5B:97 server=Shurabad
+add address=10.192.22.66 client-id=1:0:2b:67:c0:ce:d7 comment="Mr Ataee PC" \
+    mac-address=00:2B:67:C0:CE:D7 server=Shurabad
+add address=10.192.22.20 client-id=1:d8:b3:70:c6:ba:bd comment=".20 Mesh" \
+    mac-address=D8:B3:70:C6:BA:BD server=Shurabad
+add address=10.192.22.21 client-id=1:d8:b3:70:c6:ba:ca comment=".21 Mesh" \
+    mac-address=D8:B3:70:C6:BA:CA server=Shurabad
+add address=10.192.22.56 client-id=1:0:17:61:10:9e:18 comment="Finger #1" \
+    mac-address=00:17:61:10:9E:18 server=Shurabad
+add address=10.192.22.69 client-id=1:60:45:cb:6d:19:7 comment=\
+    "Mr HadiPour HR" mac-address=60:45:CB:6D:19:07 server=Shurabad
+add address=10.192.22.23 client-id=1:28:70:4e:c5:ea:6c comment=\
+    "AP2-Mesh Pro Rast Akhar" mac-address=28:70:4E:C5:EA:6C server=Shurabad
+add address=10.192.22.22 client-id=1:d8:b3:70:a6:a3:59 comment=\
+    "AP1-Mesh Pro Rast aval sw-pain" mac-address=D8:B3:70:A6:A3:59 server=\
+    Shurabad
+add address=10.192.22.26 client-id=1:28:70:4e:c5:e2:4d comment=\
+    "AP3-Mesh Pro " mac-address=28:70:4E:C5:E2:4D server=Shurabad
+add address=10.192.22.25 client-id=1:28:70:4e:c5:e0:4c comment=\
+    "AP4-Mesh Pro Chap Akhar" mac-address=28:70:4E:C5:E0:4C server=Shurabad
+add address=10.192.22.24 client-id=1:28:70:4e:c7:39:71 comment=\
+    "AP5-Mesh Pro Chap aval" mac-address=28:70:4E:C7:39:71 server=Shurabad
+add address=10.192.22.71 client-id=1:8:62:66:83:e2:a comment=Shoukoei \
+    mac-address=08:62:66:83:E2:0A server=Shurabad
+add address=10.192.22.63 client-id=1:7a:60:28:b8:b2:3 comment="Ataee Phone" \
+    mac-address=7A:60:28:B8:B2:03 server=Shurabad
+add address=10.192.22.91 client-id=1:18:31:bf:7:fe:6c comment=Ahmadzade \
+    mac-address=18:31:BF:07:FE:6C server=Shurabad
+add address=10.192.22.92 client-id=1:d8:5e:d3:56:c9:c7 comment="Ataee PC" \
+    mac-address=D8:5E:D3:56:C9:C7 server=Shurabad
+add address=10.192.22.97 client-id=1:60:cf:84:6a:4d:3f comment=OKGUARD \
+    mac-address=60:CF:84:6A:4D:3F server=Shurabad
+add address=10.192.22.117 client-id=1:0:c:29:d8:75:14 comment=Win10ICT \
+    mac-address=00:0C:29:D8:75:14 server=Shurabad
+add address=10.192.22.114 client-id=1:3c:7c:3f:c0:36:57 comment=\
+    "Mr sanati PC" mac-address=3C:7C:3F:C0:36:57 server=Shurabad
+add address=10.192.22.118 client-id=1:52:33:34:6d:56:a5 comment=Mr.Sanati \
+    mac-address=52:33:34:6D:56:A5 server=Shurabad
+add address=10.192.22.94 client-id=1:b4:2e:99:5a:ff:73 mac-address=\
+    B4:2E:99:5A:FF:73 server=Shurabad
+add address=10.192.22.108 client-id=1:4c:ed:fb:67:a7:a8 mac-address=\
+    4C:ED:FB:67:A7:A8 server=Shurabad
+add address=10.192.22.106 client-id=1:60:cf:84:6a:4d:be mac-address=\
+    60:CF:84:6A:4D:BE server=Shurabad
+add address=10.192.22.122 client-id=1:74:56:3c:97:8f:8c mac-address=\
+    74:56:3C:97:8F:8C server=Shurabad
+add address=10.192.22.109 comment="New Finger 1" mac-address=\
+    00:00:00:00:00:01
+add address=10.192.22.75 client-id=1:0:1:a9:1b:89:b0 comment=\
+    "New Virgo Finger 1" mac-address=00:01:A9:1B:89:B0 server=Shurabad
+add address=10.192.22.77 client-id=1:0:1:a9:1b:89:db comment=\
+    "New Virgo Finger 2" mac-address=00:01:A9:1B:89:DB server=Shurabad
+/ip dhcp-server network
+add address=10.192.22.0/25 dns-server=10.192.30.3,10.192.30.2 domain=okco.ir \
+    gateway=10.192.22.1 ntp-server=10.192.30.3
+/ip route
+add disabled=no dst-address=0.0.0.0/0 gateway=10.192.22.1 routing-table=main \
+    suppress-hw-offload=no
+/system identity
+set name=DHCP-shoorabad-N
+/system note
+set show-at-login=no

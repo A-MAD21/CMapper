@@ -1,0 +1,50 @@
+# 2026-06-27 14:11:55 by RouterOS 7.16.2
+# software id = 
+#
+/interface ethernet
+set [ find default-name=ether1 ] disable-running-check=no
+/ip pool
+add name=dhcp_pool0 ranges=10.192.113.166-10.192.113.252
+/ip dhcp-server
+add address-pool=dhcp_pool0 interface=ether1 name=dhcp1
+/port
+set 0 name=serial0
+set 1 name=serial1
+/ip address
+add address=10.192.113.253/25 interface=ether1 network=10.192.113.128
+/ip dhcp-client
+add interface=ether1
+/ip dhcp-server lease
+add address=10.192.113.215 client-id=1:f8:d:ac:75:5b:43 comment=\
+    "Hp Printer Edari for Mr.Mirzaei" mac-address=F8:0D:AC:75:5B:43 server=\
+    dhcp1
+add address=10.192.113.207 client-id=1:0:17:61:10:9d:ac comment=Fingerprint \
+    mac-address=00:17:61:10:9D:AC server=dhcp1
+add address=10.192.113.187 client-id=1:24:9a:d8:41:35:a9 comment=\
+    "Tlhph For Mr mirzayi" mac-address=24:9A:D8:41:35:A9 server=dhcp1
+add address=10.192.113.216 client-id=1:88:d7:f6:7e:6b:64 comment=\
+    "Mr Zakeri IP  PHONE" mac-address=88:D7:F6:7E:6B:64 server=dhcp1
+add address=10.192.113.169 client-id=1:18:31:bf:9:2f:26 comment=\
+    "Mr.Zamani PC" mac-address=18:31:BF:09:2F:26 server=dhcp1
+add address=10.192.113.248 comment="Mr Mirzayi" mac-address=00:00:00:65:45:03
+add address=10.192.113.252 client-id=1:c:9d:92:85:b1:aa comment=Zakeri.ali \
+    mac-address=0C:9D:92:85:B1:AA server=dhcp1
+add address=10.192.113.185 client-id=1:60:45:cb:6d:b2:de mac-address=\
+    60:45:CB:6D:B2:DE server=dhcp1
+add address=10.192.113.183 client-id=1:0:1:a9:1b:89:bb comment=\
+    "NEw Virgo Finger Device 1" mac-address=00:01:A9:1B:89:BB server=dhcp1
+/ip dhcp-server network
+add address=10.192.113.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=10.192.113.129
+/ip route
+add dst-address=0.0.0.0/0 gateway=10.192.113.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Tabriz-Cold
+/system note
+set show-at-login=no

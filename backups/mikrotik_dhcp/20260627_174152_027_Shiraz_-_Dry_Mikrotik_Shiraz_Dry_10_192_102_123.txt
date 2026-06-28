@@ -1,0 +1,78 @@
+# jun/27/2026 18:41:52 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=\
+    10.192.102.50-10.192.102.120,10.192.68.195-10.192.68.252
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=6h name=\
+    dhcp1
+/ip address
+add address=10.192.102.123/25 interface=ether1 network=10.192.102.0
+add address=10.192.68.194/26 interface=ether1 network=10.192.68.192
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.102.62 client-id=1:3c:91:80:7a:af:3 comment=\
+    "MR.Pezeshki's Laptop" mac-address=3C:91:80:7A:AF:03 server=dhcp1
+add address=10.192.102.89 client-id=1:6c:f1:7e:95:14:33 comment=\
+    "movaghat ta ip dorbin avaz she" mac-address=6C:F1:7E:95:14:33 server=\
+    dhcp1
+add address=10.192.102.67 client-id=1:fc:aa:14:49:52:e8 comment=\
+    "Rais Anbar PC" mac-address=FC:AA:14:49:52:E8 server=dhcp1
+add address=10.192.68.206 client-id=1:0:17:61:10:fe:89 comment=\
+    "Finger Ghadim" disabled=yes mac-address=00:17:61:10:FE:89 server=dhcp1
+add address=10.192.68.209 client-id=1:0:17:61:10:7b:41 comment="Finger Jadid" \
+    disabled=yes mac-address=00:17:61:10:7B:41 server=dhcp1
+add address=10.192.68.234 client-id=1:74:d4:35:de:52:19 mac-address=\
+    74:D4:35:DE:52:19 server=dhcp1
+add address=10.192.68.208 client-id=1:54:4:a6:2b:14:8f comment=\
+    "akbari sadegh jbc" mac-address=54:04:A6:2B:14:8F server=dhcp1
+add address=10.192.68.238 client-id=1:60:45:cb:6d:19:14 mac-address=\
+    60:45:CB:6D:19:14 server=dhcp1
+add address=10.192.102.80 client-id=1:18:c0:4d:a4:9f:58 mac-address=\
+    18:C0:4D:A4:9F:58 server=dhcp1
+add address=10.192.68.226 client-id=1:0:17:61:10:9e:42 comment="Finger #3" \
+    mac-address=00:17:61:10:9E:42 server=dhcp1
+add address=10.192.68.209 client-id=1:0:17:61:10:7b:41 comment="Finger #4" \
+    mac-address=00:17:61:10:7B:41 server=dhcp1
+add address=10.192.102.118 client-id=1:60:cf:84:6a:4f:1b mac-address=\
+    60:CF:84:6A:4F:1B server=dhcp1
+add address=10.192.102.104 client-id=1:8:62:66:83:e1:c mac-address=\
+    08:62:66:83:E1:0C server=dhcp1
+add address=10.192.68.211 client-id=1:b4:2e:99:5a:ff:48 mac-address=\
+    B4:2E:99:5A:FF:48 server=dhcp1
+add address=10.192.68.197 client-id=1:d4:5d:64:50:43:c2 mac-address=\
+    D4:5D:64:50:43:C2 server=dhcp1
+add address=10.192.68.237 client-id=1:74:d4:35:de:52:d mac-address=\
+    74:D4:35:DE:52:0D server=dhcp1
+add address=10.192.68.219 client-id=1:0:1:f5:2:20:2f comment=\
+    "New Virgo Finger 1" mac-address=00:01:F5:02:20:2F server=dhcp1
+add address=10.192.68.221 client-id=1:0:1:a9:1b:89:cc comment=\
+    "New Virgo Finger 2" mac-address=00:01:A9:1B:89:CC server=dhcp1
+/ip dhcp-server network
+add address=10.192.68.192/26 dns-server=10.192.30.3,10.192.30.2 domain=\
+    OKCO.ir gateway=10.192.68.193 netmask=26
+add address=10.192.102.0/25 dns-server=10.192.30.3,10.192.30.2 gateway=\
+    10.192.102.1
+/ip route
+add distance=1 gateway=10.192.102.1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system clock
+set time-zone-name=Asia/Tehran
+/system clock manual
+set time-zone=+03:30
+/system identity
+set name=Shiraz-Dry
+/system ntp client
+set enabled=yes primary-ntp=10.192.30.2 secondary-ntp=10.192.30.3 \
+    server-dns-names=okco.ir

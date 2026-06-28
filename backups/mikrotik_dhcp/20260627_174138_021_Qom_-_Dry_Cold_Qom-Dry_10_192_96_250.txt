@@ -1,0 +1,101 @@
+# jun/27/2026 17:37:47 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=\
+    10.192.96.171-10.192.96.249,10.192.128.130-10.192.128.190
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=1h name=\
+    dhcp1
+/ip address
+add address=10.192.96.250/25 interface=ether1 network=10.192.96.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.96.238 comment=HPm26 mac-address=6C:02:E0:BC:58:46 server=\
+    dhcp1
+add address=10.192.96.186 client-id=1:f4:92:bf:c6:9a:da comment=AP \
+    mac-address=F4:92:BF:C6:9A:DA server=dhcp1
+add address=10.192.96.183 client-id=1:f4:92:bf:c6:a0:74 comment=AP \
+    mac-address=F4:92:BF:C6:A0:74 server=dhcp1
+add address=10.192.96.187 client-id=1:f4:92:bf:c9:1b:50 comment=AP \
+    mac-address=F4:92:BF:C9:1B:50 server=dhcp1
+add address=10.192.96.247 client-id=1:64:cb:a3:f5:a4:1 comment=\
+    "problematic PDA #2" mac-address=64:CB:A3:F5:A4:01 server=dhcp1
+add address=10.192.96.215 client-id=1:0:c:29:62:c9:a0 comment="Win10 server" \
+    mac-address=00:0C:29:62:C9:A0 server=dhcp1
+add address=10.192.96.199 client-id=1:64:cb:a3:f3:72:41 comment=\
+    "problematic PDA #3" mac-address=64:CB:A3:F3:72:41 server=dhcp1
+add address=10.192.96.202 client-id=1:64:cb:a3:f3:72:f comment=\
+    "problematic PDA #4" mac-address=64:CB:A3:F3:72:0F server=dhcp1
+add address=10.192.96.205 client-id=1:64:cb:a3:f4:d0:15 comment=\
+    "problematic PDA #1" mac-address=64:CB:A3:F4:D0:15 server=dhcp1
+add address=10.192.96.231 client-id=1:64:cb:a3:f3:d2:b5 comment=\
+    "problematic PDA #7" mac-address=64:CB:A3:F3:D2:B5 server=dhcp1
+add address=10.192.96.173 client-id=1:64:cb:a3:f2:d9:5b comment=\
+    "Problematic #8" mac-address=64:CB:A3:F2:D9:5B server=dhcp1
+add address=10.192.96.192 client-id=1:60:45:cb:6d:c3:23 comment=\
+    MR.Khudabakhshi mac-address=60:45:CB:6D:C3:23 server=dhcp1
+add address=10.192.96.245 client-id=1:60:cf:84:69:5d:1 comment=Mr.dadgar \
+    mac-address=60:CF:84:69:5D:01 server=dhcp1
+add address=10.192.96.209 client-id=1:60:cf:84:6a:4f:3b comment=Mr.Keivani \
+    mac-address=60:CF:84:6A:4F:3B server=dhcp1
+add address=10.192.96.203 client-id=1:60:cf:84:69:5c:e9 comment=\
+    Mr.Khodabakhshi mac-address=60:CF:84:69:5C:E9 server=dhcp1
+add address=10.192.96.243 client-id=1:60:cf:84:6a:4d:3d comment=Karimpour \
+    mac-address=60:CF:84:6A:4D:3D server=dhcp1
+add address=10.192.128.190 client-id=1:3c:52:82:25:7:ca comment=\
+    "Printer Cold" mac-address=3C:52:82:25:07:CA server=dhcp1
+add address=10.192.128.167 client-id=1:fc:34:97:15:57:22 comment=\
+    Bagheri.hasan mac-address=FC:34:97:15:57:22 server=dhcp1
+add address=10.192.128.184 client-id=1:0:17:61:10:9e:6e comment="Finger #2" \
+    mac-address=00:17:61:10:9E:6E server=dhcp1
+add address=10.192.128.147 client-id=1:0:17:61:11:7e:90 comment=Finger#1 \
+    mac-address=00:17:61:11:7E:90 server=dhcp1
+add address=10.192.96.219 client-id=1:0:c:29:8b:8a:fc mac-address=\
+    00:0C:29:8B:8A:FC server=dhcp1
+add address=10.192.128.171 client-id=1:74:56:3c:97:82:d8 mac-address=\
+    74:56:3C:97:82:D8 server=dhcp1
+add address=10.192.96.241 client-id=1:18:c0:4d:65:cc:67 mac-address=\
+    18:C0:4D:65:CC:67 server=dhcp1
+add address=10.192.128.141 client-id=1:18:31:bf:9:30:55 mac-address=\
+    18:31:BF:09:30:55 server=dhcp1
+add address=10.192.96.229 client-id=1:70:4d:7b:b3:ba:a mac-address=\
+    70:4D:7B:B3:BA:0A server=dhcp1
+add address=10.192.128.149 client-id=1:bc:fc:e7:4f:ec:83 mac-address=\
+    BC:FC:E7:4F:EC:83 server=dhcp1
+add address=10.192.96.214 client-id=1:30:5a:3a:80:1:47 mac-address=\
+    30:5A:3A:80:01:47 server=dhcp1
+add address=10.192.128.189 client-id=1:2c:56:dc:74:cb:c0 mac-address=\
+    2C:56:DC:74:CB:C0 server=dhcp1
+add address=10.192.96.234 client-id=1:d4:5d:64:43:3d:89 mac-address=\
+    D4:5D:64:43:3D:89 server=dhcp1
+add address=10.192.128.185 client-id=1:4:d4:c4:59:b:c6 mac-address=\
+    04:D4:C4:59:0B:C6 server=dhcp1
+add address=10.192.128.188 client-id=1:0:1:f5:2:1f:e2 comment=\
+    "New Virgo Finger 1" mac-address=00:01:F5:02:1F:E2 server=dhcp1
+add address=10.192.128.187 client-id=1:0:1:f5:2:1f:8e comment=\
+    "New Virgo Finger 3" mac-address=00:01:F5:02:1F:8E server=dhcp1
+add address=10.192.128.186 client-id=1:0:1:f5:2:1f:b7 comment=\
+    "New Virgo Finger 2" mac-address=00:01:F5:02:1F:B7 server=dhcp1
+add address=10.192.128.161 comment="New Virgo Finger 4" mac-address=\
+    00:01:F5:02:1F:99
+/ip dhcp-server network
+add address=10.192.96.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    OKCO.ir gateway=10.192.96.129 ntp-server=10.192.30.3
+add address=10.192.128.128/26 dns-server=10.192.30.3,10.192.30.2 domain=\
+    OKCO.ir gateway=10.192.128.129 ntp-server=10.192.31.17
+/ip route
+add distance=1 gateway=10.192.96.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Qom-Dry

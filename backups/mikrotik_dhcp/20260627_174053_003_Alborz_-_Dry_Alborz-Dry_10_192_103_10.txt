@@ -1,0 +1,95 @@
+# jun/27/2026 14:09:57 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface ethernet
+set [ find default-name=ether1 ] mac-address=00:0C:29:AD:F3:06
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=\
+    10.192.103.38-10.192.103.125,172.29.202.20-172.29.202.60
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=40m name=\
+    dhcp1
+/ip neighbor discovery-settings
+set discover-interface-list=all
+/ip address
+add address=10.192.103.10/25 interface=ether1 network=10.192.103.0
+add address=172.29.202.19/26 interface=ether1 network=172.29.202.0
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.103.46 client-id=1:8:60:6e:d9:b6:47 mac-address=\
+    08:60:6E:D9:B6:47 server=dhcp1
+add address=10.192.103.63 client-id=1:40:b0:76:5f:96:96 mac-address=\
+    40:B0:76:5F:96:96 server=dhcp1
+add address=10.192.103.119 client-id=1:18:31:bf:9:2f:26 mac-address=\
+    18:31:BF:09:2F:26 server=dhcp1
+add address=10.192.103.101 client-id=1:e0:3f:49:46:28:a8 mac-address=\
+    E0:3F:49:46:28:A8 server=dhcp1
+add address=10.192.103.89 client-id=1:30:5a:3a:7d:2f:ba mac-address=\
+    30:5A:3A:7D:2F:BA server=dhcp1
+add address=10.192.103.44 client-id=1:3c:7c:3f:13:88:77 mac-address=\
+    3C:7C:3F:13:88:77 server=dhcp1
+add address=10.192.103.48 client-id=1:88:d7:f6:c6:12:47 mac-address=\
+    88:D7:F6:C6:12:47 server=dhcp1
+add address=172.29.202.59 client-id=1:18:31:bf:9:33:4a comment=\
+    "Shohreh sadeghi Proxy darad" mac-address=18:31:BF:09:33:4A server=dhcp1
+add address=172.29.202.27 client-id=1:0:2b:67:9a:a9:d7 mac-address=\
+    00:2B:67:9A:A9:D7 server=dhcp1
+add address=172.29.202.21 comment="Finger P44 SW negahbani " disabled=yes \
+    mac-address=00:17:61:10:65:54 server=dhcp1
+add address=172.29.202.42 client-id=1:74:56:3c:a6:b5:35 comment=\
+    Mousavi.Bagher mac-address=74:56:3C:A6:B5:35 server=dhcp1
+add address=10.192.103.118 client-id=1:8:a5:df:4e:2e:fb comment=\
+    "Mr.Mousavi Phone" mac-address=08:A5:DF:4E:2E:FB server=dhcp1
+add address=10.192.103.123 client-id=1:d8:b3:70:cc:fd:f5 comment=\
+    "AC Mesh Negahbani P40 sw negahbani" mac-address=D8:B3:70:CC:FD:F5 \
+    server=dhcp1
+add address=172.29.202.49 client-id=1:10:7b:44:a1:b:67 comment="Fallah JBC" \
+    mac-address=10:7B:44:A1:0B:67 server=dhcp1
+add address=172.29.202.24 client-id=1:0:17:61:10:7b:e5 comment=\
+    "Finger P43 SW negahbani" disabled=yes mac-address=00:17:61:10:7B:E5 \
+    server=dhcp1
+add address=10.192.103.102 client-id=1:8c:7a:3d:3e:cc:13 comment=\
+    "Mr Abdollahi Phone Poco" mac-address=8C:7A:3D:3E:CC:13 server=dhcp1
+add address=10.192.103.115 client-id=1:fc:34:97:18:cf:d8 mac-address=\
+    FC:34:97:18:CF:D8 server=dhcp1
+add address=10.192.103.125 client-id=1:60:cf:84:6a:49:12 mac-address=\
+    60:CF:84:6A:49:12 server=dhcp1
+add address=10.192.103.60 client-id=1:18:c0:4d:16:71:1e mac-address=\
+    18:C0:4D:16:71:1E server=dhcp1
+add address=10.192.103.56 client-id=1:18:31:bf:7:fb:e8 mac-address=\
+    18:31:BF:07:FB:E8 server=dhcp1
+add address=10.192.103.120 client-id=1:cc:28:aa:34:d:d6 mac-address=\
+    CC:28:AA:34:0D:D6 server=dhcp1
+add address=10.192.103.99 client-id=1:b4:2e:99:db:b1:c6 mac-address=\
+    B4:2E:99:DB:B1:C6 server=dhcp1
+add address=10.192.103.104 client-id=1:f8:a2:d6:f5:93:41 mac-address=\
+    F8:A2:D6:F5:93:41 server=dhcp1
+add address=10.192.103.105 client-id=1:4:d4:c4:f1:e2:fc mac-address=\
+    04:D4:C4:F1:E2:FC server=dhcp1
+add address=172.29.202.24 client-id=1:0:1:a9:1b:89:bd comment=\
+    "New Virgo FInger 1" mac-address=00:01:A9:1B:89:BD server=dhcp1
+add address=172.29.202.35 client-id=1:0:1:f5:2:20:1b comment=\
+    "New Virgo Finger 2" mac-address=00:01:F5:02:20:1B server=dhcp1
+add address=172.29.202.22 client-id=1:0:c:29:22:ad:8e comment="ICT win" \
+    mac-address=00:0C:29:22:AD:8E server=dhcp1
+add address=10.192.103.69 client-id=1:0:c:29:30:e7:bc mac-address=\
+    00:0C:29:30:E7:BC server=dhcp1
+/ip dhcp-server network
+add address=10.192.103.0/25 dns-server=10.192.30.3,10.192.30.2 gateway=\
+    10.192.103.1
+add address=172.29.202.0/26 dns-server=10.192.30.3,10.192.30.2 gateway=\
+    172.29.202.11 netmask=26
+/ip route
+add distance=1 gateway=10.192.103.1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Alborz-Dry

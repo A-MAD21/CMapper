@@ -1,0 +1,100 @@
+# jun/27/2026 14:12:01 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=\
+    10.192.98.158-10.192.98.237,10.192.129.130-10.192.129.190
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=1h name=\
+    dhcp1
+/ip address
+add address=10.192.98.254/25 interface=ether1 network=10.192.98.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.98.180 mac-address=F4:92:BF:C9:1A:56
+add address=10.192.98.232 mac-address=F4:92:BF:20:91:F2
+add address=10.192.98.161 mac-address=F4:92:BF:C6:A0:73
+add address=10.192.98.188 mac-address=F4:92:BF:20:91:F0
+add address=10.192.98.192 mac-address=F4:92:BF:C9:1A:61
+add address=10.192.98.175 comment="New NVR for Kermanshah Cold" mac-address=\
+    C4:79:05:7C:90:95
+add address=10.192.98.248 comment="Reserved for Cold SW" mac-address=\
+    01:01:01:01:01:01
+add address=10.192.98.249 comment="Reserved for Cold SW" mac-address=\
+    01:01:01:01:01:02
+add address=10.192.98.250 comment="Reserved for Cold SW" mac-address=\
+    01:01:01:01:01:03
+add address=10.192.98.199 client-id=1:28:39:26:a2:78:89 mac-address=\
+    28:39:26:A2:78:89 server=dhcp1
+add address=10.192.98.153 comment="NEW NVR FOR KERMANSHAH COLD" mac-address=\
+    C4:79:05:7C:90:91
+add address=10.192.98.234 client-id=1:0:17:61:10:9e:d3 comment=Finger \
+    mac-address=00:17:61:10:9E:D3 server=dhcp1
+add address=10.192.98.201 client-id=1:f8:75:a4:2a:2e:5d comment=\
+    "Mr Esfandyari LT" mac-address=F8:75:A4:2A:2E:5D server=dhcp1
+add address=10.192.98.215 comment=Finger2 mac-address=00:00:00:00:00:0A
+add address=10.192.98.218 comment="SIP- GRP2601P" mac-address=\
+    00:00:00:00:00:0B
+add address=10.192.98.213 comment="Printer 402n" mac-address=\
+    00:00:00:00:00:0C
+add address=10.192.98.159 comment="PDA QC" mac-address=B4:29:3D:89:6F:5A \
+    server=dhcp1
+add address=10.192.98.145 comment=Finger mac-address=00:17:61:10:7C:7E
+add address=10.192.98.222 client-id=1:3c:7c:3f:13:86:92 mac-address=\
+    3C:7C:3F:13:86:92 server=dhcp1
+add address=10.192.129.140 client-id=1:30:9c:23:80:b9:38 mac-address=\
+    30:9C:23:80:B9:38 server=dhcp1
+add address=10.192.98.233 client-id=1:3c:7c:3f:b8:f1:70 mac-address=\
+    3C:7C:3F:B8:F1:70 server=dhcp1
+add address=10.192.98.169 client-id=1:ac:22:b:2b:d3:ab mac-address=\
+    AC:22:0B:2B:D3:AB server=dhcp1
+add address=10.192.98.223 client-id=1:88:d7:f6:7e:6c:59 mac-address=\
+    88:D7:F6:7E:6C:59 server=dhcp1
+add address=10.192.98.216 client-id=1:ac:22:b:2b:d3:7e mac-address=\
+    AC:22:0B:2B:D3:7E server=dhcp1
+add address=10.192.98.170 client-id=1:cc:28:aa:34:c:c4 mac-address=\
+    CC:28:AA:34:0C:C4 server=dhcp1
+add address=10.192.98.202 client-id=1:8:60:6e:7b:e1:7 mac-address=\
+    08:60:6E:7B:E1:07 server=dhcp1
+add address=10.192.98.191 client-id=1:8:60:6e:7b:e3:9a mac-address=\
+    08:60:6E:7B:E3:9A server=dhcp1
+add address=10.192.98.200 client-id=1:18:c0:4d:65:c9:6f mac-address=\
+    18:C0:4D:65:C9:6F server=dhcp1
+add address=10.192.98.173 client-id=1:88:d7:f6:c6:15:c3 mac-address=\
+    88:D7:F6:C6:15:C3 server=dhcp1
+add address=10.192.98.165 client-id=1:4:d9:f5:ae:42:28 mac-address=\
+    04:D9:F5:AE:42:28 server=dhcp1
+add address=10.192.98.194 client-id=1:88:d7:f6:c6:14:dd mac-address=\
+    88:D7:F6:C6:14:DD server=dhcp1
+add address=10.192.129.131 client-id=1:fc:34:97:18:d3:86 mac-address=\
+    FC:34:97:18:D3:86 server=dhcp1
+add address=10.192.98.167 client-id=1:18:c0:4d:a4:9b:46 mac-address=\
+    18:C0:4D:A4:9B:46 server=dhcp1
+add address=10.192.129.184 comment="new virgo f 1 Dry" mac-address=\
+    00:01:A9:1B:89:C7
+add address=10.192.129.142 client-id=1:0:1:f5:2:1f:bf comment=\
+    "New Virgo f 2 Dry" mac-address=00:01:F5:02:1F:BF server=dhcp1
+add address=10.192.129.189 comment="New virgo f 3 Cold" mac-address=\
+    00:01:F5:02:20:12
+add address=10.192.129.186 client-id=1:0:1:a9:1b:89:a9 comment="Virgo Finger" \
+    mac-address=00:01:A9:1B:89:A9 server=dhcp1
+/ip dhcp-server network
+add address=10.192.98.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=10.192.98.129
+add address=10.192.129.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=10.192.129.129
+/ip route
+add distance=1 gateway=10.192.98.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Kermanshah-Cold&Dry

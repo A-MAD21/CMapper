@@ -1,0 +1,113 @@
+# jun/27/2026 18:40:57 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface ethernet
+set [ find default-name=ether1 ] mac-address=00:0C:29:AD:5E:AA
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool1 ranges=10.192.104.50-10.192.104.210
+/ip dhcp-server
+add address-pool=dhcp_pool1 disabled=no interface=ether1 lease-time=1d name=\
+    dhcp1
+/ip address
+add address=10.192.104.2/24 interface=ether1 network=10.192.104.0
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.104.156 comment=SedghiPhone mac-address=BC:10:7B:2B:D4:92 \
+    server=dhcp1
+add address=10.192.104.179 client-id=1:d4:5d:64:af:40:c9 mac-address=\
+    D4:5D:64:AF:40:C9 server=dhcp1
+add address=10.192.104.114 client-id=1:f4:6a:dd:26:45:13 mac-address=\
+    F4:6A:DD:26:45:13 server=dhcp1
+add address=10.192.104.124 client-id=1:0:17:61:10:9d:c4 comment=\
+    " New Finger Print" mac-address=00:17:61:10:9D:C4 server=dhcp1
+add address=10.192.104.155 comment="Printer Mr.Athari" mac-address=\
+    38:22:E2:D8:D6:2F server=dhcp1
+add address=10.192.104.100 client-id=1:40:b0:76:60:9a:4b comment="Mr.Shahi " \
+    mac-address=40:B0:76:60:9A:4B server=dhcp1
+add address=10.192.104.117 client-id=1:f8:a2:d6:e8:b8:3f comment=\
+    "peymani far LAPTOP" mac-address=F8:A2:D6:E8:B8:3F server=dhcp1
+add address=10.192.104.180 client-id=1:0:17:61:10:9f:c3 comment="NEW Finger" \
+    mac-address=00:17:61:10:9F:C3 server=dhcp1
+add address=10.192.104.55 client-id=1:fc:34:97:18:ce:e0 comment="Sedghi,s PC" \
+    mac-address=FC:34:97:18:CE:E0 server=dhcp1
+add address=10.192.104.92 client-id=1:2c:4d:54:e9:ac:66 mac-address=\
+    2C:4D:54:E9:AC:66 server=dhcp1
+add address=10.192.104.144 client-id=1:60:45:cb:a3:2d:6c comment="Ethari PC" \
+    mac-address=60:45:CB:A3:2D:6C server=dhcp1
+add address=10.192.104.145 client-id=1:18:c0:4d:a4:9f:12 comment="Dinyar PC" \
+    mac-address=18:C0:4D:A4:9F:12 server=dhcp1
+add address=10.192.104.154 client-id=1:18:31:bf:7:fb:c6 comment="Rahmani PC" \
+    mac-address=18:31:BF:07:FB:C6 server=dhcp1
+add address=10.192.104.178 client-id=1:74:56:3c:16:f1:ff comment=Mr.Zamani \
+    mac-address=74:56:3C:16:F1:FF server=dhcp1
+add address=10.192.104.165 client-id=1:18:31:bf:c8:e2:a comment=Manavi.Maryam \
+    mac-address=18:31:BF:C8:E2:0A server=dhcp1
+add address=10.192.104.188 client-id=1:60:cf:84:6a:4d:d7 comment="Miraan PC" \
+    mac-address=60:CF:84:6A:4D:D7 server=dhcp1
+add address=10.192.104.190 client-id=1:b4:2e:99:5a:f7:6f mac-address=\
+    B4:2E:99:5A:F7:6F server=dhcp1
+add address=10.192.104.134 client-id=1:18:31:bf:c8:e4:1a mac-address=\
+    18:31:BF:C8:E4:1A server=dhcp1
+add address=10.192.104.208 client-id=1:0:c:29:a6:6f:b2 comment="Win-10 ICT" \
+    mac-address=00:0C:29:A6:6F:B2 server=dhcp1
+add address=10.192.104.90 client-id=1:4:d4:c4:6:93:fb comment="Mr Parvare" \
+    mac-address=04:D4:C4:06:93:FB server=dhcp1
+add address=10.192.104.159 client-id=1:7c:10:c9:9f:b2:cc mac-address=\
+    7C:10:C9:9F:B2:CC server=dhcp1
+add address=10.192.104.70 client-id=1:18:c0:4d:de:95:b8 comment=Guard \
+    mac-address=18:C0:4D:DE:95:B8 server=dhcp1
+add address=10.192.104.85 comment="JBC Static by client" mac-address=\
+    08:62:66:83:C3:02
+add address=10.192.104.210 client-id=1:7c:10:c9:9f:b8:cc mac-address=\
+    7C:10:C9:9F:B8:CC server=dhcp1
+add address=10.192.104.131 client-id=1:50:3e:aa:55:a5:15 mac-address=\
+    50:3E:AA:55:A5:15 server=dhcp1
+add address=10.192.104.56 client-id=1:3c:7c:3f:13:89:dc mac-address=\
+    3C:7C:3F:13:89:DC server=dhcp1
+add address=10.192.104.51 client-id=1:18:31:bf:7:f8:fc mac-address=\
+    18:31:BF:07:F8:FC server=dhcp1
+add address=10.192.104.151 client-id=1:20:7b:d2:37:a1:51 mac-address=\
+    20:7B:D2:37:A1:51 server=dhcp1
+add address=10.192.104.68 client-id=1:18:c0:4d:15:99:76 mac-address=\
+    18:C0:4D:15:99:76 server=dhcp1
+add address=10.192.104.158 client-id=1:4:d9:f5:ac:a0:a4 mac-address=\
+    04:D9:F5:AC:A0:A4 server=dhcp1
+add address=10.192.104.113 client-id=1:2c:56:dc:74:ca:35 mac-address=\
+    2C:56:DC:74:CA:35 server=dhcp1
+add address=10.192.104.74 client-id=1:18:31:bf:7:f6:fb mac-address=\
+    18:31:BF:07:F6:FB server=dhcp1
+add address=10.192.104.169 client-id=1:50:3e:aa:5e:21:18 mac-address=\
+    50:3E:AA:5E:21:18 server=dhcp1
+add address=10.192.104.105 client-id=1:18:e8:29:e9:6d:4f mac-address=\
+    18:E8:29:E9:6D:4F server=dhcp1
+add address=10.192.104.143 client-id=1:ae:af:32:10:93:3c mac-address=\
+    AE:AF:32:10:93:3C server=dhcp1
+add address=10.192.104.191 client-id=1:f4:6a:dd:26:45:ed mac-address=\
+    F4:6A:DD:26:45:ED server=dhcp1
+add address=10.192.104.146 client-id=1:0:1:f5:2:1f:c1 comment=\
+    "FInger jadid STFACE" mac-address=00:01:F5:02:1F:C1 server=dhcp1
+add address=10.192.104.181 client-id=1:0:1:a9:1b:89:73 comment=\
+    "Finger jadid STFACE2" mac-address=00:01:A9:1B:89:73 server=dhcp1
+/ip dhcp-server network
+add address=10.192.104.0/24 dns-server=10.192.30.3,10.192.30.2,8.8.8.8 \
+    domain=okco.ir gateway=10.192.104.1 ntp-server=10.192.30.3
+/ip route
+add distance=1 gateway=10.192.104.1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www port=800
+set api disabled=yes
+set winbox port=2121
+set api-ssl disabled=yes
+/system clock
+set time-zone-name=Asia/Tehran
+/system identity
+set name=Apadana
+/system ntp client
+set enabled=yes primary-ntp=10.192.30.3 secondary-ntp=10.192.30.2

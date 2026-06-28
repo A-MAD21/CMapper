@@ -1,0 +1,68 @@
+# 2026-06-27 14:10:58 by RouterOS 7.13.3
+# software id = TI09-7WK3
+#
+/interface ethernet
+set [ find default-name=ether1 ] disable-running-check=no
+set [ find default-name=ether2 ] disable-running-check=no
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/iot lora servers
+add address=eu.mikrotik.thethings.industries name=TTN-EU protocol=UDP
+add address=us.mikrotik.thethings.industries name=TTN-US protocol=UDP
+add address=eu1.cloud.thethings.industries name="TTS Cloud (eu1)" protocol=\
+    UDP
+add address=nam1.cloud.thethings.industries name="TTS Cloud (nam1)" protocol=\
+    UDP
+add address=au1.cloud.thethings.industries name="TTS Cloud (au1)" protocol=\
+    UDP
+add address=eu1.cloud.thethings.network name="TTN V3 (eu1)" protocol=UDP
+add address=nam1.cloud.thethings.network name="TTN V3 (nam1)" protocol=UDP
+add address=au1.cloud.thethings.network name="TTN V3 (au1)" protocol=UDP
+/ip pool
+add name=pool1 ranges=10.192.113.38-10.192.113.120
+/ip dhcp-server
+add address-pool=pool1 interface=ether1 name=server1
+/ip address
+add address=10.192.113.126/25 interface=ether1 network=10.192.113.0
+/ip dhcp-server lease
+add address=10.192.113.113 client-id=1:74:56:3c:d6:5d:78 comment=\
+    "TomarZade Head of WH" mac-address=74:56:3C:D6:5D:78 server=server1
+add address=10.192.113.48 client-id=1:0:17:61:10:7a:f7 comment=\
+    "Finger Print Device" mac-address=00:17:61:10:7A:F7 server=server1
+add address=10.192.113.120 client-id=1:ac:8b:a9:70:75:d9 mac-address=\
+    AC:8B:A9:70:75:D9 server=server1
+add address=10.192.113.114 client-id=1:ac:8b:a9:70:7c:71 mac-address=\
+    AC:8B:A9:70:7C:71 server=server1
+add address=10.192.113.119 client-id=1:ac:8b:a9:70:7f:9a mac-address=\
+    AC:8B:A9:70:7F:9A server=server1
+add address=10.192.113.118 client-id=1:ac:8b:a9:70:7c:65 mac-address=\
+    AC:8B:A9:70:7C:65 server=server1
+add address=10.192.113.116 client-id=1:ac:8b:a9:70:7c:7f mac-address=\
+    AC:8B:A9:70:7C:7F server=server1
+add address=10.192.113.117 client-id=1:ac:8b:a9:70:77:ae mac-address=\
+    AC:8B:A9:70:77:AE server=server1
+add address=10.192.113.115 client-id=1:ac:8b:a9:70:77:bf mac-address=\
+    AC:8B:A9:70:77:BF server=server1
+add address=10.192.113.101 client-id=1:3c:7c:3f:13:8b:4c mac-address=\
+    3C:7C:3F:13:8B:4C server=server1
+add address=10.192.113.40 client-id=1:fc:34:97:18:dc:ed mac-address=\
+    FC:34:97:18:DC:ED server=server1
+add address=10.192.113.39 client-id=1:30:9c:23:a5:6c:11 mac-address=\
+    30:9C:23:A5:6C:11 server=server1
+/ip dhcp-server network
+add address=10.192.113.0/25 dns-server=10.192.30.3,10.192.30.2 domain=okco.ir \
+    gateway=10.192.113.1 ntp-server=10.192.30.3
+/ip route
+add dst-address=0.0.0.0/0 gateway=10.192.113.1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system hardware
+set allow-x86-64=yes
+/system identity
+set name=Bushehr-Cold
+/system note
+set show-at-login=no

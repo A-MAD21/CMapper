@@ -1,0 +1,90 @@
+# jun/27/2026 14:12:05 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=\
+    10.192.112.170-10.192.112.178,10.192.112.180-10.192.112.220
+add name=IDP ranges=10.192.105.150-10.192.105.249
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=1w3d \
+    name=dhcp1
+add address-pool=IDP disabled=no interface=ether2 lease-time=20m name=IDP
+/interface bridge vlan
+add vlan-ids=1
+add vlan-ids=9
+add tagged=ether1 vlan-ids=1
+add tagged=ether1 vlan-ids=9
+/ip address
+add address=10.192.112.254/25 interface=ether1 network=10.192.112.128
+add address=10.192.105.254/25 interface=ether2 network=10.192.105.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.112.199 client-id=1:40:b0:76:60:9b:81 comment="MR Kazemi" \
+    mac-address=40:B0:76:60:9B:81 server=dhcp1
+add address=10.192.112.197 client-id=1:18:c0:4d:15:9b:47 mac-address=\
+    18:C0:4D:15:9B:47 server=dhcp1
+add address=10.192.112.195 client-id=1:0:17:61:10:7a:ce comment=\
+    "Finger Print Anbar Tajhiz" mac-address=00:17:61:10:7A:CE server=dhcp1
+add address=10.192.112.194 client-id=1:4:d9:f5:ac:a2:8a mac-address=\
+    04:D9:F5:AC:A2:8A server=dhcp1
+add address=10.192.112.183 client-id=1:cc:28:aa:34:f:d mac-address=\
+    CC:28:AA:34:0F:0D server=dhcp1
+add address=10.192.112.185 client-id=1:cc:28:aa:34:73:5b mac-address=\
+    CC:28:AA:34:73:5B server=dhcp1
+add address=10.192.112.172 client-id=1:0:17:61:10:9f:e1 comment=\
+    "Finger Print  Anbar tajhiz 2" mac-address=00:17:61:10:9F:E1 server=dhcp1
+add address=10.192.112.198 client-id=1:18:c0:4d:7d:9e:25 comment=Mr.Sultani \
+    mac-address=18:C0:4D:7D:9E:25 server=dhcp1
+add address=10.192.105.225 client-id=1:d8:b3:70:a9:26:2d comment=AP-IDP \
+    mac-address=D8:B3:70:A9:26:2D server=IDP
+add address=10.192.105.220 client-id=1:bc:32:b2:1f:4b:a1 comment=\
+    "Mr.Gholami " mac-address=BC:32:B2:1F:4B:A1 server=IDP
+add address=10.192.105.219 client-id=1:c4:77:64:e6:1f:39 comment=Mr.Balizade \
+    mac-address=C4:77:64:E6:1F:39 server=IDP
+add address=10.192.112.171 client-id=1:c4:77:64:e6:1f:39 comment=Mr.Balizade \
+    mac-address=C4:77:64:E6:1F:39 server=dhcp1
+add address=10.192.112.170 client-id=1:5c:ed:f4:74:8c:6f comment=Mr.Nazarloo \
+    mac-address=5C:ED:F4:74:8C:6F server=dhcp1
+add address=10.192.112.176 client-id=1:d8:b3:70:a9:26:2d comment=AP-IDP \
+    mac-address=D8:B3:70:A9:26:2D server=dhcp1
+add address=10.192.112.177 client-id=1:bc:32:b2:1f:4b:a1 comment=Mr.Gholami \
+    mac-address=BC:32:B2:1F:4B:A1 server=dhcp1
+add address=10.192.112.175 client-id=1:24:24:b7:18:3b:70 comment=\
+    "Mr Kazemi Phone" mac-address=24:24:B7:18:3B:70 server=dhcp1
+add address=10.192.112.190 client-id=1:94:52:44:86:cb:81 comment=\
+    "Mr Soltani Phone" mac-address=94:52:44:86:CB:81 server=dhcp1
+add address=10.192.112.189 client-id=1:62:ef:c2:f7:85:47 comment=\
+    "Mr HaghighatNejad Phone" mac-address=62:EF:C2:F7:85:47 server=dhcp1
+add address=10.192.112.192 client-id=1:b4:2e:99:75:26:3a mac-address=\
+    B4:2E:99:75:26:3A server=dhcp1
+add address=10.192.112.181 client-id=1:70:bc:10:85:ef:74 mac-address=\
+    70:BC:10:85:EF:74 server=dhcp1
+add address=10.192.112.193 client-id=1:d8:b3:70:a9:26:fe comment="Mesh 3" \
+    mac-address=D8:B3:70:A9:26:FE server=dhcp1
+add address=10.192.112.196 client-id=1:0:1:f5:2:20:1f comment=\
+    "New Virgo Finger 1" mac-address=00:01:F5:02:20:1F server=dhcp1
+/ip dhcp-server network
+add address=10.192.105.128/25 dns-server=10.192.30.2,10.192.30.3 domain=\
+    okco.ir gateway=10.192.105.129 netmask=25
+add address=10.192.112.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=10.192.112.129
+/ip firewall nat
+add action=src-nat chain=srcnat src-address=10.192.105.128/25 to-addresses=\
+    10.192.105.129
+/ip route
+add distance=1 gateway=10.192.112.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Tajhiz-DHCP
+/system ntp client
+set enabled=yes primary-ntp=10.192.30.3

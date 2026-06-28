@@ -1,0 +1,82 @@
+# 2026-06-27 14:17:03 by RouterOS 7.16.2
+# software id = 
+#
+/interface ethernet
+set [ find default-name=ether1 ] disable-running-check=no
+/ip pool
+add name=Edari ranges=10.192.19.91-10.192.19.250
+/ip dhcp-server
+add address-pool=Edari interface=ether1 name=server1
+/port
+set 0 name=serial0
+set 1 name=serial1
+/ip address
+add address=10.192.19.253/24 interface=ether1 network=10.192.19.0
+/ip dhcp-client
+add interface=ether1
+/ip dhcp-server lease
+add address=10.192.19.111 client-id=1:18:c0:4d:de:9b:70 comment="Mr Kosari" \
+    mac-address=18:C0:4D:DE:9B:70 server=server1
+add address=10.192.19.40 comment=Finger#1 mac-address=11:22:33:44:55:66
+add address=10.192.19.54 comment="AP#1 SW19.8-P47" mac-address=\
+    D8:B3:70:A6:A2:C0
+add address=10.192.19.53 comment="APE#F2   SW19.4 - P22" mac-address=\
+    0C:EA:14:89:18:E9
+add address=10.192.19.52 comment="APE#F1  SW19.4 - P20" mac-address=\
+    0C:EA:14:2C:97:ED
+add address=10.192.19.50 comment="AP#2 SW19.17-P47" mac-address=\
+    D8:B3:70:A6:01:F8
+add address=10.192.19.49 comment="AP#3 SW19.11-P48" mac-address=\
+    AC:8B:A9:70:03:6C
+add address=10.192.19.48 comment="AP#4 SW19.18-P48" mac-address=\
+    D8:B3:70:A6:0B:70
+add address=10.192.19.47 comment="AP#5 SW19.21-P47" mac-address=\
+    D8:B3:70:A6:04:B9
+add address=10.192.19.46 comment="AP#6 SW19.18-P46" mac-address=\
+    D8:B3:70:A6:0B:7C
+add address=10.192.19.44 comment="AP#8 SW19.15-P47" mac-address=\
+    AC:8B:A9:70:03:8A
+add address=10.192.19.112 comment="Mr.GholamPour PC" mac-address=\
+    04:92:26:5E:15:A9 server=server1
+add address=10.192.19.237 client-id=1:10:78:d2:84:4d:6b comment=Rastegarfard \
+    mac-address=10:78:D2:84:4D:6B server=server1
+add address=10.192.19.162 client-id=1:e4:f1:4c:60:43:31 comment=\
+    "NVR New Cold #3" mac-address=E4:F1:4C:60:43:31 server=server1
+add address=10.192.19.152 client-id=1:3c:7c:3f:b8:f4:6 mac-address=\
+    3C:7C:3F:B8:F4:06 server=server1
+add address=10.192.19.131 client-id=1:18:31:bf:c8:d4:3a mac-address=\
+    18:31:BF:C8:D4:3A server=server1
+add address=10.192.19.122 client-id=1:cc:28:aa:33:e5:5c mac-address=\
+    CC:28:AA:33:E5:5C server=server1
+add address=10.192.19.173 client-id=1:cc:28:aa:33:e4:ff mac-address=\
+    CC:28:AA:33:E4:FF server=server1
+add address=10.192.19.178 client-id=1:a8:5e:45:a2:6d:c5 mac-address=\
+    A8:5E:45:A2:6D:C5 server=server1
+add address=10.192.19.123 client-id=1:24:4b:fe:79:e:b5 mac-address=\
+    24:4B:FE:79:0E:B5 server=server1
+add address=10.192.19.163 client-id=1:50:46:5d:b4:b7:29 mac-address=\
+    50:46:5D:B4:B7:29 server=server1
+add address=10.192.19.154 client-id=1:0:1:a9:1b:89:b2 comment=\
+    "New Virgo Finger 1" mac-address=00:01:A9:1B:89:B2 server=server1
+add address=10.192.19.166 client-id=1:ac:8b:a9:70:2:b4 mac-address=\
+    AC:8B:A9:70:02:B4 server=server1
+add address=10.192.19.156 client-id=1:d8:b3:70:a6:a3:12 mac-address=\
+    D8:B3:70:A6:A3:12 server=server1
+add address=10.192.19.187 client-id=1:0:1:a9:1b:89:b2 comment=\
+    "New Virgo Finger 1" mac-address=00:01:A9:1B:89:CB server=server1
+add address=10.192.19.206 comment="New Virgo 2" mac-address=00:01:A9:1B:89:CB
+/ip dhcp-server network
+add address=10.192.19.0/24 dns-server=10.192.30.3,10.192.30.2 domain=OKCO.ir \
+    gateway=10.192.19.1 ntp-server=10.192.30.3
+/ip route
+add dst-address=0.0.0.0/0 gateway=ether1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=DHCP-Mashhad
+/system note
+set show-at-login=no

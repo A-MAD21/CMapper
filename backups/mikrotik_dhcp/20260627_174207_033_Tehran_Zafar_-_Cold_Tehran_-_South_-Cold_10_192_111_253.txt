@@ -1,0 +1,69 @@
+# jun/27/2026 14:12:00 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.111.170-10.192.111.241
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=1h name=\
+    dhcp1
+/ip address
+add address=10.192.111.253/25 interface=ether1 network=10.192.111.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.111.205 client-id=1:5a:53:c4:87:34:24 mac-address=\
+    5A:53:C4:87:34:24 server=dhcp1
+add address=10.192.111.216 mac-address=D8:5E:D3:FB:52:04 server=dhcp1
+add address=10.192.111.171 client-id=1:0:c:29:b0:19:ec comment=\
+    "Anbar sard tehran jonob Machine Windows server" mac-address=\
+    00:0C:29:B0:19:EC server=dhcp1
+add address=10.192.111.204 client-id=1:0:17:61:10:7c:7d comment=\
+    "FingerPrint Device" disabled=yes mac-address=00:17:61:10:7C:7D server=\
+    dhcp1
+add address=10.192.111.217 comment=\
+    "Problematic PDA Fixed by manually giving the MAC address to DHCP" \
+    mac-address=B4:29:3D:7D:5D:30
+add address=10.192.111.218 client-id=1:18:c0:4d:10:3b:8c comment=Mr.nameni \
+    mac-address=18:C0:4D:10:3B:8C server=dhcp1
+add address=10.192.111.240 client-id=1:0:17:61:10:9d:ee comment="Finger 2#" \
+    mac-address=00:17:61:10:9D:EE server=dhcp1
+add address=10.192.111.184 client-id=1:18:31:bf:7:fe:6c comment=\
+    "Mr Ahmadzadeh.jamil" mac-address=18:31:BF:07:FE:6C server=dhcp1
+add address=10.192.111.197 client-id=1:cc:28:aa:34:c:9e mac-address=\
+    CC:28:AA:34:0C:9E server=dhcp1
+add address=10.192.111.202 client-id=1:fc:34:97:18:d6:27 mac-address=\
+    FC:34:97:18:D6:27 server=dhcp1
+add address=10.192.111.198 client-id=1:74:56:3c:35:a1:81 mac-address=\
+    74:56:3C:35:A1:81 server=dhcp1
+add address=10.192.111.203 client-id=1:60:45:cb:a3:9:97 mac-address=\
+    60:45:CB:A3:09:97 server=dhcp1
+add address=10.192.111.195 client-id=1:d8:5e:d3:56:c3:5d mac-address=\
+    D8:5E:D3:56:C3:5D server=dhcp1
+add address=10.192.111.191 client-id=1:d8:5e:d3:56:c8:5d mac-address=\
+    D8:5E:D3:56:C8:5D server=dhcp1
+add address=10.192.111.178 client-id=1:c8:a3:62:f2:d4:63 mac-address=\
+    C8:A3:62:F2:D4:63 server=dhcp1
+add address=10.192.111.237 client-id=1:1c:ce:51:59:a5:a4 mac-address=\
+    1C:CE:51:59:A5:A4 server=dhcp1
+add address=10.192.111.204 client-id=1:0:1:f5:2:20:28 comment="New Finger 1" \
+    mac-address=00:01:F5:02:20:28 server=dhcp1
+add address=10.192.111.227 comment="New Finger 2" mac-address=\
+    00:01:A9:1B:8A:6A
+/ip dhcp-server network
+add address=10.192.111.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=10.192.111.129
+/ip route
+add distance=1 gateway=10.192.111.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name="Tehran - South -Cold"
+/system ntp client
+set enabled=yes primary-ntp=10.192.30.3 secondary-ntp=10.192.30.2

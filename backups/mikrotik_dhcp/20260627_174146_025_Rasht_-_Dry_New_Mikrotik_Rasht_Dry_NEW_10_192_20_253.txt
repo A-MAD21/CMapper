@@ -1,0 +1,72 @@
+# oct/25/2001 04:49:52 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.20.170-10.192.20.240
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=20m name=\
+    dhcp1
+/ip address
+add address=10.192.20.253/25 interface=ether1 network=10.192.20.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.20.207 client-id=1:88:d7:f6:c6:11:e0 mac-address=\
+    88:D7:F6:C6:11:E0 server=dhcp1
+add address=10.192.20.206 client-id=1:3c:52:82:2b:25:4c comment=Printer \
+    mac-address=3C:52:82:2B:25:4C server=dhcp1
+add address=10.192.20.190 client-id=1:bc:fc:e7:4f:ec:27 comment=\
+    KhoshBin-FileShare mac-address=BC:FC:E7:4F:EC:27 server=dhcp1
+add address=10.192.20.189 client-id=1:bc:fc:e7:86:ca:36 mac-address=\
+    BC:FC:E7:86:CA:36 server=dhcp1
+add address=10.192.20.188 client-id=1:cc:6b:1e:76:54:59 comment=\
+    "Mr Keshavarz LPT" mac-address=CC:6B:1E:76:54:59 server=dhcp1
+add address=10.192.20.187 client-id=1:bc:fc:e7:86:cc:c2 mac-address=\
+    BC:FC:E7:86:CC:C2 server=dhcp1
+add address=10.192.20.196 client-id=1:bc:fc:e7:4f:eb:fd mac-address=\
+    BC:FC:E7:4F:EB:FD server=dhcp1
+add address=10.192.20.185 client-id=1:3c:52:82:2b:8b:e2 comment=\
+    "Printer 2 Cardex" mac-address=3C:52:82:2B:8B:E2 server=dhcp1
+add address=10.192.20.211 client-id=1:bc:fc:e7:4f:eb:3a comment=MohammadDost \
+    mac-address=BC:FC:E7:4F:EB:3A server=dhcp1
+add address=10.192.20.213 comment="NVR 164 sabegh" mac-address=\
+    E4:F1:4C:60:43:4D server=dhcp1
+add address=10.192.20.214 client-id=1:60:45:cb:6d:b3:96 comment="Mr Zabihi" \
+    mac-address=60:45:CB:6D:B3:96 server=dhcp1
+add address=10.192.20.174 client-id=1:bc:fc:e7:87:46:af comment=KH.Guard \
+    mac-address=BC:FC:E7:87:46:AF server=dhcp1
+add address=10.192.20.216 client-id=1:88:d7:f6:c6:13:52 comment=Mohamadi.PC \
+    mac-address=88:D7:F6:C6:13:52 server=dhcp1
+add address=10.192.20.205 client-id=1:0:17:61:10:9d:bb comment=Finger1 \
+    mac-address=00:17:61:10:9D:BB server=dhcp1
+add address=10.192.20.215 comment=NVR mac-address=E4:F1:4C:60:44:95 server=\
+    dhcp1
+add address=10.192.20.212 comment="NVR 165 sabegh" mac-address=\
+    E4:F1:4C:60:44:65
+add address=10.192.20.231 client-id=1:c4:fc:22:33:28:4 mac-address=\
+    C4:FC:22:33:28:04 server=dhcp1
+add address=10.192.20.226 client-id=1:60:45:cb:6d:15:ea mac-address=\
+    60:45:CB:6D:15:EA server=dhcp1
+add address=10.192.20.224 client-id=1:a8:7e:ea:4e:94:4a comment=\
+    "MR mousavi bagher" mac-address=A8:7E:EA:4E:94:4A server=dhcp1
+add address=10.192.20.218 client-id=1:bc:fc:e7:87:47:8c mac-address=\
+    BC:FC:E7:87:47:8C server=dhcp1
+add address=10.192.20.239 client-id=1:0:1:f5:2:20:1e comment=\
+    "New Virgo Finger 1" mac-address=00:01:F5:02:20:1E server=dhcp1
+add address=10.192.20.236 comment="New Virgo Finger 2" mac-address=\
+    00:01:A9:1B:89:E6
+/ip dhcp-server network
+add address=10.192.20.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    OKCO.ir gateway=10.192.20.129
+/ip route
+add distance=1 gateway=ether1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes

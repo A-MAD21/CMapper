@@ -1,0 +1,59 @@
+# 2026-06-27 14:10:16 by RouterOS 7.16.2
+# software id = 
+#
+/interface ethernet
+set [ find default-name=ether1 ] disable-running-check=no
+/ip pool
+add comment="DHCP " name=DHCP ranges=10.192.18.178-10.192.18.250
+/ip dhcp-server
+add address-pool=DHCP comment="Qazvin dhcp" interface=ether1 lease-time=20m \
+    name=DHCP
+/port
+set 0 name=serial0
+set 1 name=serial1
+/ip address
+add address=10.192.18.253/25 interface=ether1 network=10.192.18.128
+/ip dhcp-client
+add interface=ether1
+/ip dhcp-server lease
+add address=10.192.18.179 client-id=1:0:17:61:10:a0:ba comment=Finger \
+    mac-address=00:17:61:10:A0:BA server=DHCP
+add address=10.192.18.226 client-id=1:d8:b3:70:cc:fd:85 comment="AP05 Mesh" \
+    mac-address=D8:B3:70:CC:FD:85 server=DHCP
+add address=10.192.18.236 client-id=1:e4:f1:4c:60:44:af comment=NVR7 \
+    mac-address=E4:F1:4C:60:44:AF server=DHCP
+add address=10.192.18.205 client-id=1:60:cf:84:69:5d:8 mac-address=\
+    60:CF:84:69:5D:08 server=DHCP
+add address=10.192.18.212 client-id=1:60:cf:84:69:5c:94 mac-address=\
+    60:CF:84:69:5C:94 server=DHCP
+add address=10.192.18.207 client-id=1:60:cf:84:6a:49:b9 mac-address=\
+    60:CF:84:6A:49:B9 server=DHCP
+add address=10.192.18.213 client-id=1:4c:ed:fb:6c:29:d2 mac-address=\
+    4C:ED:FB:6C:29:D2 server=DHCP
+add address=10.192.18.220 client-id=1:60:cf:84:6a:4f:68 mac-address=\
+    60:CF:84:6A:4F:68 server=DHCP
+add address=10.192.18.194 client-id=1:4:d9:f5:ac:4:24 mac-address=\
+    04:D9:F5:AC:04:24 server=DHCP
+add address=10.192.18.219 client-id=1:60:cf:84:6a:4f:73 mac-address=\
+    60:CF:84:6A:4F:73 server=DHCP
+add address=10.192.18.196 client-id=1:60:cf:84:6a:4d:bf mac-address=\
+    60:CF:84:6A:4D:BF server=DHCP
+add address=10.192.18.208 client-id=1:70:4d:7b:b3:b9:6c mac-address=\
+    70:4D:7B:B3:B9:6C server=DHCP
+add address=10.192.18.233 client-id=1:0:17:61:10:9d:67 mac-address=\
+    00:17:61:10:9D:67 server=DHCP
+add address=10.192.18.242 client-id=1:0:1:a9:1b:89:a1 comment=\
+    "New Virgi Finger 1" mac-address=00:01:A9:1B:89:A1 server=DHCP
+add address=10.192.18.245 client-id=1:0:1:a9:1b:89:a1 comment=\
+    "New Virgi Finger 2" mac-address=00:01:A9:1B:89:D2 server=DHCP
+add address=10.192.18.178 comment="Finger virgo 2" mac-address=\
+    00:01:A9:1B:89:D2
+/ip dhcp-server network
+add address=10.192.18.128/25 comment=qazvin dns-server=\
+    10.192.30.3,10.192.30.2 domain=OKCO.ir gateway=10.192.18.129 netmask=25 \
+    ntp-server=10.192.30.3
+/ip route
+add gateway=10.192.18.129
+add gateway=10.192.18.129
+/system note
+set show-at-login=no

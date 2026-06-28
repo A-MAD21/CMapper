@@ -1,0 +1,68 @@
+# 2026-06-27 14:12:15 by RouterOS 7.16.2
+# software id = 
+#
+/interface ethernet
+set [ find default-name=ether1 ] disable-running-check=no
+/ip pool
+add name=dhcp_pool0 ranges=10.192.114.80-10.192.114.240
+/ip dhcp-server
+add address-pool=dhcp_pool0 interface=ether1 name=dhcp1
+/port
+set 0 name=serial0
+set 1 name=serial1
+/ip address
+add address=10.192.114.253/24 interface=ether1 network=10.192.114.0
+/ip dhcp-client
+add interface=ether1
+/ip dhcp-server lease
+add address=10.192.114.208 client-id=1:0:17:61:10:9f:91 comment=\
+    "FingerPrint Anbar Bushehr Dry" mac-address=00:17:61:10:9F:91 server=\
+    dhcp1
+add address=10.192.114.120 mac-address=AC:8B:A9:70:7C:67
+add address=10.192.114.80 client-id=1:0:c:29:11:be:d1 comment=QNAP \
+    mac-address=00:0C:29:11:BE:D1 server=dhcp1
+add address=10.192.114.135 client-id=1:d4:5d:64:af:37:a4 comment=Surena \
+    mac-address=D4:5D:64:AF:37:A4 server=dhcp1
+add address=10.192.114.117 client-id=1:2c:4d:54:e9:ab:de comment=\
+    "Mr.Farzanfar PC" mac-address=2C:4D:54:E9:AB:DE server=dhcp1
+add address=10.192.114.141 client-id=1:0:17:61:10:9d:7d comment=\
+    "Finger Print #2" disabled=yes mac-address=00:17:61:10:9D:7D server=dhcp1
+add address=10.192.114.109 client-id=1:18:c0:4d:15:9e:8b comment=\
+    "MR Rajabpour PC" mac-address=18:C0:4D:15:9E:8B server=dhcp1
+add address=10.192.114.104 client-id=1:fc:34:97:18:d2:aa mac-address=\
+    FC:34:97:18:D2:AA server=dhcp1
+add address=10.192.114.129 client-id=1:8:62:66:83:e1:ec mac-address=\
+    08:62:66:83:E1:EC server=dhcp1
+add address=10.192.114.105 client-id=1:38:2c:4a:b9:ff:7b mac-address=\
+    38:2C:4A:B9:FF:7B server=dhcp1
+add address=10.192.114.82 client-id=1:70:4d:7b:b3:b8:c9 mac-address=\
+    70:4D:7B:B3:B8:C9 server=dhcp1
+add address=10.192.114.110 client-id=1:4:d4:c4:ed:64:eb mac-address=\
+    04:D4:C4:ED:64:EB server=dhcp1
+add address=10.192.114.108 client-id=1:c:9d:92:d:8:45 mac-address=\
+    0C:9D:92:0D:08:45 server=dhcp1
+add address=10.192.114.119 client-id=1:30:9c:23:a5:69:d5 mac-address=\
+    30:9C:23:A5:69:D5 server=dhcp1
+add address=10.192.114.136 client-id=1:2c:fd:a1:5a:ab:63 mac-address=\
+    2C:FD:A1:5A:AB:63 server=dhcp1
+add address=10.192.114.115 client-id=1:18:31:bf:c8:cd:d1 mac-address=\
+    18:31:BF:C8:CD:D1 server=dhcp1
+add address=10.192.114.141 client-id=1:0:1:f5:2:1f:9a comment=\
+    "New Virgo Finger 1" mac-address=00:01:F5:02:1F:9A server=dhcp1
+add address=10.192.114.121 client-id=1:60:cf:84:6a:49:b3 comment="Gaurd new" \
+    mac-address=60:CF:84:6A:49:B3 server=dhcp1
+/ip dhcp-server network
+add address=10.192.114.0/24 dns-server=10.192.30.3,10.192.30.2 domain=okco.ir \
+    gateway=10.192.114.1
+/ip route
+add dst-address=0.0.0.0/0 gateway=10.192.114.1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Bushehr-Dry
+/system note
+set show-at-login=no

@@ -1,0 +1,95 @@
+# 2001-01-06 19:56:52 by RouterOS 7.16.2
+# software id = 
+#
+/interface ethernet
+set [ find default-name=ether1 ] disable-running-check=no
+/ip pool
+add name=Zavieh ranges=10.192.86.155-10.192.86.250
+/ip dhcp-server
+add address-pool=Zavieh interface=ether1 name=Zavieh-HUB
+/port
+set 0 name=serial0
+set 1 name=serial1
+/ip address
+add address=10.192.86.253/25 comment=Zavieh interface=ether1 network=\
+    10.192.86.128
+/ip dhcp-client
+add interface=ether1
+/ip dhcp-server lease
+add address=10.192.86.226 client-id=1:d8:b3:70:cc:fd:97 comment="A#5 " \
+    mac-address=D8:B3:70:CC:FD:97 server=Zavieh-HUB
+add address=10.192.86.235 client-id=1:d8:b3:70:cc:fe:f5 comment=\
+    "A#14 Sole 03-01" mac-address=D8:B3:70:CC:FE:F5 server=Zavieh-HUB
+add address=10.192.86.232 client-id=1:28:70:4e:d4:81:5c comment=\
+    "A#11 Mesh Biroon Sole5" mac-address=28:70:4E:D4:81:5C server=Zavieh-HUB
+add address=10.192.86.229 client-id=1:d8:b3:70:cc:fd:b8 comment=\
+    "A#8 Sole 05-01" mac-address=D8:B3:70:CC:FD:B8 server=Zavieh-HUB
+add address=10.192.86.233 client-id=1:d8:b3:70:cc:fd:79 comment=\
+    "A#12 Sole 01-02" mac-address=D8:B3:70:CC:FD:79 server=Zavieh-HUB
+add address=10.192.86.230 client-id=1:d8:b3:70:cc:fb:cb comment=\
+    "A#9 Sole 04-02" mac-address=D8:B3:70:CC:FB:CB server=Zavieh-HUB
+add address=10.192.86.227 client-id=1:d8:b3:70:cc:fd:40 comment=\
+    "A#6 Sole 06-01" mac-address=D8:B3:70:CC:FD:40 server=Zavieh-HUB
+add address=10.192.86.225 client-id=1:d8:b3:70:cc:fe:79 comment=\
+    "A#4 Sole 01-01" mac-address=D8:B3:70:CC:FE:79 server=Zavieh-HUB
+add address=10.192.86.234 client-id=1:d8:b3:70:cc:fe:25 comment=\
+    "A#13 Sole 03-02" mac-address=D8:B3:70:CC:FE:25 server=Zavieh-HUB
+add address=10.192.86.222 client-id=1:d8:b3:70:cc:fe:50 comment=\
+    "A#1 Sole 07-02" mac-address=D8:B3:70:CC:FE:50 server=Zavieh-HUB
+add address=10.192.86.224 client-id=1:28:70:4e:d4:7e:44 comment=A#3 \
+    mac-address=28:70:4E:D4:7E:44 server=Zavieh-HUB
+add address=10.192.86.228 client-id=1:d8:b3:70:cc:fd:6a comment=A#7 \
+    mac-address=D8:B3:70:CC:FD:6A server=Zavieh-HUB
+add address=10.192.86.231 client-id=1:d8:b3:70:cc:fe:6f comment=\
+    "A#10 Sole 04-01" mac-address=D8:B3:70:CC:FE:6F server=Zavieh-HUB
+add address=10.192.86.223 client-id=1:d8:b3:70:cc:fc:c0 comment=\
+    "A#2 sole 07-01" mac-address=D8:B3:70:CC:FC:C0 server=Zavieh-HUB
+add address=10.192.86.205 comment=ipphone mac-address=11:22:33:44:56:07
+add address=10.192.86.204 client-id=1:0:17:61:10:a0:d8 comment=Finger#1 \
+    mac-address=00:17:61:10:A0:D8 server=Zavieh-HUB
+add address=10.192.86.203 client-id=1:0:17:61:10:a1:4f comment=Finger#2 \
+    mac-address=00:17:61:10:A1:4F server=Zavieh-HUB
+add address=10.192.86.213 client-id=1:e:af:25:38:b:43 comment="Emami Phone" \
+    mac-address=0E:AF:25:38:0B:43 server=Zavieh-HUB
+add address=10.192.86.156 client-id=1:c4:fc:22:33:25:b9 comment=\
+    "IP Phone Yealink Mr Emami" mac-address=C4:FC:22:33:25:B9 server=\
+    Zavieh-HUB
+add address=10.192.86.248 client-id=1:18:c0:4d:d8:9f:d6 mac-address=\
+    18:C0:4D:D8:9F:D6 server=Zavieh-HUB
+add address=10.192.86.207 client-id=1:60:cf:84:69:5c:c7 mac-address=\
+    60:CF:84:69:5C:C7 server=Zavieh-HUB
+add address=10.192.86.236 client-id=1:18:31:bf:2c:f4:36 mac-address=\
+    18:31:BF:2C:F4:36 server=Zavieh-HUB
+add address=10.192.86.217 client-id=1:4:d9:f5:20:96:4f mac-address=\
+    04:D9:F5:20:96:4F server=Zavieh-HUB
+add address=10.192.86.218 client-id=1:2c:4d:54:52:82:73 mac-address=\
+    2C:4D:54:52:82:73 server=Zavieh-HUB
+add address=10.192.86.211 client-id=1:60:cf:84:6a:4d:63 mac-address=\
+    60:CF:84:6A:4D:63 server=Zavieh-HUB
+add address=10.192.86.219 client-id=1:fc:34:97:18:de:24 mac-address=\
+    FC:34:97:18:DE:24 server=Zavieh-HUB
+add address=10.192.86.162 client-id=1:94:de:80:42:73:1 mac-address=\
+    94:DE:80:42:73:01 server=Zavieh-HUB
+add address=10.192.86.178 client-id=1:d8:b3:70:cc:fd:30 comment=\
+    "A#15 Sole 02-01" mac-address=D8:B3:70:CC:FD:30 server=Zavieh-HUB
+add address=10.192.86.179 client-id=1:d8:b3:70:cc:fc:a1 comment=\
+    "A#16 Sole 02-02" mac-address=D8:B3:70:CC:FC:A1 server=Zavieh-HUB
+add address=10.192.86.166 client-id=1:0:1:a9:1b:89:e3 comment=\
+    "New Virgo Finger 1" mac-address=00:01:A9:1B:89:E3 server=Zavieh-HUB
+add address=10.192.86.221 client-id=1:3c:a8:2a:10:67:22 mac-address=\
+    3C:A8:2A:10:67:22 server=Zavieh-HUB
+add address=10.192.86.171 comment="Finger Virgo 2" mac-address=\
+    00:01:A9:1B:89:E8
+/ip dhcp-server network
+add address=10.192.86.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=10.192.86.129 ntp-server=10.192.30.3
+/ip route
+add gateway=10.192.86.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system note
+set show-at-login=no

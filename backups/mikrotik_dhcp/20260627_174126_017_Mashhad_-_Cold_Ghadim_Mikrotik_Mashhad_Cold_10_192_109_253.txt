@@ -1,0 +1,46 @@
+# jun/27/2026 14:11:30 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface ethernet
+set [ find default-name=ether1 ] mac-address=00:0C:29:AD:F3:06
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.109.145-10.192.109.180
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=1w name=\
+    dhcp1
+/ip address
+add address=10.192.109.253/25 interface=ether1 network=10.192.109.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.109.158 mac-address=00:17:61:11:27:0F
+add address=10.192.109.174 client-id=1:d4:5d:64:23:65:24 comment=\
+    "Khaqani Internet" mac-address=D4:5D:64:23:65:24 server=dhcp1
+add address=10.192.109.180 mac-address=FC:AA:B6:B0:BA:CA
+add address=10.192.109.160 client-id=1:b4:2e:99:73:8e:2b comment=\
+    "Mr. Zahmatkesh" mac-address=B4:2E:99:73:8E:2B server=dhcp1
+add address=10.192.109.156 client-id=1:c:9d:92:85:97:15 mac-address=\
+    0C:9D:92:85:97:15 server=dhcp1
+add address=10.192.109.166 client-id=1:30:9c:23:a5:6b:29 mac-address=\
+    30:9C:23:A5:6B:29 server=dhcp1
+add address=10.192.109.168 client-id=1:0:1:f5:2:20:2a comment="NEw Finger 1" \
+    mac-address=00:01:F5:02:20:2A server=dhcp1
+add address=10.192.109.170 client-id=1:0:1:f5:2:20:2d comment="New Finger 2" \
+    mac-address=00:01:F5:02:20:2D server=dhcp1
+/ip dhcp-server network
+add address=10.192.109.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=10.192.109.129
+/ip route
+add distance=1 gateway=10.192.109.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Mashhad-Cold

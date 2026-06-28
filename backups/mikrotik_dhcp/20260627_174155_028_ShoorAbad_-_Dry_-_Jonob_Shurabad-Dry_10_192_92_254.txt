@@ -1,0 +1,128 @@
+# 2026-06-26 23:20:24 by RouterOS 7.13.3
+# software id = TI09-7WK3
+#
+/interface ethernet
+set [ find default-name=ether1 ] disable-running-check=no
+set [ find default-name=ether2 ] disable-running-check=no
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/iot lora servers
+add address=eu.mikrotik.thethings.industries name=TTN-EU protocol=UDP
+add address=us.mikrotik.thethings.industries name=TTN-US protocol=UDP
+add address=eu1.cloud.thethings.industries name="TTS Cloud (eu1)" protocol=\
+    UDP
+add address=nam1.cloud.thethings.industries name="TTS Cloud (nam1)" protocol=\
+    UDP
+add address=au1.cloud.thethings.industries name="TTS Cloud (au1)" protocol=\
+    UDP
+add address=eu1.cloud.thethings.network name="TTN V3 (eu1)" protocol=UDP
+add address=nam1.cloud.thethings.network name="TTN V3 (nam1)" protocol=UDP
+add address=au1.cloud.thethings.network name="TTN V3 (au1)" protocol=UDP
+/ip pool
+add name=pool1 ranges=10.192.92.155-10.192.92.250
+/ip dhcp-server
+add address-pool=pool1 interface=ether1 name=DHCP-Shur-j-D
+/ip address
+add address=10.192.92.254/25 interface=ether1 network=10.192.92.128
+/ip dhcp-server lease
+add address=10.192.92.137 comment=NVR mac-address=48:EA:63:CD:9A:B0 server=\
+    DHCP-Shur-j-D
+add address=10.192.92.136 comment=NVR mac-address=48:EA:63:CD:9A:A2 server=\
+    DHCP-Shur-j-D
+add address=10.192.92.129 comment=R-ShoorAbad.OKCO.IR mac-address=\
+    58:AC:78:B7:FE:C0 server=DHCP-Shur-j-D
+add address=10.192.92.131 comment=SW2-Eddari.OKCO.ir mac-address=\
+    28:C7:CE:42:E2:C0 server=DHCP-Shur-j-D
+add address=10.192.92.132 comment=SW3-3750 mac-address=40:F4:EC:EB:28:C0 \
+    server=DHCP-Shur-j-D
+add address=10.192.92.133 comment=SW4-Negahbani.OKCO.ir mac-address=\
+    C4:0A:CB:C9:C7:C0 server=DHCP-Shur-j-D
+add address=10.192.92.135 comment=SW6-Khorogi.OKCO.ir mac-address=\
+    C4:0A:CB:7A:2F:40 server=DHCP-Shur-j-D
+add address=10.192.92.130 comment=SW1-Main.OKCO.ir mac-address=\
+    6C:9C:ED:9B:0E:C0 server=DHCP-Shur-j-D
+add address=10.192.92.134 comment=SW5-Vorodi.OKCO.ir mac-address=\
+    5C:FC:66:9E:7D:40 server=DHCP-Shur-j-D
+add address=10.192.92.180 comment=ok001p5833 mac-address=60:45:CB:6D:BF:B1 \
+    server=DHCP-Shur-j-D
+add address=10.192.92.144 comment=OKW01102SRV/OKCS/AX mac-address=\
+    00:0C:29:7D:CE:F1 server=DHCP-Shur-j-D
+add address=10.192.92.142 comment=ESXI mac-address=98:F2:B3:26:A9:C4 server=\
+    DHCP-Shur-j-D
+add address=10.192.92.138 comment=NVR mac-address=48:EA:63:CD:9A:AC server=\
+    DHCP-Shur-j-D
+add address=10.192.92.139 comment=NVR mac-address=48:EA:63:B7:92:9A server=\
+    DHCP-Shur-j-D
+add address=10.192.92.147 comment=2 mac-address=E0:63:DA:B0:CF:5B server=\
+    DHCP-Shur-j-D
+add address=10.192.92.146 comment=1 mac-address=E0:63:DA:33:72:C3 server=\
+    DHCP-Shur-j-D
+add address=10.192.92.148 comment=3 mac-address=E0:63:DA:B0:CA:15 server=\
+    DHCP-Shur-j-D
+add address=10.192.92.150 comment=5 mac-address=E0:63:DA:33:60:52 server=\
+    DHCP-Shur-j-D
+add address=10.192.92.151 comment=6 mac-address=E0:63:DA:33:54:E6 server=\
+    DHCP-Shur-j-D
+add address=10.192.92.149 comment=4 mac-address=E0:63:DA:73:C3:AA server=\
+    DHCP-Shur-j-D
+add address=10.192.92.152 comment=1Mesh mac-address=E0:63:DA:BC:DB:56 server=\
+    DHCP-Shur-j-D
+add address=10.192.92.153 comment=2Mesh mac-address=E0:63:DA:BC:DA:B5 server=\
+    DHCP-Shur-j-D
+add address=10.192.92.171 comment=ok001p105158 mac-address=B4:2E:99:73:96:89 \
+    server=DHCP-Shur-j-D
+add address=10.192.92.175 comment=ok001p1115414 mac-address=BC:FC:E7:87:45:56 \
+    server=DHCP-Shur-j-D
+add address=10.192.92.182 comment=OK001PC5812/OKCO mac-address=\
+    B4:2E:99:DB:43:6C server=DHCP-Shur-j-D
+add address=10.192.92.195 comment=ok001c406783 mac-address=B4:2E:99:54:58:05 \
+    server=DHCP-Shur-j-D
+add address=10.192.92.202 comment=OK001pc1116408 mac-address=\
+    C8:A3:62:F2:D4:63 server=DHCP-Shur-j-D
+add address=10.192.92.200 comment=otaghrack mac-address=E0:63:DA:33:78:40 \
+    server=DHCP-Shur-j-D
+add address=10.192.92.207 comment=SIP-T30P mac-address=24:9A:D8:47:42:D9 \
+    server=DHCP-Shur-j-D
+add address=10.192.92.237 comment=OK001pc1116408 mac-address=\
+    1C:CE:51:59:A5:A4 server=DHCP-Shur-j-D
+add address=10.192.92.213 comment=ok001pj1115414 mac-address=\
+    70:4D:7B:B3:BA:3C server=DHCP-Shur-j-D
+add address=10.192.92.227 comment=NVR mac-address=C4:79:05:7C:90:B0 server=\
+    DHCP-Shur-j-D
+add address=10.192.92.224 comment=ok001p920315530 mac-address=\
+    F8:32:E4:9D:7F:E2 server=DHCP-Shur-j-D
+add address=10.192.92.189 comment=SIP-T30 mac-address=24:9A:D8:41:97:AD \
+    server=DHCP-Shur-j-D
+add address=10.192.92.192 comment="Finger 1" mac-address=00:17:61:10:9E:DE \
+    server=DHCP-Shur-j-D
+add address=10.192.92.174 comment=KRC001N245 mac-address=80:A5:89:7F:EB:A5 \
+    server=DHCP-Shur-j-D
+add address=10.192.92.229 comment=ok001p920325685 mac-address=\
+    60:CF:84:6A:49:CD server=DHCP-Shur-j-D
+add address=10.192.92.220 comment=ok01p920337351 mac-address=\
+    FC:34:97:18:D1:DD server=DHCP-Shur-j-D
+add address=10.192.92.196 comment=virgo-0001a91b89b1 mac-address=\
+    00:01:A9:1B:89:B1 server=DHCP-Shur-j-D
+add address=10.192.92.179 comment=virgo-0001f5021fd8 mac-address=\
+    00:17:61:12:75:C1 server=DHCP-Shur-j-D
+add address=10.192.92.169 comment=virgo-0001f5021fd8 mac-address=\
+    00:01:F5:02:1F:D8 server=DHCP-Shur-j-D
+add address=10.192.92.251 comment=Sw-Bargiri-New.OKCO.ir mac-address=\
+    C4:72:95:AF:27:C0 server=DHCP-Shur-j-D
+add address=10.192.92.240 comment=iPhone mac-address=EE:BE:70:1E:0E:DA \
+    server=DHCP-Shur-j-D
+/ip dhcp-server network
+add address=10.192.92.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    OKCO.ir gateway=10.192.92.129 ntp-server=10.192.30.3
+/ip route
+add dst-address=0.0.0.0/0 gateway=10.192.92.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system hardware
+set allow-x86-64=yes
+/system note
+set show-at-login=no

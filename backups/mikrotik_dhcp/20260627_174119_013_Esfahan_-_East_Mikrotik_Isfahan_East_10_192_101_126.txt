@@ -1,0 +1,60 @@
+# jun/27/2026 14:17:47 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.101.51-10.192.101.119
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=8h10m \
+    name=dhcp1
+/ip address
+add address=10.192.101.126/25 interface=ether1 network=10.192.101.0
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.101.84 client-id=1:d4:5d:64:43:3e:2b comment=Mr.Dadvar \
+    mac-address=D4:5D:64:43:3E:2B server=dhcp1
+add address=10.192.101.114 client-id=1:d8:b3:70:b6:bc:d5 comment=\
+    "AC-Lr Connex Edari" mac-address=D8:B3:70:B6:BC:D5 server=dhcp1
+add address=10.192.101.90 client-id=1:0:17:61:10:9d:f1 comment=\
+    "Finger print #2" mac-address=00:17:61:10:9D:F1 server=dhcp1
+add address=10.192.101.16 comment="Finger Print #1" mac-address=\
+    AA:AA:AA:AA:AA:AA
+add address=10.192.101.63 client-id=1:1c:bf:ce:d4:38:76 comment=Guard2 \
+    mac-address=1C:BF:CE:D4:38:76 server=dhcp1
+add address=10.192.101.62 client-id=1:c4:79:5:7c:90:73 comment="New NVR" \
+    mac-address=C4:79:05:7C:90:73 server=dhcp1
+add address=10.192.101.79 client-id=1:e4:f1:4c:33:49:c7 comment="New NVR" \
+    mac-address=E4:F1:4C:33:49:C7 server=dhcp1
+add address=10.192.101.120 mac-address=11:11:11:11:11:11
+add address=10.192.101.121 mac-address=11:11:11:11:11:12
+add address=10.192.101.94 client-id=1:e4:f1:4c:33:49:7f comment="New NVR" \
+    mac-address=E4:F1:4C:33:49:7F server=dhcp1
+add address=10.192.101.85 client-id=1:40:b0:76:60:98:77 mac-address=\
+    40:B0:76:60:98:77 server=dhcp1
+add address=10.192.101.68 client-id=1:cc:28:aa:33:ee:99 mac-address=\
+    CC:28:AA:33:EE:99 server=dhcp1
+add address=10.192.101.70 client-id=1:40:b0:76:5f:98:ec mac-address=\
+    40:B0:76:5F:98:EC server=dhcp1
+add address=10.192.101.66 client-id=1:4:d4:c4:f3:73:be mac-address=\
+    04:D4:C4:F3:73:BE server=dhcp1
+add address=10.192.101.92 client-id=1:18:c0:4d:de:99:e8 mac-address=\
+    18:C0:4D:DE:99:E8 server=dhcp1
+add address=10.192.101.89 comment="Virgo F 1" mac-address=00:01:F5:02:20:1C
+add address=10.192.111.88 comment="Virgo F 2" mac-address=00:01:F5:02:1F:C9
+/ip dhcp-server network
+add address=10.192.101.0/25 dns-server=10.192.30.3,10.192.30.2 domain=OKCO.ir \
+    gateway=10.192.101.1
+/ip route
+add distance=1 gateway=10.192.101.1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name="Esfahan Shargh"

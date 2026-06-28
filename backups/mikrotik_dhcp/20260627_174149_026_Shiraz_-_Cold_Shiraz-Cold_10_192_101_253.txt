@@ -1,0 +1,36 @@
+# jun/27/2026 14:12:20 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.101.151-10.192.101.200
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=1h10m \
+    name=dhcp1
+/ip address
+add address=10.192.101.253/25 interface=ether1 network=10.192.101.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.101.197 client-id=1:0:17:61:10:9d:99 comment="New Finger" \
+    mac-address=00:17:61:10:9D:99 server=dhcp1
+add address=10.192.101.173 client-id=1:4c:5f:70:6a:b:bc comment="MR Pezeshki" \
+    mac-address=4C:5F:70:6A:0B:BC server=dhcp1
+add address=10.192.101.151 client-id=1:0:1:a9:1b:89:d1 comment=\
+    "New Virgo Finger 1" mac-address=00:01:A9:1B:89:D1 server=dhcp1
+/ip dhcp-server network
+add address=10.192.101.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=10.192.101.129
+/ip route
+add distance=1 gateway=10.192.101.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Shiraz-Cold

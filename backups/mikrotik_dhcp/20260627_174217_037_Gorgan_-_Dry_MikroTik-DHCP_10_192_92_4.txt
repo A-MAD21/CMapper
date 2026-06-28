@@ -1,0 +1,60 @@
+# 2026-06-27 14:14:36 by RouterOS 7.13.3
+# software id = TI09-7WK3
+#
+/interface ethernet
+set [ find default-name=ether1 ] disable-running-check=no
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/iot lora servers
+add address=eu.mikrotik.thethings.industries name=TTN-EU protocol=UDP
+add address=us.mikrotik.thethings.industries name=TTN-US protocol=UDP
+add address=eu1.cloud.thethings.industries name="TTS Cloud (eu1)" protocol=\
+    UDP
+add address=nam1.cloud.thethings.industries name="TTS Cloud (nam1)" protocol=\
+    UDP
+add address=au1.cloud.thethings.industries name="TTS Cloud (au1)" protocol=\
+    UDP
+add address=eu1.cloud.thethings.network name="TTN V3 (eu1)" protocol=UDP
+add address=nam1.cloud.thethings.network name="TTN V3 (nam1)" protocol=UDP
+add address=au1.cloud.thethings.network name="TTN V3 (au1)" protocol=UDP
+/ip pool
+add name=prim ranges=10.192.92.28-10.192.92.90
+/ip dhcp-server
+add address-pool=prim interface=ether1 lease-time=20m name=server1
+/ip address
+add address=10.192.92.4/25 interface=ether1 network=10.192.92.0
+/ip dhcp-server lease
+add address=10.192.92.50 client-id=1:3c:7c:3f:10:37:50 mac-address=\
+    3C:7C:3F:10:37:50 server=server1
+add address=10.192.92.32 client-id=1:3c:7c:3f:14:62:9a mac-address=\
+    3C:7C:3F:14:62:9A server=server1
+add address=10.192.92.57 client-id=1:3c:7c:3f:13:89:c9 mac-address=\
+    3C:7C:3F:13:89:C9 server=server1
+add address=10.192.92.88 client-id=1:74:56:3c:3c:6f:6d mac-address=\
+    74:56:3C:3C:6F:6D server=server1
+add address=10.192.92.54 client-id=1:2c:4d:54:ea:b7:26 mac-address=\
+    2C:4D:54:EA:B7:26 server=server1
+add address=10.192.92.51 client-id=1:0:17:61:10:9d:db comment="Finger 1" \
+    mac-address=00:17:61:10:9D:DB server=server1
+add address=10.192.92.48 client-id=1:0:17:61:10:9d:fe comment="Finger 2" \
+    mac-address=00:17:61:10:9D:FE server=server1
+add address=10.192.92.62 mac-address=30:68:93:7A:FD:D2 server=server1
+add address=10.192.92.70 client-id=1:68:e4:3b:30:7c:7c comment=\
+    "MR DoosMohammadi" mac-address=68:E4:3B:30:7C:7C server=server1
+add address=10.192.92.76 mac-address=00:01:A9:1B:89:B9
+/ip dhcp-server network
+add address=10.192.92.0/25 dns-server=10.192.30.3,10.192.30.2 domain=okco.ir \
+    gateway=10.192.92.1
+/ip route
+add dst-address=0.0.0.0/0 gateway=ether1
+add dst-address=0.0.0.0/0 gateway=10.192.92.1
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system hardware
+set allow-x86-64=yes
+/system note
+set show-at-login=no

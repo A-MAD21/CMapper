@@ -1,0 +1,73 @@
+# jun/27/2026 18:41:01 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface ethernet
+set [ find default-name=ether1 ] mac-address=00:0C:29:AD:F3:06
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=\
+    10.192.107.150-10.192.107.208,10.192.107.210-10.192.107.230
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=7h name=\
+    dhcp1
+/ip address
+add address=10.192.107.253/25 interface=ether1 network=10.192.107.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.107.230 client-id=1:7c:10:c9:87:4c:fd mac-address=\
+    7C:10:C9:87:4C:FD server=dhcp1
+add address=10.192.107.227 client-id=1:18:c0:4d:de:9a:66 mac-address=\
+    18:C0:4D:DE:9A:66 server=dhcp1
+add address=10.192.107.226 client-id=1:c:9d:92:85:b8:ef comment="Guard 2" \
+    mac-address=0C:9D:92:85:B8:EF server=dhcp1
+add address=10.192.107.220 client-id=1:18:31:bf:9:36:2e mac-address=\
+    18:31:BF:09:36:2E server=dhcp1
+add address=10.192.107.219 client-id=1:70:4d:7b:65:44:81 mac-address=\
+    70:4D:7B:65:44:81 server=dhcp1
+add address=10.192.107.217 client-id=1:b4:2e:99:74:ed:33 mac-address=\
+    B4:2E:99:74:ED:33 server=dhcp1
+add address=10.192.107.196 client-id=1:80:91:33:14:d9:d5 comment=\
+    "Mehrdad karami laptop" mac-address=80:91:33:14:D9:D5 server=dhcp1
+add address=10.192.107.229 client-id=1:0:17:61:10:9e:41 comment=\
+    "Finger Print number 2" mac-address=00:17:61:10:9E:41 server=dhcp1
+add address=10.192.107.207 comment=Mrs.Joghta mac-address=00:55:66:99:88:77 \
+    server=dhcp1
+add address=10.192.107.168 client-id=1:60:45:cb:a9:6:74 mac-address=\
+    60:45:CB:A9:06:74 server=dhcp1
+add address=10.192.107.182 client-id=1:a0:a3:f0:aa:1f:ca comment=\
+    "Mr Karami.Mehrdad" mac-address=A0:A3:F0:AA:1F:CA server=dhcp1
+add address=10.192.107.167 client-id=1:d8:5e:d3:55:28:a9 mac-address=\
+    D8:5E:D3:55:28:A9 server=dhcp1
+add address=10.192.107.212 client-id=1:2c:4d:54:e9:ae:4d mac-address=\
+    2C:4D:54:E9:AE:4D server=dhcp1
+add address=10.192.107.178 client-id=1:0:1:f5:2:1f:e1 comment=\
+    "Finger New 1 virgo" mac-address=00:01:F5:02:1F:E1 server=dhcp1
+add address=10.192.107.197 client-id=1:0:17:61:11:3:52 comment=\
+    "Finger print Number 1" mac-address=00:17:61:11:03:52 server=dhcp1
+add address=10.192.107.179 client-id=1:0:1:a9:1b:89:a0 comment=\
+    "New Virgo Finger 2" mac-address=00:01:A9:1B:89:A0 server=dhcp1
+/ip dhcp-server network
+add address=10.192.107.128/25 dns-server=\
+    10.192.31.2,10.192.30.2,10.192.30.3,192.168.14.32 domain=okco.ir gateway=\
+    10.192.107.129 ntp-server=10.192.31.17
+/ip route
+add distance=1 gateway=10.192.107.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system clock
+set time-zone-name=Asia/Tehran
+/system identity
+set name=Babolsar-Dry
+/system note
+set note=Babolsar-DRY show-at-login=no
+/system ntp client
+set enabled=yes primary-ntp=10.192.30.2 secondary-ntp=10.192.30.3 \
+    server-dns-names=okco.ir

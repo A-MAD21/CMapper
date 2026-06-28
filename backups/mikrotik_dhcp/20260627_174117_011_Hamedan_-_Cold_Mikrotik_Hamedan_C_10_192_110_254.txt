@@ -1,0 +1,60 @@
+# jun/27/2026 14:11:15 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface ethernet
+set [ find default-name=ether1 ] mac-address=00:0C:29:CB:A0:3D
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.110.160-10.192.110.190
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=8h name=\
+    dhcp1
+/ip address
+add address=10.192.110.254/25 interface=ether1 network=10.192.110.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.110.184 client-id=1:88:d7:f6:7e:a4:71 mac-address=\
+    88:D7:F6:7E:A4:71 server=dhcp1
+add address=10.192.110.183 client-id=1:e0:3f:49:47:db:b5 mac-address=\
+    E0:3F:49:47:DB:B5 server=dhcp1
+add address=10.192.110.152 client-id=1:ac:8b:a9:70:77:bc comment=3-Mesh \
+    mac-address=AC:8B:A9:70:77:BC server=dhcp1
+add address=10.192.110.153 client-id=1:e4:f1:4c:33:83:38 comment=\
+    "NVR4 New installed by Mr pahani (Contractor)" mac-address=\
+    E4:F1:4C:33:83:38 server=dhcp1
+add address=10.192.110.154 comment="MR Sadeghi" mac-address=B8:A3:86:98:2B:D1
+add address=10.192.110.210 client-id=1:e4:f1:4c:33:49:67 comment="NEW NVR 5" \
+    mac-address=E4:F1:4C:33:49:67 server=dhcp1
+add address=10.192.110.211 client-id=1:c4:79:5:7c:90:81 comment="NEW NVR 6" \
+    mac-address=C4:79:05:7C:90:81 server=dhcp1
+add address=10.192.110.179 client-id=1:74:56:3c:3c:6f:90 mac-address=\
+    74:56:3C:3C:6F:90 server=dhcp1
+add address=10.192.110.163 client-id=1:f4:e2:c6:26:4f:f8 comment=\
+    "AP Edari Mesh SWedari P.23" mac-address=F4:E2:C6:26:4F:F8 server=dhcp1
+add address=10.192.110.250 comment="Reserved for sw" mac-address=\
+    12:33:44:55:66:77
+add address=10.192.110.168 client-id=1:2c:4d:54:e9:aa:9e comment=\
+    "Mr mohammadi" mac-address=2C:4D:54:E9:AA:9E server=dhcp1
+add address=10.192.110.176 client-id=1:0:17:61:10:7b:fe comment=Finger2 \
+    mac-address=00:17:61:10:7B:FE server=dhcp1
+add address=10.192.110.188 client-id=1:0:1:a9:1b:89:a8 comment=\
+    "New Virgo Hamedan 1" mac-address=00:01:A9:1B:89:A8 server=dhcp1
+add address=10.192.110.182 client-id=1:0:1:a9:1b:89:9a comment=\
+    "New Virgo Finger 2" mac-address=00:01:A9:1B:89:9A server=dhcp1
+/ip dhcp-server network
+add address=10.192.110.128/25 dns-server=10.192.30.3,10.192.30.2 gateway=\
+    10.192.110.129
+/ip route
+add distance=1 gateway=10.192.110.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name=Hamedan-Cold

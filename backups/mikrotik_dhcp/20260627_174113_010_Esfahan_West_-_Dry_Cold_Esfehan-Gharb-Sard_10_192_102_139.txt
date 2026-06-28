@@ -1,0 +1,85 @@
+# jun/27/2026 18:41:16 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface ethernet
+set [ find default-name=ether1 ] mac-address=00:0C:29:AD:F3:06
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.102.166-10.192.102.245
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=2h name=\
+    dhcp1
+/ip address
+add address=10.192.102.139/25 interface=ether1 network=10.192.102.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.102.179 client-id=1:d8:b3:70:a9:37:cd mac-address=\
+    D8:B3:70:A9:37:CD server=dhcp1
+add address=10.192.102.244 client-id=1:6c:f1:7e:3e:3a:ab comment="NVR jadid" \
+    mac-address=6C:F1:7E:3E:3A:AB server=dhcp1
+add address=10.192.102.245 client-id=1:0:17:61:10:9d:df comment="Finger #2" \
+    mac-address=00:17:61:10:9D:DF server=dhcp1
+add address=10.192.102.236 comment="RES for Server" mac-address=\
+    22:66:55:99:88:77
+add address=10.192.102.235 client-id=1:d8:b3:70:cc:fe:e5 comment=\
+    "AP Negahbani" mac-address=D8:B3:70:CC:FE:E5 server=dhcp1
+add address=10.192.102.232 client-id=1:3c:7c:3f:b8:f0:e9 disabled=yes \
+    mac-address=3C:7C:3F:B8:F1:33 server=dhcp1
+add address=10.192.102.237 client-id=1:18:c0:4d:a4:9b:76 comment=Hatamzade \
+    mac-address=18:C0:4D:A4:9B:76 server=dhcp1
+add address=10.192.102.233 client-id=1:3c:7c:3f:b8:f1:33 comment=\
+    "Mr Ganji 1st intf" mac-address=3C:7C:3F:B8:F1:33 server=dhcp1
+add address=10.192.102.229 client-id=1:cc:28:aa:34:c:77 mac-address=\
+    CC:28:AA:34:0C:77 server=dhcp1
+add address=10.192.102.216 client-id=1:3c:7c:3f:14:60:de mac-address=\
+    3C:7C:3F:14:60:DE server=dhcp1
+add address=10.192.102.218 client-id=1:cc:28:aa:33:e5:c2 mac-address=\
+    CC:28:AA:33:E5:C2 server=dhcp1
+add address=10.192.102.191 client-id=1:18:c0:4d:de:98:3c mac-address=\
+    18:C0:4D:DE:98:3C server=dhcp1
+add address=10.192.102.186 client-id=1:60:45:cb:86:2e:9e mac-address=\
+    60:45:CB:86:2E:9E server=dhcp1
+add address=10.192.102.221 client-id=1:38:2c:4a:b0:cb:2b mac-address=\
+    38:2C:4A:B0:CB:2B server=dhcp1
+add address=10.192.102.240 client-id=1:3c:7c:3f:b8:f0:e9 mac-address=\
+    3C:7C:3F:B8:F0:E9 server=dhcp1
+add address=10.192.102.212 client-id=1:60:45:cb:6d:c2:eb mac-address=\
+    60:45:CB:6D:C2:EB server=dhcp1
+add address=10.192.102.188 client-id=1:2c:56:dc:74:ca:92 mac-address=\
+    2C:56:DC:74:CA:92 server=dhcp1
+add address=10.192.102.224 client-id=1:0:1:a9:1b:89:da comment=\
+    "New Virgo Finger 2" mac-address=00:01:A9:1B:89:DA server=dhcp1
+add address=10.192.102.223 client-id=1:0:1:f5:2:20:21 comment=\
+    "New Virgo Finger 1" mac-address=00:01:F5:02:20:21 server=dhcp1
+add address=10.192.102.222 client-id=1:0:1:a9:1b:8a:65 comment=\
+    "New Virgo Finger 3" mac-address=00:01:A9:1B:8A:65 server=dhcp1
+/ip dhcp-server network
+add address=10.192.102.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=10.192.102.129 ntp-server=10.192.30.3
+/ip firewall filter
+add action=reject chain=input reject-with=icmp-host-unreachable src-address=\
+    10.192.102.245-10.192.102.246
+add action=drop chain=forward src-address=10.192.102.173-10.192.102.179
+add action=drop chain=output src-address=10.192.102.187-10.192.102.193
+add action=drop chain=input src-address=10.192.102.230-10.192.102.233
+add action=drop chain=input src-address=10.192.102.237-10.192.102.239
+/ip route
+add distance=1 gateway=10.192.102.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes port=800
+set api disabled=yes
+set winbox port=2121
+set api-ssl disabled=yes
+/system clock
+set time-zone-name=Asia/Tehran
+/system identity
+set name="Esfehan-Gharb-Sard "
+/system ntp client
+set enabled=yes primary-ntp=10.192.30.2 secondary-ntp=10.192.30.3 \
+    server-dns-names=okco.ir

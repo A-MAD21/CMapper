@@ -1,0 +1,53 @@
+# jun/27/2026 14:02:32 by RouterOS 6.47.9
+# software id = TI09-7WK3
+#
+#
+#
+/interface ethernet
+set [ find default-name=ether1 ] mac-address=00:0C:29:AD:F3:06
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip pool
+add name=dhcp_pool0 ranges=10.192.99.150-10.192.99.195
+/ip dhcp-server
+add address-pool=dhcp_pool0 disabled=no interface=ether1 lease-time=1w name=\
+    dhcp1
+/ip address
+add address=10.192.99.253/25 interface=ether1 network=10.192.99.128
+/ip cloud
+set update-time=no
+/ip dhcp-server lease
+add address=10.192.99.158 client-id=1:4:d9:f5:6:6e:b8 mac-address=\
+    04:D9:F5:06:6E:B8 server=dhcp1
+add address=10.192.99.150 client-id=1:74:56:3c:3c:6f:6e mac-address=\
+    74:56:3C:3C:6F:6E server=dhcp1
+add address=10.192.99.178 client-id=1:60:45:cb:86:2d:b6 mac-address=\
+    60:45:CB:86:2D:B6 server=dhcp1
+add address=10.192.99.189 comment="Saeedi PC" mac-address=70:4D:7B:B3:B8:F1 \
+    server=dhcp1
+add address=10.192.99.179 client-id=1:18:c0:4d:de:96:67 mac-address=\
+    18:C0:4D:DE:96:67 server=dhcp1
+add address=10.192.99.188 client-id=1:0:17:61:10:7b:a5 comment="Finger 2" \
+    mac-address=00:17:61:10:7B:A5 server=dhcp1
+add address=10.192.99.195 client-id=1:80:84:89:80:5c:5f mac-address=\
+    80:84:89:80:5C:5F server=dhcp1
+add address=10.192.99.175 client-id=1:d4:5d:64:49:23:ad mac-address=\
+    D4:5D:64:49:23:AD server=dhcp1
+add address=10.192.99.145 comment="Finger 1" mac-address=00:17:61:10:6E:0A
+add address=10.192.99.180 client-id=1:0:1:a9:1b:89:b6 comment=\
+    "New Virgo Finger Device 1" mac-address=00:01:A9:1B:89:B6 server=dhcp1
+add address=10.192.99.191 client-id=1:0:1:f5:2:1f:c2 comment="New Finge r2" \
+    mac-address=00:01:F5:02:1F:C2 server=dhcp1
+/ip dhcp-server network
+add address=10.192.99.128/25 dns-server=10.192.30.3,10.192.30.2 domain=\
+    okco.ir gateway=10.192.99.129
+/ip route
+add distance=1 gateway=10.192.99.129
+/ip service
+set telnet disabled=yes
+set ftp disabled=yes
+set www disabled=yes
+set api disabled=yes
+set api-ssl disabled=yes
+/system identity
+set name="Oroumiyeh Sard"
