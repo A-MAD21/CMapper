@@ -382,3 +382,4 @@ B6:70:1B:00:00:00-B6:70:1B:FF:FF:FF=Phone,device_type=phone
 68:E4:3B:00:00:00-68:E4:3B:FF:FF:FF=PC,device_type=pc
 48:88:CA:00:00:00-48:88:CA:FF:FF:FF=Motorolla,device_type=phone
 B4:A4:E3:00:00:00-B4:A4:E3:FF:FF:FF=Cisco Switch,device_type=switch
+64:AE:0C:00:00:00-64:AE:0C:FF:FF:FF=Cisco Switch,device_type=switch
